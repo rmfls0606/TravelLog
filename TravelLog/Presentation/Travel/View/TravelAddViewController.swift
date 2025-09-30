@@ -7,6 +7,8 @@
 
 import UIKit
 import SnapKit
+import RxSwift
+import RxCocoa
 
 final class TravelAddViewController: BaseViewController {
     
@@ -140,6 +142,9 @@ final class TravelAddViewController: BaseViewController {
         return button
     }()
     
+    private let viewModel = TravelAddViewModel()
+    private let disposeBag = DisposeBag()
+    
     // MARK: - Lifecycle
     override func configureHierarchy() {
         view.addSubview(scrollView)
@@ -237,7 +242,28 @@ final class TravelAddViewController: BaseViewController {
         navigationItem.title = "여행지 설정"
     }
     
-    // MARK: - Helper
+    override func configureBind() {
+        let input = TravelAddViewModel.Input(
+            transportTapped: Observable.merge(
+                transportButtons.map({ button in
+                    button.rx.tap
+                        .map{ Transport.allCases[button.tag] }
+                })
+            )
+        )
+        
+        let output = viewModel.transform(input: input)
+        
+        output.transportItems
+            .drive(with: self){ owner, items in
+                for (button, item) in zip(owner.transportButtons, items){
+                    button.isSelected = item.isSelected
+                }
+            }
+            .disposed(by: disposeBag)
+    }
+    
+    //MARK: - Component
     private func makeTransportButton(title: String, icon: String) -> UIButton {
         var config = UIButton.Configuration.filled()
         config.attributedTitle = AttributedString(title,
