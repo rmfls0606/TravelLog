@@ -131,16 +131,7 @@ final class TravelAddViewController: BaseViewController {
     ))
     
     // Create Button
-    private let createButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("여행 카드 생성하기", for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = .boldSystemFont(ofSize: 18)
-        button.layer.cornerRadius = 20
-        button.clipsToBounds = true
-        button.backgroundColor = .systemBlue
-        return button
-    }()
+    private let createButton = PrimaryButton(title: "여행 카드 생성하기")
     
     private let viewModel = TravelAddViewModel()
     private let disposeBag = DisposeBag()
@@ -233,7 +224,7 @@ final class TravelAddViewController: BaseViewController {
         createButton.snp.makeConstraints { make in
             make.left.right.equalToSuperview().inset(20)
             make.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
-            make.height.equalTo(56)
+            make.height.equalTo(52)
         }
     }
     
