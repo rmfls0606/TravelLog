@@ -36,11 +36,11 @@ final class FormCardView: BaseCardView {
         return view
     }()
     
-    private let textField: UITextField = {
-        let textField = UITextField()
-        textField.font = .systemFont(ofSize: 16)
-        textField.isUserInteractionEnabled = false
-        return textField
+    private let valueLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .gray
+        return label
     }()
     
     private let rightIcon: UIImageView = {
@@ -64,13 +64,13 @@ final class FormCardView: BaseCardView {
         
         addSubview(inputBackground)
         
-        inputBackground.addSubview(textField)
+        inputBackground.addSubview(valueLabel)
         inputBackground.addSubview(rightIcon)
     }
     
     override func configureLayout() {
         titleView.snp.makeConstraints { make in
-            make.top.horizontalEdges.equalToSuperview().inset(16)
+            make.top.horizontalEdges.equalToSuperview().inset(22)
         }
         
         iconView.snp.makeConstraints { make in
@@ -86,12 +86,12 @@ final class FormCardView: BaseCardView {
         }
         
         inputBackground.snp.makeConstraints { make in
-            make.top.equalTo(titleView.snp.bottom).offset(12)
-            make.horizontalEdges.bottom.equalToSuperview().inset(16)
+            make.top.equalTo(titleView.snp.bottom).offset(16)
+            make.horizontalEdges.bottom.equalToSuperview().inset(22)
             make.height.equalTo(44)
         }
         
-        textField.snp.makeConstraints { make in
+        valueLabel.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(12)
             make.centerY.equalToSuperview()
             make.trailing.equalTo(rightIcon.snp.leading).offset(-8)
@@ -112,12 +112,12 @@ final class FormCardView: BaseCardView {
         case .location(let title, let placeholder, let icon):
             titleLabel.text = title
             iconView.image = UIImage(systemName: icon)
-            textField.placeholder = placeholder
+            valueLabel.text = placeholder
             rightIcon.image = UIImage(systemName: "mappin.and.ellipse.circle")
         case .date(let title, let placeholder):
             titleLabel.text = title
             iconView.image = UIImage(systemName: "calendar")
-            textField.placeholder = placeholder
+            valueLabel.text = placeholder
             rightIcon.image = UIImage(systemName: "calendar")
         }
     }
