@@ -1,0 +1,331 @@
+//
+//  DateRangeCardView.swift
+//  TravelLog
+//
+//  Created by 이상민 on 10/1/25.
+//
+
+import UIKit
+import SnapKit
+
+enum QUickSelectOption: String, CaseIterable{
+    case oneNightTwoDays = "1박 2일"
+    case twoNightsThreeDays = "2박 3일"
+    case threeNightsFourDays = "3박 4일"
+    case oneWeek = "1주일"
+    
+    var days: Int{
+        switch self {
+        case .oneNightTwoDays:
+            return 2
+        case .twoNightsThreeDays:
+            return 3
+        case .threeNightsFourDays:
+            return 4
+        case .oneWeek:
+            return 7
+        }
+    }
+}
+
+final class DateRangeCardView: BaseView {
+    // MARK: - Header
+    private let headerStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .horizontal
+        view.alignment = .center
+        view.spacing = 8
+        return view
+    }()
+    
+    private let headerIcon: UIImageView = {
+        let view = UIImageView()
+        view.image =  UIImage(systemName: "calendar")
+        view.tintColor = .systemBlue
+        return view
+    }()
+    
+    private let headerTitle: UILabel = {
+        let label = UILabel()
+        label.text = "여행 기간"
+        label.font = .systemFont(ofSize: 16, weight: .bold)
+        label.textColor = .darkGray
+        return label
+    }()
+    
+    // MARK: - Select Box
+    private let dashedBox = UIView()
+    private let dashedLayer: CAShapeLayer = {
+        let layer = CAShapeLayer()
+        layer.strokeColor = UIColor.systemGray4.cgColor
+        layer.lineDashPattern = [4, 4]
+        layer.fillColor = UIColor.clear.cgColor
+        return layer
+    }()
+    
+    // 안내 상태 (날짜 선택 전)
+    private let placeholderStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .vertical
+        view.alignment = .center
+        view.spacing = 6
+        return view
+    }()
+    
+    private let placeholderIcon: UIImageView = {
+        let view = UIImageView()
+        view.image = UIImage(systemName: "calendar")
+        view.tintColor = .systemGray3
+        return view
+    }()
+    
+    private let placeholderLabel: UILabel = {
+        let label = UILabel()
+        label.text = "여행 날짜를 선택하세요\n출발일과 도착일을 한번에 설정"
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .lightGray
+        label.textAlignment = .center
+        label.numberOfLines = 2
+        return label
+    }()
+    
+    // 날짜 상태 (날짜 선택 후)
+    private let dateStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .vertical
+        view.alignment = .center
+        view.spacing = 12
+        view.isHidden = true
+        return view
+    }()
+    
+    private let departStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .vertical
+        view.alignment = .center
+        view.spacing = 4
+        return view
+    }()
+    
+    private let departTitle: UILabel = {
+        let label = UILabel()
+        label.text = "출발"
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .darkGray
+        return label
+    }()
+    
+    private let departDateLabel: UILabel = {
+        let label = UILabel()
+        label.font = .boldSystemFont(ofSize: 14)
+        label.textColor = .black
+        return label
+    }()
+    
+    private let arriveStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .vertical
+        view.alignment = .center
+        view.spacing = 4
+        return view
+    }()
+    
+    private let arriveTitle: UILabel = {
+        let label = UILabel()
+        label.text = "도착"
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .darkGray
+        return label
+    }()
+    
+    private let arriveDateLabel: UILabel = {
+        let label = UILabel()
+        label.font = .boldSystemFont(ofSize: 14)
+        label.textColor = .black
+        return label
+    }()
+    
+    private let leftLine: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemGray3
+        return view
+    }()
+    
+    private let rightLine: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemGray3
+        return view
+    }()
+    
+    private let transportIcon: UIImageView = {
+        let view = UIImageView()
+        view.image = UIImage(systemName: "airplane")
+        view.tintColor = .systemBlue
+        view.contentMode = .scaleAspectFit
+        return view
+    }()
+    
+    private let lineStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .horizontal
+        view.alignment = .center
+        view.spacing = 8
+        view.distribution = .fill
+        return view
+    }()
+    
+    private let durationLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        label.textColor = .systemBlue
+        return label
+    }()
+    
+    // MARK: - 빠른 선택
+    private let quickSelectTitle: UILabel = {
+        let label = UILabel()
+        label.text = "빠른 선택"
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
+        label.textColor = .darkGray
+        return label
+    }()
+    
+    private let quickSelectStack: UIStackView = {
+        let view = UIStackView()
+        view.axis = .horizontal
+        view.spacing = 8
+        view.distribution = .fillEqually
+        return view
+    }()
+    
+    private(set) var quickButtons: [UIButton] = []
+    
+    // MARK: - Gesture
+    let tapGesture = UITapGestureRecognizer()
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        dashedLayer.path = UIBezierPath(
+            roundedRect: dashedBox.bounds,
+            cornerRadius: 12
+        ).cgPath
+        dashedLayer.frame = dashedBox.bounds
+    }
+    
+    override func configureHierarchy() {
+        headerStack.addArrangedSubview(headerIcon)
+        headerStack.addArrangedSubview(headerTitle)
+        
+        placeholderStack.addArrangedSubview(placeholderIcon)
+        placeholderStack.addArrangedSubview(placeholderLabel)
+        
+        dashedBox.addSubview(placeholderStack)
+        
+        departStack.addArrangedSubview(departTitle)
+        departStack.addArrangedSubview(departDateLabel)
+        
+        arriveStack.addArrangedSubview(arriveTitle)
+        arriveStack.addArrangedSubview(arriveDateLabel)
+        
+        lineStack.addArrangedSubview(departStack)
+        lineStack.addArrangedSubview(leftLine)
+        lineStack.addArrangedSubview(transportIcon)
+        lineStack.addArrangedSubview(rightLine)
+        lineStack.addArrangedSubview(arriveStack)
+        
+        dateStack.addArrangedSubview(lineStack)
+        
+        dateStack.addArrangedSubview(durationLabel)
+        
+        dashedBox.addSubview(dateStack)
+        
+        addSubview(headerStack)
+        addSubview(dashedBox)
+        addSubview(quickSelectTitle)
+        addSubview(quickSelectStack)
+    }
+    
+    override func configureLayout() {
+        headerIcon.snp.makeConstraints { make in
+            make.size.equalTo(20)
+        }
+        
+        placeholderIcon.snp.makeConstraints { make in
+            make.size.equalTo(28)
+        }
+        
+        leftLine.snp.makeConstraints { make in
+            make.height.equalTo(1)
+            make.width.greaterThanOrEqualTo(20)
+        }
+        rightLine.snp.makeConstraints { make in
+            make.height.equalTo(1)
+            make.width.greaterThanOrEqualTo(20)
+        }
+        transportIcon.snp.makeConstraints { make in
+            make.size.equalTo(24)
+        }
+        
+        headerStack.snp.makeConstraints { make in
+            make.top.equalToSuperview().inset(16)
+            make.leading.equalToSuperview().inset(22)
+        }
+        
+        dashedBox.snp.makeConstraints { make in
+            make.top.equalTo(headerStack.snp.bottom).offset(16)
+            make.horizontalEdges.equalToSuperview().inset(22)
+            make.height.equalTo(120)
+        }
+        
+        placeholderStack.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+        dateStack.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+        }
+        
+        quickSelectTitle.snp.makeConstraints { make in
+            make.top.equalTo(dashedBox.snp.bottom).offset(16)
+            make.leading.equalToSuperview().inset(22)
+        }
+        
+        quickSelectStack.snp.makeConstraints { make in
+            make.top.equalTo(quickSelectTitle.snp.bottom).offset(8)
+            make.horizontalEdges.equalToSuperview().inset(22)
+            make.bottom.equalToSuperview().inset(16)
+            make.height.equalTo(36)
+        }
+    }
+    
+    override func configureView() {
+        dashedBox.addGestureRecognizer(tapGesture)
+        
+        backgroundColor = .white
+        layer.cornerRadius = 20
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.systemGray5.cgColor
+        
+        // Dashed Box
+        dashedBox.layer.addSublayer(dashedLayer)
+        dashedBox.layer.cornerRadius = 12
+        dashedBox.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.2)
+        
+        // Hugging & Compression
+        departStack.setContentHuggingPriority(.required, for: .horizontal)
+        arriveStack.setContentHuggingPriority(.required, for: .horizontal)
+        leftLine.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        rightLine.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        
+        QUickSelectOption.allCases.forEach { option in
+            let button = UIButton(type: .system)
+            button.setTitle(option.rawValue, for: .normal)
+            button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+            button.backgroundColor = .systemGray6
+            button.layer.cornerRadius = 8
+            button.setTitleColor(.darkGray, for: .normal)
+            quickButtons.append(button)
+            quickSelectStack.addArrangedSubview(button)
+        }
+    }
+}
