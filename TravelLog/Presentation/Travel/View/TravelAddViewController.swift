@@ -1,19 +1,13 @@
-//
-//  TravelAddViewController.swift
-//  TravelLog
-//
-//  Created by 이상민 on 9/29/25.
-//
-
 import UIKit
 import SnapKit
 import RxSwift
 import RxCocoa
 
 final class TravelAddViewController: BaseViewController {
-    
     // MARK: - UI
     private let scrollView = UIScrollView()
+    
+    private let bodyView = UIView()
     
     private let contentView: UIStackView = {
         let view = UIStackView()
@@ -107,6 +101,8 @@ final class TravelAddViewController: BaseViewController {
     
     private var transportButtons: [UIButton] = []
     
+    private let dateRangeCard = DateRangeCardView()
+    
     // FormCards
     private let departureCard = FormCardView(type: .location(
         title: "출발지",
@@ -120,16 +116,6 @@ final class TravelAddViewController: BaseViewController {
         icon: "mappin.circle.fill"
     ))
     
-    private let departDateCard = FormCardView(type: .date(
-        title: "출발 날짜",
-        placeholder: "날짜를 선택하세요"
-    ))
-    
-    private let arriveDateCard = FormCardView(type: .date(
-        title: "도착 날짜",
-        placeholder: "날짜를 선택하세요"
-    ))
-    
     // Create Button
     private let createButton = PrimaryButton(title: "여행 카드 생성하기")
     
@@ -139,7 +125,9 @@ final class TravelAddViewController: BaseViewController {
     // MARK: - Lifecycle
     override func configureHierarchy() {
         view.addSubview(scrollView)
-        scrollView.addSubview(contentView)
+        scrollView.addSubview(bodyView)
+        
+        bodyView.addSubview(contentView)
         
         // Header Section
         contentView.addArrangedSubview(headerView)
@@ -164,10 +152,9 @@ final class TravelAddViewController: BaseViewController {
         }
         
         // Form Section (출발/도착, 날짜)
+        contentView.addArrangedSubview(dateRangeCard)
         contentView.addArrangedSubview(departureCard)
         contentView.addArrangedSubview(destinationCard)
-        contentView.addArrangedSubview(departDateCard)
-        contentView.addArrangedSubview(arriveDateCard)
         
         // Create Button
         view.addSubview(createButton)
@@ -179,13 +166,13 @@ final class TravelAddViewController: BaseViewController {
             make.bottom.equalTo(createButton.snp.top).offset(-16)
         }
         
-        contentView.snp.makeConstraints { make in
+        bodyView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
             make.width.equalToSuperview()
         }
         
-        // Header
-        headerView.snp.makeConstraints { make in
+        contentView.snp.makeConstraints { make in
+            make.verticalEdges.equalToSuperview()
             make.horizontalEdges.equalToSuperview().inset(16)
         }
         
@@ -198,14 +185,14 @@ final class TravelAddViewController: BaseViewController {
             make.size.equalTo(32)
         }
         
-        // Transport Card
-        transportCard.snp.makeConstraints { make in
-            make.horizontalEdges.equalToSuperview().inset(16)
-        }
-        
         transportHeader.snp.makeConstraints { make in
             make.top.horizontalEdges.equalToSuperview().inset(22)
         }
+        
+        transportHeaderIcon.snp.makeConstraints { make in
+            make.size.equalTo(20)
+        }
+
         
         transportStack.snp.makeConstraints { make in
             make.top.equalTo(transportHeader.snp.bottom).offset(16)
@@ -213,16 +200,9 @@ final class TravelAddViewController: BaseViewController {
             make.height.equalTo(80)
         }
         
-        // Form Cards
-        [departureCard, destinationCard, departDateCard, arriveDateCard].forEach { card in
-            card.snp.makeConstraints { make in
-                make.horizontalEdges.equalToSuperview().inset(16)
-            }
-        }
-        
         // Create Button
         createButton.snp.makeConstraints { make in
-            make.left.right.equalToSuperview().inset(20)
+            make.horizontalEdges.equalToSuperview().inset(20)
             make.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
             make.height.equalTo(52)
         }
