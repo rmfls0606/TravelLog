@@ -232,6 +232,14 @@ final class TravelAddViewController: BaseViewController {
                 }
             }
             .disposed(by: disposeBag)
+        
+        dateRangeCard.tapGesture.rx.event
+            .bind(with: self) { owner, _ in
+                let vc = CalendarViewController()
+                owner.navigationController?
+                    .pushViewController(vc, animated: true)
+            }
+            .disposed(by: disposeBag)
     }
     
     //MARK: - Component
