@@ -328,4 +328,19 @@ final class DateRangeCardView: BaseView {
             quickSelectStack.addArrangedSubview(button)
         }
     }
+    
+    func updateRange(start: Date, end: Date){
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일"
+        
+        departDateLabel.text = formatter.string(from: start)
+        arriveDateLabel.text = formatter.string(from: end)
+        
+        let days = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 0
+        durationLabel.text = "\(days + 1)일 여행"
+        
+        placeholderStack.isHidden = true
+        dateStack.isHidden = false
+    }
 }
