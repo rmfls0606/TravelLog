@@ -78,7 +78,7 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
     private var selectedStartDate: Date?
     private var selectedEndDate: Date?
     
-    private(set) var selectedDateRangeRelay = PublishRelay<(Date, Date)>()
+    private(set) var selectedDateRangeRelay = PublishRelay<(start: Date, end: Date)>()
     
     let disposeBag = DisposeBag()
     
