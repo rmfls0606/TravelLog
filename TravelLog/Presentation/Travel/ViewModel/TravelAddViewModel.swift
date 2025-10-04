@@ -7,6 +7,7 @@
 
 import RxSwift
 import RxCocoa
+import Foundation
 
 struct transportItem{
     let transport: Transport
@@ -14,6 +15,8 @@ struct transportItem{
 }
 
 final class TravelAddViewModel: BaseViewModel {
+    
+    let selectedDateRelay = BehaviorRelay<(start: Date, end: Date)?>(value: nil)
     
     private let disposeBag = DisposeBag()
     
@@ -23,6 +26,7 @@ final class TravelAddViewModel: BaseViewModel {
     
     struct Output{
         private(set) var transportItems: Driver<[transportItem]>
+        private(set) var selectedDaterange: Driver<(start: Date, end: Date)?>
     }
     
     func transform(input: Input) -> Output {
@@ -42,7 +46,8 @@ final class TravelAddViewModel: BaseViewModel {
             .asDriver(onErrorDriveWith: .empty())
         
         return Output(
-            transportItems: transportItems
+            transportItems: transportItems,
+            selectedDaterange: selectedDateRelay.asDriver()
         )
     }
 }
