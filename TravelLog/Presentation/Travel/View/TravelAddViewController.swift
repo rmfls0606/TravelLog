@@ -236,18 +236,26 @@ final class TravelAddViewController: BaseViewController {
         dateRangeCard.tapGesture.rx.event
             .bind(with: self) { owner, _ in
                 let vc = CalendarViewController()
+
+                let range = owner.viewModel.selectedDateRelay.value
+                vc.updateSelectedDate(start: range?.start, end: range?.end)
                 
                 vc.selectedDateRangeRelay
-                    .bind(onNext: { range in
-                        owner.dateRangeCard
-                            .updateRange(start: range.start, end: range.end)
-                    })
+                    .bind(to: owner.viewModel.selectedDateRelay)
                     .disposed(by: vc.disposeBag)
                 
                 owner.navigationController?
                     .pushViewController(vc, animated: true)
             }
             .disposed(by: disposeBag)
+        
+        output.selectedDaterange
+            .drive(with: self) { owner, range in
+                owner.dateRangeCard
+                    .updateRange(start: range?.start, end: range?.end)
+            }
+            .disposed(by: disposeBag)
+
     }
     
     //MARK: - Component
