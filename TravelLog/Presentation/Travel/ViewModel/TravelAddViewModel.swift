@@ -16,7 +16,7 @@ struct transportItem{
 
 final class TravelAddViewModel: BaseViewModel {
     
-    let selectedDateRelay = BehaviorRelay<(start: Date, end: Date)?>(value: nil)
+    let selectedDateRelay = BehaviorRelay<(start: Date?, end: Date?)>(value: (start: nil, end: nil))
     
     private let disposeBag = DisposeBag()
     
@@ -26,7 +26,7 @@ final class TravelAddViewModel: BaseViewModel {
     
     struct Output{
         private(set) var transportItems: Driver<[transportItem]>
-        private(set) var selectedDaterange: Driver<(start: Date, end: Date)?>
+        private(set) var selectedDaterange: Driver<(start: Date?, end: Date?)>
     }
     
     func transform(input: Input) -> Output {

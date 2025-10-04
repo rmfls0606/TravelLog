@@ -238,7 +238,7 @@ final class TravelAddViewController: BaseViewController {
                 let vc = CalendarViewController()
 
                 let range = owner.viewModel.selectedDateRelay.value
-                vc.updateSelectedDate(start: range?.start, end: range?.end)
+                vc.updateSelectedDate(start: range.start, end: range.end)
                 
                 vc.selectedDateRangeRelay
                     .bind(to: owner.viewModel.selectedDateRelay)
@@ -249,13 +249,30 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
+        dateRangeCard.quickButtons.enumerated().forEach { index, button in
+            button.rx.tap
+                .bind(with: self) { owner, _ in
+                    let option = QUickSelectOption.allCases[index]
+                    
+                    let calendar = Calendar.current
+                    let startDate = Date()
+                    let endDate = calendar.date( byAdding: .day,
+                                                 value: option.days - 1,
+                                                 to: startDate
+                    )
+                    
+                    owner.viewModel.selectedDateRelay.accept((start: startDate, end: endDate))
+                    owner.dateRangeCard.updateRange(start: startDate, end: endDate)
+                }
+                .disposed(by: disposeBag)
+        }
+        
         output.selectedDaterange
             .drive(with: self) { owner, range in
                 owner.dateRangeCard
-                    .updateRange(start: range?.start, end: range?.end)
+                    .updateRange(start: range.start, end: range.end)
             }
             .disposed(by: disposeBag)
-
     }
     
     //MARK: - Component
