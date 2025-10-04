@@ -60,7 +60,7 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
         label.text = "선택된 기간"
         label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.textColor = .systemBlue
-        label.textAlignment = .center   // ✅ 중앙 정렬
+        label.textAlignment = .center // 중앙 정렬
         return label
     }()
     
@@ -273,5 +273,10 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
             confirmButton.isEnabled = false
             confirmButton.alpha = 0.5   // 비활성화 (시각적으로 흐리게)
         }
+    }
+    
+    func updateSelectedDate(start: Date?, end: Date?){
+        selectedStartDate = start
+        selectedEndDate = end
     }
 }
