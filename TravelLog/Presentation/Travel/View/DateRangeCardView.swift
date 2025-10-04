@@ -329,7 +329,9 @@ final class DateRangeCardView: BaseView {
         }
     }
     
-    func updateRange(start: Date, end: Date){
+    func updateRange(start: Date?, end: Date?){
+        guard let start, let end else { return }
+        
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "M월 d일"
