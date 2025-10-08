@@ -104,17 +104,17 @@ final class TravelAddViewController: BaseViewController {
     private let dateRangeCard = DateRangeCardView()
     
     // FormCards
-    private let departureCard = FormCardView(type: .location(
+    private let departureCard = LocationCardView(
         title: "출발지",
         placeholder: "어디서 출발하시나요?",
         icon: "mappin.circle"
-    ))
+    )
     
-    private let destinationCard = FormCardView(type: .location(
+    private let destinationCard = LocationCardView(
         title: "도착지",
         placeholder: "어디로 가시나요?",
         icon: "mappin.circle.fill"
-    ))
+    )
     
     // Create Button
     private let createButton = PrimaryButton(title: "여행 카드 생성하기")
@@ -122,7 +122,6 @@ final class TravelAddViewController: BaseViewController {
     private let viewModel = TravelAddViewModel()
     private let disposeBag = DisposeBag()
     
-    // MARK: - Lifecycle
     override func configureHierarchy() {
         view.addSubview(scrollView)
         scrollView.addSubview(bodyView)

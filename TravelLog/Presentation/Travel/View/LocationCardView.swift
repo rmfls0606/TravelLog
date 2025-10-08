@@ -1,19 +1,14 @@
 //
-//  FormCardView.swift
+//  LocationCardView.swift
 //  TravelLog
 //
-//  Created by 이상민 on 9/30/25.
+//  Created by 이상민 on 10/9/25.
 //
 
 import UIKit
 import SnapKit
 
-enum FormCardType{
-    case location(title: String, placeholder: String, icon: String)
-    case date(title: String, placeholder: String)
-}
-
-final class FormCardView: BaseCardView {
+final class LocationCardView: BaseCardView {
     private let titleView = UIView()
     
     private let titleLabel: UILabel = {
@@ -45,25 +40,25 @@ final class FormCardView: BaseCardView {
     
     private let rightIcon: UIImageView = {
         let view = UIImageView()
+        view.image = UIImage(systemName: "mappin.and.ellipse.circle")
         view.tintColor = .systemBlue
         return view
     }()
     
-    private let type: FormCardType
-    
-    init(type: FormCardType){
-        self.type = type
+    init(title: String, placeholder: String, icon: String) {
         super.init(frame: .zero)
+        
+        titleLabel.text = title
+        valueLabel.text = placeholder
+        iconView.image = UIImage(systemName: icon)
     }
     
     override func configureHierarchy() {
         addSubview(titleView)
-        
         titleView.addSubview(iconView)
         titleView.addSubview(titleLabel)
         
         addSubview(inputBackground)
-        
         inputBackground.addSubview(valueLabel)
         inputBackground.addSubview(rightIcon)
     }
@@ -80,9 +75,8 @@ final class FormCardView: BaseCardView {
         }
         
         titleLabel.snp.makeConstraints { make in
-            make.centerY.equalTo(titleView)
+            make.centerY.equalTo(iconView)
             make.leading.equalTo(iconView.snp.trailing).offset(8)
-            make.verticalEdges.equalToSuperview()
         }
         
         inputBackground.snp.makeConstraints { make in
@@ -103,22 +97,9 @@ final class FormCardView: BaseCardView {
             make.size.equalTo(20)
         }
     }
-    
+
     override func configureView() {
         super.configureView()
         backgroundColor = .white
-        
-        switch type {
-        case .location(let title, let placeholder, let icon):
-            titleLabel.text = title
-            iconView.image = UIImage(systemName: icon)
-            valueLabel.text = placeholder
-            rightIcon.image = UIImage(systemName: "mappin.and.ellipse.circle")
-        case .date(let title, let placeholder):
-            titleLabel.text = title
-            iconView.image = UIImage(systemName: "calendar")
-            valueLabel.text = placeholder
-            rightIcon.image = UIImage(systemName: "calendar")
-        }
     }
 }
