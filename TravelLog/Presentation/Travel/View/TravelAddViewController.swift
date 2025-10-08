@@ -232,6 +232,13 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
+        output.selectedTransport
+            .drive(with: self){ owner, transport in
+                owner.dateRangeCard
+                    .updateTransportIcon(name: transport.iconName)
+            }
+            .disposed(by: disposeBag)
+        
         dateRangeCard.tapGesture.rx.event
             .bind(with: self) { owner, _ in
                 let vc = CalendarViewController()

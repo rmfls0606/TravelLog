@@ -345,4 +345,8 @@ final class DateRangeCardView: BaseView {
         placeholderStack.isHidden = true
         dateStack.isHidden = false
     }
+    
+    func updateTransportIcon(name: String){
+        transportIcon.image = UIImage(systemName: name)
+    }
 }

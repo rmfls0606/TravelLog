@@ -26,6 +26,7 @@ final class TravelAddViewModel: BaseViewModel {
     
     struct Output{
         private(set) var transportItems: Driver<[transportItem]>
+        private(set) var selectedTransport: Driver<Transport>
         private(set) var selectedDaterange: Driver<(start: Date?, end: Date?)>
     }
     
@@ -38,8 +39,7 @@ final class TravelAddViewModel: BaseViewModel {
         
         let transportItems = selectedTransport
             .map { selected in
-                Transport.allCases
-                    .map{
+                Transport.allCases.map{
                         transportItem(transport: $0, isSelected: $0 == selected)
                     }
             }
@@ -47,6 +47,7 @@ final class TravelAddViewModel: BaseViewModel {
         
         return Output(
             transportItems: transportItems,
+            selectedTransport: selectedTransport.asDriver(),
             selectedDaterange: selectedDateRelay.asDriver()
         )
     }
