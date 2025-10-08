@@ -8,28 +8,63 @@
 import UIKit
 import SnapKit
 
-final class CityTableViewCell: UITableViewCell {
-    private let cityLabel = UILabel()
-    private let regionLabel = UILabel()
+final class CityTableViewCell: BaseTableViewCell {
     
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: style, reuseIdentifier: reuseIdentifier)
-        setupUI()
+    // MARK: - UI
+    private let cityLabel: UILabel = {
+        let label = UILabel()
+        label.font = .boldSystemFont(ofSize: 16)
+        label.textColor = .black
+        return label
+    }()
+    
+    private let countryLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .gray
+        return label
+    }()
+    
+    private let chevronIcon: UIImageView = {
+        let view = UIImageView(image: UIImage(systemName: "chevron.right"))
+        view.tintColor = .systemGray3
+        view.contentMode = .scaleAspectFit
+        return view
+    }()
+    
+    private let stackView: UIStackView = {
+        let view = UIStackView()
+        view.axis = .vertical
+        view.spacing = 4
+        return view
+    }()
+    
+    // MARK: - Lifecycle
+    override func configureHierarchy() {
+        stackView.addArrangedSubview(cityLabel)
+        stackView.addArrangedSubview(countryLabel)
+        contentView.addSubview(stackView)
+        contentView.addSubview(chevronIcon)
     }
-    required init?(coder: NSCoder) { fatalError() }
     
-    private func setupUI() {
-        cityLabel.font = .boldSystemFont(ofSize: 16)
-        regionLabel.font = .systemFont(ofSize: 14)
-        regionLabel.textColor = .gray
-        
-        let stack = UIStackView(arrangedSubviews: [cityLabel, regionLabel])
-        stack.axis = .vertical
-        stack.spacing = 4
-        contentView.addSubview(stack)
-        stack.snp.makeConstraints { $0.edges.equalToSuperview().inset(12) }
+    override func configureLayout() {
+        stackView.snp.makeConstraints {
+            $0.verticalEdges.equalToSuperview().inset(8)
+            $0.horizontalEdges.equalToSuperview().inset(16)
+        }
+        chevronIcon.snp.makeConstraints {
+            $0.centerY.equalToSuperview()
+            $0.trailing.equalToSuperview().inset(16)
+            $0.size.equalTo(14)
+        }
     }
     
+    override func configureView() {
+        backgroundColor = .white
+        selectionStyle = .none
+    }
+    
+    // MARK: - Configure
     func configure(with city: City) {
         var formattedCity = city.name
         
@@ -48,6 +83,6 @@ final class CityTableViewCell: UITableViewCell {
         }
         
         cityLabel.text = formattedCity
-        regionLabel.text = "\(city.region)"
+        countryLabel.text = "\(city.region)"
     }
 }

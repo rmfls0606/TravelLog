@@ -18,7 +18,7 @@ final class DestinationSelectorViewController: BaseViewController {
     
     private let searchField: UITextField = {
         let field = UITextField()
-        field.placeholder = "공항명 또는 도시명 검색"
+        field.placeholder = "도시명 검색"
         field.layer.cornerRadius = 12
         field.layer.borderWidth = 1.0
         field.layer.borderColor = UIColor.systemBlue.cgColor
