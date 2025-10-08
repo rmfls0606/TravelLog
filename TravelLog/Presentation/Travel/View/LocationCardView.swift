@@ -9,6 +9,9 @@ import UIKit
 import SnapKit
 
 final class LocationCardView: BaseCardView {
+    
+    let tapGesture = UITapGestureRecognizer()
+    
     private let titleView = UIView()
     
     private let titleLabel: UILabel = {
@@ -97,9 +100,15 @@ final class LocationCardView: BaseCardView {
             make.size.equalTo(20)
         }
     }
-
+    
     override func configureView() {
         super.configureView()
         backgroundColor = .white
+        inputBackground.addGestureRecognizer(tapGesture)
+    }
+    
+    func updateValue(_ text: String) {
+        valueLabel.text = text
+        valueLabel.textColor = .black
     }
 }

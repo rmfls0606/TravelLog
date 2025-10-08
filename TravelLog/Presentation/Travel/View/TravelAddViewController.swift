@@ -191,7 +191,7 @@ final class TravelAddViewController: BaseViewController {
         transportHeaderIcon.snp.makeConstraints { make in
             make.size.equalTo(20)
         }
-
+        
         
         transportStack.snp.makeConstraints { make in
             make.top.equalTo(transportHeader.snp.bottom).offset(16)
@@ -272,13 +272,42 @@ final class TravelAddViewController: BaseViewController {
                     .updateRange(start: range.start, end: range.end)
             }
             .disposed(by: disposeBag)
+        
+        departureCard.tapGesture.rx.event
+            .bind(with: self) { owner, _ in
+                let vc = DestinationSelectorViewController()
+                
+                vc.selectedCity
+                    .bind(with: self) { owner, city in
+                        owner.departureCard.updateValue(city.name)
+                    }
+                    .disposed(by: vc.disposeBag)
+                
+                owner.navigationController?.pushViewController(vc, animated: true)
+            }
+            .disposed(by: disposeBag)
+        
+        
+        destinationCard.tapGesture.rx.event
+            .bind(with: self) { owner, _ in
+                let vc = DestinationSelectorViewController()
+                
+                vc.selectedCity
+                    .bind(with: self) { owner, city in
+                        owner.destinationCard.updateValue(city.name)
+                    }
+                    .disposed(by: vc.disposeBag)
+                
+                owner.navigationController?.pushViewController(vc, animated: true)
+            }
+            .disposed(by: disposeBag)
     }
     
     //MARK: - Component
     private func makeTransportButton(title: String, icon: String) -> UIButton {
         var config = UIButton.Configuration.filled()
         config.attributedTitle = AttributedString(title,
-            attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 12)])
+                                                  attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 12)])
         )
         let imageConfig = UIImage.SymbolConfiguration(scale: .medium)
         config.preferredSymbolConfigurationForImage = imageConfig

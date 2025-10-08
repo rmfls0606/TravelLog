@@ -11,8 +11,10 @@ import RxSwift
 import RxCocoa
 
 final class DestinationSelectorViewController: BaseViewController {
-    private let disposeBag = DisposeBag()
+    private(set) var disposeBag = DisposeBag()
     private let viewModel = DestinationViewModel()
+    
+    let selectedCity = PublishRelay<City>()
     
     private let searchField: UITextField = {
         let field = UITextField()
@@ -26,22 +28,22 @@ final class DestinationSelectorViewController: BaseViewController {
         field.textColor = .darkGray
         field.leftViewMode = .always
         field.rightViewMode = .always
-
+        
         let iconContainer = UIView(frame: CGRect(x: 0, y: 0, width: 48, height: 20))
         let leftIcon = UIImageView(image: UIImage(systemName: "magnifyingglass"))
         leftIcon.tintColor = .gray
         leftIcon.contentMode = .scaleAspectFit
         leftIcon.frame = CGRect(x: 12, y: 0, width: 20, height: 20)
         iconContainer.addSubview(leftIcon)
-
+        
         field.leftView = iconContainer
-
+        
         let rightPaddingView = UIView(frame: CGRect(x: 0, y: 0, width: 32, height: 20))
         field.rightView = rightPaddingView
-
+        
         field.borderStyle = .none
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
+        
         return field
     }()
     
@@ -87,13 +89,20 @@ final class DestinationSelectorViewController: BaseViewController {
         let output = viewModel.transform(input: input)
         
         output.cities
-                    .drive(tableView.rx.items(
-                        cellIdentifier: CityTableViewCell.identifier,
-                        cellType: CityTableViewCell.self
-                    )) { _, city, cell in
-                        cell.configure(with: city)
-                    }
-                    .disposed(by: disposeBag)
+            .drive(tableView.rx.items(
+                cellIdentifier: CityTableViewCell.identifier,
+                cellType: CityTableViewCell.self
+            )) { _, city, cell in
+                cell.configure(with: city)
+            }
+            .disposed(by: disposeBag)
+        
+        tableView.rx.modelSelected(City.self)
+            .bind(with: self) { owner, city in
+                owner.selectedCity.accept(city)
+                owner.navigationController?.popViewController(animated: true)
+            }
+            .disposed(by: disposeBag)
     }
 }
 
