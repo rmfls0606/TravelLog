@@ -85,10 +85,12 @@ final class DestinationSelectorViewController: BaseViewController {
     
     // MARK: - Binding
     override func configureBind() {
-        let input = DestinationViewModel.Input()
+        let input = DestinationViewModel.Input(
+            searchCityText: searchField.rx.text.orEmpty
+        )
         let output = viewModel.transform(input: input)
         
-        output.cities
+        output.filteredCities
             .drive(tableView.rx.items(
                 cellIdentifier: CityTableViewCell.identifier,
                 cellType: CityTableViewCell.self
