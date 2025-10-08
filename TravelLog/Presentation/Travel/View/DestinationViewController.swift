@@ -55,6 +55,12 @@ final class DestinationSelectorViewController: BaseViewController {
         return table
     }()
     
+    private lazy var emptyView = EmptyView(
+        iconName: "magnifyingglass",
+        title: "검색 결과가 없습니다.",
+        subtitle: "도시 이름을 입력해보세요.\n단어가 한글 혹은 영어로 정확한지 확인해보세요."
+    )
+    
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(searchField)
@@ -96,6 +102,16 @@ final class DestinationSelectorViewController: BaseViewController {
                 cellType: CityTableViewCell.self
             )) { _, city, cell in
                 cell.configure(with: city)
+            }
+            .disposed(by: disposeBag)
+        
+        output.filteredCities
+            .drive(with: self) { owner, cities in
+                if cities.isEmpty {
+                    owner.tableView.backgroundView = owner.emptyView
+                } else {
+                    owner.tableView.backgroundView = nil
+                }
             }
             .disposed(by: disposeBag)
         

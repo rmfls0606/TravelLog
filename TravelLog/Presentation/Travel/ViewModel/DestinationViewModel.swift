@@ -11,7 +11,7 @@ import RxCocoa
 
 final class DestinationViewModel {
     private let disposeBag = DisposeBag()
-    private let repository = CityRepositoryImpl()
+    private let fetchCitiesUseCase = FetchCitiesUseCaseImpl()
     
     struct Input {
         let searchCityText: ControlProperty<String>
@@ -21,19 +21,17 @@ final class DestinationViewModel {
     }
     
     func transform(input: Input) -> Output {
-        let cities = repository.fetchCities()
-            .asObservable()
-            .share(replay: 1)
+        let cities = fetchCitiesUseCase.execute()
+            .asDriver(onErrorJustReturn: [])
         
-        let filteredCities = Observable<[City]>
-            .combineLatest(cities, input.searchCityText) { cities, query in
+        let filteredCities = Driver
+            .combineLatest(cities, input.searchCityText.asDriver()) { cities, query in
                 let trimmed = query.trimmingCharacters(in: .whitespaces)
                 guard !trimmed.isEmpty else { return cities }
                 return cities.filter { $0.name.localizedCaseInsensitiveContains(trimmed) ||
                     $0.id.localizedCaseInsensitiveContains(trimmed)
                 }
             }
-            .asDriver(onErrorJustReturn: [])
         
         return Output(
             filteredCities: filteredCities
