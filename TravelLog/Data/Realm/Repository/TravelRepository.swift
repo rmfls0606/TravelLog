@@ -17,6 +17,8 @@ protocol TravelRepositoryType {
         endDate: Date,
         transport: Transport
     ) -> Completable
+    
+    func fetchTrips() -> Observable<[TravelTable]>
 }
 
 final class TravelRepository: TravelRepositoryType {
@@ -26,7 +28,6 @@ final class TravelRepository: TravelRepositoryType {
     init() {
         do {
             realm = try Realm()
-            print(realm.configuration.fileURL)
         } catch {
             fatalError("Realm 초기화 실패: \(error)")
         }
@@ -70,5 +71,13 @@ final class TravelRepository: TravelRepositoryType {
             
             return Disposables.create()
         }
+    }
+    
+    func fetchTrips() -> Observable<[TravelTable]> {
+        let results = realm.objects(TravelTable.self)
+            .sorted(byKeyPath: "endDate", ascending: true)    // 2순위: 도착일
+            .sorted(byKeyPath: "startDate", ascending: true)  // 1순위: 출발일
+        
+        return Observable.just(Array(results))
     }
 }
