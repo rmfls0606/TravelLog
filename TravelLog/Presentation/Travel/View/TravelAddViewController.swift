@@ -219,7 +219,8 @@ final class TravelAddViewController: BaseViewController {
                     button.rx.tap
                         .map{ Transport.allCases[button.tag] }
                 })
-            )
+            ),
+            createButtonTapped: createButton.rx.tap
         )
         
         let output = viewModel.transform(input: input)
@@ -236,13 +237,14 @@ final class TravelAddViewController: BaseViewController {
             .drive(with: self){ owner, transport in
                 owner.dateRangeCard
                     .updateTransportIcon(name: transport.iconName)
+                owner.viewModel.selectedTransportRelay.accept(transport)
             }
             .disposed(by: disposeBag)
         
         dateRangeCard.tapGesture.rx.event
             .bind(with: self) { owner, _ in
                 let vc = CalendarViewController()
-
+                
                 let range = owner.viewModel.selectedDateRelay.value
                 vc.updateSelectedDate(start: range.start, end: range.end)
                 
@@ -285,8 +287,9 @@ final class TravelAddViewController: BaseViewController {
                 let vc = DestinationSelectorViewController()
                 
                 vc.selectedCity
-                    .bind(with: self) { owner, city in
+                    .bind(with: owner) { owner, city in
                         owner.departureCard.updateValue(city.name)
+                        owner.viewModel.departureRelay.accept(CityTable(from: city))
                     }
                     .disposed(by: vc.disposeBag)
                 
@@ -302,10 +305,25 @@ final class TravelAddViewController: BaseViewController {
                 vc.selectedCity
                     .bind(with: self) { owner, city in
                         owner.destinationCard.updateValue(city.name)
+                        owner.viewModel.destinationRelay
+                            .accept(CityTable(from: city))
                     }
                     .disposed(by: vc.disposeBag)
                 
                 owner.navigationController?.pushViewController(vc, animated: true)
+            }
+            .disposed(by: disposeBag)
+        
+        output.saveCompleted
+            .emit(with: self) { owner, _ in
+                print("여행 저장 완료!")
+            }
+            .disposed(by: disposeBag)
+        
+        // 저장 실패 시 알림
+        output.saveError
+            .emit(with: self) { owner, message in
+                print("저장 실패:", message)
             }
             .disposed(by: disposeBag)
     }
