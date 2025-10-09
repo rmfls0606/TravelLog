@@ -317,6 +317,7 @@ final class TravelAddViewController: BaseViewController {
         output.saveCompleted
             .emit(with: self) { owner, _ in
                 print("여행 저장 완료!")
+                owner.navigationController?.popViewController(animated: true)
             }
             .disposed(by: disposeBag)
         

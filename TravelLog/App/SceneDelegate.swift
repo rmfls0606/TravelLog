@@ -20,7 +20,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         window = UIWindow(windowScene: windowScene)
         
-        let vc = TravelAddViewController()
+        let vc = TripsViewController()
         let nav = UINavigationController(rootViewController: vc)
         
         window?.rootViewController = nav
