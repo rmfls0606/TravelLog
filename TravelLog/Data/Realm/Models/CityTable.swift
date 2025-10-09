@@ -1,0 +1,64 @@
+//
+//  CityTable.swift
+//  TravelLog
+//
+//  Created by 이상민 on 10/9/25.
+//
+
+import Foundation
+import RealmSwift
+
+final class CityTable: Object {
+    @Persisted(primaryKey: true) var id: ObjectId
+    
+    @Persisted var name: String // 도시명 (예: 파리)
+    @Persisted var nameEn: String // 영어 도시명 (예: 파리)
+    @Persisted var country: String // 나라명 (예: 프랑스)
+    @Persisted var continent: String // 대륙명 (예: 유럽)
+    
+    @Persisted var iataCode: String? // 공항 코드 (CDG 등)
+    @Persisted var latitude: Double // 위도
+    @Persisted var longitude: Double // 경도
+    
+    @Persisted var imageURL: String? // 도시 대표 이미지
+    @Persisted var lastUpdated: Date = Date() // 마지막 갱신일
+    
+    // 역참조
+    @Persisted(originProperty: "departure") var asDeparture: LinkingObjects<TravelTable>
+    @Persisted(originProperty: "destination") var asDestination: LinkingObjects<TravelTable>
+    
+    convenience init(
+        name: String,
+        nameEn: String,
+        country: String,
+        continent: String,
+        iataCode: String? = nil,
+        latitude: Double = 0,
+        longitude: Double = 0,
+        imageURL: String? = nil,
+    ) {
+        self.init()
+        self.name = name
+        self.nameEn = nameEn
+        self.country = country
+        self.continent = continent
+        self.iataCode = iataCode
+        self.latitude = latitude
+        self.longitude = longitude
+        self.imageURL = imageURL
+    }
+}
+
+extension CityTable {
+    convenience init(from city: City) {
+        self.init()
+        self.name = city.name
+        self.nameEn = city.id
+        self.country = city.country
+        self.continent = "Asia"
+        self.iataCode = nil
+        self.latitude = 0
+        self.longitude = 0
+        self.imageURL = nil
+    }
+}
