@@ -31,14 +31,12 @@ final class JournalTimelineViewModel: BaseViewModel {
     }
 
     func transform(input: Input) -> Output {
-        // ✅ fetch 시 Observable을 Driver로 변환
         let journals = input.viewWillAppear
             .flatMapLatest { [weak self] _ -> Observable<[JournalTable]> in
                 guard let self = self else { return .just([]) }
-                
                 return self.useCase.fetchJournals(tripId: self.tripId)
             }
-            .asDriver(onErrorJustReturn: []) // ✅ 여기서 변환 완료
+            .asDriver(onErrorJustReturn: [])
 
         let navigateToAdd = input.addTapped
             .map { [weak self] in self?.tripId }
