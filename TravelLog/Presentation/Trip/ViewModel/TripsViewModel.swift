@@ -10,15 +10,13 @@ import RxSwift
 import RxCocoa
 
 final class TripsViewModel: BaseViewModel {
-
+    
     struct Input {
         let viewWillAppear: Observable<Void>
-        let tripSelected: Observable<TravelTable>
     }
 
     struct Output {
         let trips: Driver<[TravelTable]>
-        let selectedTrip: Signal<TravelTable>
     }
 
     private let repository: TravelRepositoryType
@@ -38,9 +36,6 @@ final class TripsViewModel: BaseViewModel {
             .bind(to: tripsRelay)
             .disposed(by: disposeBag)
         
-        return Output(
-            trips: tripsRelay.asDriver(),
-            selectedTrip: input.tripSelected.asSignal(onErrorSignalWith: .empty())
-        )
+        return Output(trips: tripsRelay.asDriver())
     }
 }
