@@ -120,45 +120,30 @@ final class JournalTextBlockView: UIView {
         
         // Rx 바인딩
         textView.rx.text.orEmpty
-                    .map { text -> String in
-                        // ⚠️ 엔터·공백만 입력한 경우는 빈 문자열로 처리
-                        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            return ""
-                        }
-                        return text
-                    }
-                    .distinctUntilChanged()
-                    .bind(with: self) { owner, text in
-                        // ✅ placeholder 표시/숨김
-                        owner.placeholderLabel.isHidden = !text.isEmpty
-                        
-                        // ✅ 텍스트 변경 이벤트 전달
-                        owner.textChanged.accept(text)
-                    }
-                    .disposed(by: disposeBag)
+            .map { text -> String in
+                // ⚠️ 엔터·공백만 입력한 경우는 빈 문자열로 처리
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return ""
+                }
+                return text
+            }
+            .distinctUntilChanged()
+            .bind(with: self) { owner, text in
+                // ✅ placeholder 표시/숨김
+                owner.placeholderLabel.isHidden = !text.isEmpty
+                
+                // ✅ 텍스트 변경 이벤트 전달
+                owner.textChanged.accept(text)
+            }
+            .disposed(by: disposeBag)
         
         removeButton.rx.tap
             .bind(to: removeTapped)
             .disposed(by: disposeBag)
     }
     
-    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            if text == "\n" {
-                // 엔터 입력 → 단순 개행 허용, 저장 trigger 없음
-                return true
-            }
-            return true
-        }
-
-        // ✅ 텍스트가 바뀔 때마다 (엔터 제외) ViewModel로 전달
-        func textViewDidChange(_ textView: UITextView) {
-            let current = textView.text ?? ""
-            // 🔸 1. 줄바꿈만 있는 변경은 무시
-            guard !current.hasSuffix("\n") else { return }
-            // 🔸 2. 중복 저장 방지
-            guard current != lastSentText else { return }
-
-            lastSentText = current
-            textChanged.accept(current)
-        }
+    // MARK: - Public Accessors
+    var textContent: String {
+        return textView.text ?? ""
+    }
 }
