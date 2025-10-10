@@ -78,6 +78,20 @@ final class JournalTimelineViewController: BaseViewController {
                 owner.tableView.isHidden = journals.isEmpty
             }
             .disposed(by: disposeBag)
+        
+        output.navigateToAdd
+            .emit(with: self) { owner, tripId in
+                // ✅ ViewModel 생성
+                let addViewModel = JournalAddViewModel(tripId: tripId)
+                
+                // ✅ ViewController 생성
+                let addVC = JournalAddViewController(viewModel: addViewModel)
+                addVC.hidesBottomBarWhenPushed = true
+                
+                // ✅ 네비게이션 이동
+                owner.navigationController?.pushViewController(addVC, animated: true)
+            }
+            .disposed(by: disposeBag)
     }
 }
 
