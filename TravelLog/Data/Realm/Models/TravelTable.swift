@@ -23,6 +23,8 @@ final class TravelTable: Object {
     @Persisted var createdAt: Date //생성 일자
     @Persisted var updateAt: Date //업데이트 일자
     
+    @Persisted var journals: List<JournalTable>
+    
     convenience init(
         departure: CityTable,
         destination: CityTable,
