@@ -10,7 +10,7 @@ import SnapKit
 import RxSwift
 import RxCocoa
 
-final class JournalTextBlockView: UIView {
+final class JournalTextBlockView: UIView, UITextViewDelegate {
     
     // MARK: - UI
     private let headerStack = UIStackView()
@@ -20,7 +20,7 @@ final class JournalTextBlockView: UIView {
     private let removeButton = UIButton(type: .system)
     
     private let textContainer = UIView()
-    private let textView = UITextView()
+    let textView = UITextView()
     private let placeholderLabel = UILabel()
     
     // MARK: - Rx
@@ -58,6 +58,8 @@ final class JournalTextBlockView: UIView {
         headerStack.axis = .horizontal
         headerStack.alignment = .center
         headerStack.spacing = 6
+        
+        textView.delegate = self
     }
     
     private func setupLayout() {
@@ -141,6 +143,15 @@ final class JournalTextBlockView: UIView {
             .bind(to: removeTapped)
             .disposed(by: disposeBag)
     }
+    
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+           // ✅ Return 키 누를 시 키보드 내리기
+           if text == "\n" {
+               textView.resignFirstResponder()
+               return false
+           }
+           return true
+       }
     
     // MARK: - Public Accessors
     var textContent: String {

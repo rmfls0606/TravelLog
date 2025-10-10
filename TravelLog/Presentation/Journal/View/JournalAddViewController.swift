@@ -89,6 +89,16 @@ final class JournalAddViewController: BaseViewController {
         saveButton.backgroundColor = .systemGray4
         saveButton.layer.cornerRadius = 12
         saveButton.isEnabled = false
+        
+        let tapGesture = UITapGestureRecognizer()
+            tapGesture.cancelsTouchesInView = false
+            view.addGestureRecognizer(tapGesture)
+            
+            tapGesture.rx.event
+                .bind(with: self) { owner, _ in
+                    owner.view.endEditing(true)
+                }
+                .disposed(by: disposeBag)
     }
     
     override func configureBind() {
