@@ -106,6 +106,19 @@ final class TripsViewController: BaseViewController {
                 owner.navigationController?.pushViewController(vc, animated: true)
             }
             .disposed(by: disposeBag)
+        
+        tableView.rx.modelDeleted(TravelTable.self)
+                .bind(with: self) { owner, trip in
+                    owner.viewModel.deleteTrip(trip)
+                }
+                .disposed(by: disposeBag)
+            
+            // ✅ 스와이프 삭제 액션 설정
+            tableView.rx.itemDeleted
+                .bind(with: self) { owner, indexPath in
+                    print("삭제됨: \(indexPath)")
+                }
+                .disposed(by: disposeBag)
     }
 }
 

@@ -18,6 +18,7 @@ final class TripsViewModel: BaseViewModel {
     struct Output {
         let trips: Driver<[TravelTable]>
     }
+    private let reloadTrigger = PublishRelay<Void>()
 
     private let repository: TravelRepositoryType
     private let disposeBag = DisposeBag()
@@ -38,4 +39,8 @@ final class TripsViewModel: BaseViewModel {
         
         return Output(trips: tripsRelay.asDriver())
     }
+    func deleteTrip(_ trip: TravelTable) {
+            repository.deleteTravel(trip)
+        reloadTrigger.accept(()) 
+        }
 }
