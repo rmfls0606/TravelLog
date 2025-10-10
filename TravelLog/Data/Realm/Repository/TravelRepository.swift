@@ -29,7 +29,6 @@ final class TravelRepository: TravelRepositoryType {
     init() {
         do {
             realm = try Realm()
-            print(realm.configuration.fileURL)
         } catch {
             fatalError("Realm 초기화 실패: \(error)")
         }
@@ -108,24 +107,24 @@ final class TravelRepository: TravelRepositoryType {
     func deleteTravel(_ trip: TravelTable) {
         do {
             try realm.write {
-                // 1️⃣ tripId로 연결된 JournalTable 모두 찾기
+                //tripId로 연결된 JournalTable 모두 찾기
                 let journals = realm.objects(JournalTable.self)
                     .filter("tripId == %@", trip.id)
                 
-                // 2️⃣ 각 Journal의 blocks 삭제
+                //각 Journal의 blocks 삭제
                 for journal in journals {
                     realm.delete(journal.blocks)
                 }
                 
-                // 3️⃣ JournalTable 삭제
+                //JournalTable 삭제
                 realm.delete(journals)
                 
-                // 4️⃣ TravelTable 삭제
+                //TravelTable 삭제
                 realm.delete(trip)
             }
-            print("✅ 여행 및 관련 일지/블록 모두 삭제 완료")
+            print("여행 및 관련 일지/블록 모두 삭제 완료")
         } catch {
-            print("❌ 삭제 실패:", error.localizedDescription)
+            print("삭제 실패:", error.localizedDescription)
         }
     }
 }
