@@ -10,7 +10,9 @@ import RxCocoa
 import Foundation
 
 final class TravelAddViewModel: BaseViewModel {
-    let selectedDateRelay = BehaviorRelay<(start: Date?, end: Date?)>(value: (start: nil, end: nil))
+    
+    private(set) var selectedDateRelay = BehaviorRelay<(start: Date?, end: Date?)>(value: (nil, nil))
+    
     let departureRelay = PublishRelay<CityTable>()
     let destinationRelay = PublishRelay<CityTable>()
     
@@ -24,22 +26,33 @@ final class TravelAddViewModel: BaseViewModel {
     
     struct Input{
         let transportSelected: Observable<Transport>
+        let dateSelected: Observable<(Date?, Date?)>
+        let calendarTapped: Observable<Void>
         let createButtonTapped: ControlEvent<Void>
     }
     
     struct Output{
         private(set) var selectedTransport: Driver<Transport>
         private(set) var selectedDaterange: Driver<(start: Date?, end: Date?)>
+        private(set) var showCalendar: Signal<Void>
         private(set) var saveCompleted: Signal<Void>
         private(set) var saveError: Signal<String>
     }
     
     func transform(input: Input) -> Output {
         let selectedTransportRelay = BehaviorRelay<Transport>(value: .airplane)
-
+       
         input.transportSelected
             .bind(to: selectedTransportRelay)
             .disposed(by: disposeBag)
+        
+        input.dateSelected
+            .map{(start: $0.0, end: $0.1)}
+            .bind(to: selectedDateRelay)
+            .disposed(by: disposeBag)
+        
+        let showCalendar = input.calendarTapped
+            .asSignal(onErrorJustReturn: ())
         
         let saveResult = input.createButtonTapped
             .withLatestFrom(Observable.combineLatest(
@@ -83,6 +96,7 @@ final class TravelAddViewModel: BaseViewModel {
         return Output(
             selectedTransport: selectedTransportRelay.asDriver(),
             selectedDaterange: selectedDateRelay.asDriver(),
+            showCalendar: showCalendar,
             saveCompleted: saveCompleted,
             saveError: saveError
         )

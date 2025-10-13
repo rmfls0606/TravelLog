@@ -220,8 +220,21 @@ final class TravelAddViewController: BaseViewController {
             }
         )
         
+        let dateSelected = Observable.merge(
+            dateRangeCard.quickButtons.enumerated().map{ index, button in
+                button.rx.tap.map{ () -> (Date?, Date?) in
+                    let option = QUickSelectOption.allCases[index]
+                    let start = Date()
+                    let end = Calendar.current.date(byAdding: .day, value: option.days - 1, to: start)
+                    return (start, end)
+                }
+            }
+        )
+        
         let input = TravelAddViewModel.Input(
             transportSelected: transportSelected,
+            dateSelected: dateSelected,
+            calendarTapped: dateRangeCard.tapGesture.rx.event.map{ _ in },
             createButtonTapped: createButton.rx.tap
         )
         
@@ -236,44 +249,23 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
-        dateRangeCard.tapGesture.rx.event
-            .bind(with: self) { owner, _ in
+        output.selectedDaterange
+            .drive(with: self){ owner, range in
+                owner.dateRangeCard.updateRange(start: range.start, end: range.end)
+            }
+            .disposed(by: disposeBag)
+        
+        output.showCalendar
+            .withLatestFrom(output.selectedDaterange)
+            .emit(with: self){ owner, range in
                 let vc = CalendarViewController()
-                
-                let range = owner.viewModel.selectedDateRelay.value
                 vc.updateSelectedDate(start: range.start, end: range.end)
                 
                 vc.selectedDateRangeRelay
                     .bind(to: owner.viewModel.selectedDateRelay)
                     .disposed(by: vc.disposeBag)
                 
-                owner.navigationController?
-                    .pushViewController(vc, animated: true)
-            }
-            .disposed(by: disposeBag)
-        
-        dateRangeCard.quickButtons.enumerated().forEach { index, button in
-            button.rx.tap
-                .bind(with: self) { owner, _ in
-                    let option = QUickSelectOption.allCases[index]
-                    
-                    let calendar = Calendar.current
-                    let startDate = Date()
-                    let endDate = calendar.date( byAdding: .day,
-                                                 value: option.days - 1,
-                                                 to: startDate
-                    )
-                    
-                    owner.viewModel.selectedDateRelay.accept((start: startDate, end: endDate))
-                    owner.dateRangeCard.updateRange(start: startDate, end: endDate)
-                }
-                .disposed(by: disposeBag)
-        }
-        
-        output.selectedDaterange
-            .drive(with: self) { owner, range in
-                owner.dateRangeCard
-                    .updateRange(start: range.start, end: range.end)
+                owner.navigationController?.pushViewController(vc, animated: true)
             }
             .disposed(by: disposeBag)
         
