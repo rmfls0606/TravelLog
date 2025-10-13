@@ -12,39 +12,34 @@ final class LocationCardView: BaseCardView {
     
     let tapGesture = UITapGestureRecognizer()
     
-    private let titleView = UIView()
+    private let contentView = UIView()
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 14, weight: .bold)
-        label.textColor = .darkGray
+        label.font = .systemFont(ofSize: 16, weight: .bold)
+        label.textColor = .black
         return label
     }()
     
     private let iconView: UIImageView = {
         let view = UIImageView()
-        view.tintColor = .systemBlue
+        view.tintColor = .systemGreen
+        view.contentMode = .scaleAspectFit
         return view
     }()
-    
-    private let inputBackground: UIView = {
-        let view = UIView()
-        view.backgroundColor = .systemGray6
-        view.layer.cornerRadius = 12
-        return view
-    }()
-    
+
     private let valueLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 14)
-        label.textColor = .gray
+        label.textColor = .darkGray
         return label
     }()
     
     private let rightIcon: UIImageView = {
         let view = UIImageView()
-        view.image = UIImage(systemName: "mappin.and.ellipse.circle")
-        view.tintColor = .systemBlue
+        view.image = UIImage(systemName: "chevron.right")
+        view.tintColor = .darkGray
+        view.contentMode = .scaleAspectFit
         return view
     }()
     
@@ -57,54 +52,51 @@ final class LocationCardView: BaseCardView {
     }
     
     override func configureHierarchy() {
-        addSubview(titleView)
-        titleView.addSubview(iconView)
-        titleView.addSubview(titleLabel)
+        addSubview(contentView)
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(valueLabel)
         
-        addSubview(inputBackground)
-        inputBackground.addSubview(valueLabel)
-        inputBackground.addSubview(rightIcon)
+        addSubview(iconView)
+        addSubview(contentView)
+        addSubview(rightIcon)
     }
     
     override func configureLayout() {
-        titleView.snp.makeConstraints { make in
-            make.top.horizontalEdges.equalToSuperview().inset(22)
+        iconView.snp.makeConstraints { make in
+            make.centerY.equalToSuperview()
+            make.size.equalTo(20)
+            make.leading.equalToSuperview().offset(16)
         }
         
-        iconView.snp.makeConstraints { make in
-            make.top.leading.equalToSuperview()
-            make.size.equalTo(20)
-            make.bottom.equalToSuperview()
+        contentView.snp.makeConstraints { make in
+            make.verticalEdges.equalToSuperview()
+            make.leading.equalTo(iconView.snp.trailing).offset(16)
+            make.trailing.equalTo(rightIcon.snp.leading).offset(-16)
         }
         
         titleLabel.snp.makeConstraints { make in
-            make.centerY.equalTo(iconView)
-            make.leading.equalTo(iconView.snp.trailing).offset(8)
+            make.top.equalToSuperview().offset(16)
+            make.horizontalEdges.equalToSuperview()
         }
-        
-        inputBackground.snp.makeConstraints { make in
-            make.top.equalTo(titleView.snp.bottom).offset(16)
-            make.horizontalEdges.bottom.equalToSuperview().inset(22)
-            make.height.equalTo(44)
-        }
-        
+
         valueLabel.snp.makeConstraints { make in
-            make.leading.equalToSuperview().offset(12)
-            make.centerY.equalToSuperview()
-            make.trailing.equalTo(rightIcon.snp.leading).offset(-8)
+            make.horizontalEdges.equalToSuperview()
+            make.top.equalTo(titleLabel.snp.bottom).offset(4)
+            make.bottom.equalToSuperview().inset(16)
         }
         
         rightIcon.snp.makeConstraints { make in
             make.centerY.equalToSuperview()
-            make.trailing.equalToSuperview().inset(12)
-            make.size.equalTo(20)
+            make.trailing.equalToSuperview().inset(16)
+            make.size.equalTo(14)
         }
     }
     
     override func configureView() {
         super.configureView()
+        
         backgroundColor = .white
-        inputBackground.addGestureRecognizer(tapGesture)
+        addGestureRecognizer(tapGesture)
     }
     
     func updateValue(_ text: String) {

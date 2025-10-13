@@ -105,8 +105,8 @@ final class TravelAddViewController: BaseViewController {
     )
     
     private let destinationCard = LocationCardView(
-        title: "도착지",
-        placeholder: "어디로 가시나요?",
+        title: "목적지",
+        placeholder: "어디로 떠나시나요?",
         icon: "mappin.circle.fill"
     )
     
