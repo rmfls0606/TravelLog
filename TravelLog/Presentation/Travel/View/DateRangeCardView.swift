@@ -48,8 +48,8 @@ final class DateRangeCardView: BaseCardView {
     private let headerTitle: UILabel = {
         let label = UILabel()
         label.text = "여행 기간"
-        label.font = .systemFont(ofSize: 16, weight: .bold)
-        label.textColor = .darkGray
+        label.font = .boldSystemFont(ofSize: 16)
+        label.textColor = .black
         return label
     }()
     

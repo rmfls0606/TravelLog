@@ -16,7 +16,7 @@ final class LocationCardView: BaseCardView {
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 16, weight: .bold)
+        label.font = .boldSystemFont(ofSize: 16)
         label.textColor = .black
         return label
     }()
