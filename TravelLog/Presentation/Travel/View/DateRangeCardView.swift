@@ -28,7 +28,7 @@ enum QUickSelectOption: String, CaseIterable{
     }
 }
 
-final class DateRangeCardView: BaseView {
+final class DateRangeCardView: BaseCardView {
     // MARK: - Header
     private let headerStack: UIStackView = {
         let view = UIStackView()
@@ -54,7 +54,13 @@ final class DateRangeCardView: BaseView {
     }()
     
     // MARK: - Select Box
-    private let dashedBox = UIView()
+    private let dashedBox: UIView = {
+        let view = UIView()
+        view.layer.cornerRadius = 12
+        view.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.2)
+        return view
+    }()
+    
     private let dashedLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
         layer.strokeColor = UIColor.systemGray4.cgColor
@@ -96,14 +102,16 @@ final class DateRangeCardView: BaseView {
         view.alignment = .center
         view.spacing = 12
         view.isHidden = true
+        view.distribution = .fillProportionally
         return view
     }()
     
+    //출발일
     private let departStack: UIStackView = {
         let view = UIStackView()
         view.axis = .vertical
-        view.alignment = .center
-        view.spacing = 4
+        view.alignment = .leading
+        view.spacing = 8
         return view
     }()
     
@@ -111,7 +119,7 @@ final class DateRangeCardView: BaseView {
         let label = UILabel()
         label.text = "출발"
         label.font = .systemFont(ofSize: 12)
-        label.textColor = .darkGray
+        label.textColor = .systemBlue
         return label
     }()
     
@@ -122,11 +130,29 @@ final class DateRangeCardView: BaseView {
         return label
     }()
     
+    //교통수단
+    private let transportIconContainer: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBlue
+        view.layer.cornerRadius = 16
+        view.clipsToBounds = true
+        return view
+    }()
+    
+    private let transportIcon: UIImageView = {
+        let view = UIImageView()
+        view.image = UIImage(systemName: "airplane")
+        view.tintColor = .white
+        view.contentMode = .scaleAspectFit
+        return view
+    }()
+    
+    //도착일
     private let arriveStack: UIStackView = {
         let view = UIStackView()
         view.axis = .vertical
-        view.alignment = .center
-        view.spacing = 4
+        view.alignment = .trailing
+        view.spacing = 8
         return view
     }()
     
@@ -134,7 +160,7 @@ final class DateRangeCardView: BaseView {
         let label = UILabel()
         label.text = "도착"
         label.font = .systemFont(ofSize: 12)
-        label.textColor = .darkGray
+        label.textColor = .systemBlue
         return label
     }()
     
@@ -145,39 +171,25 @@ final class DateRangeCardView: BaseView {
         return label
     }()
     
-    private let leftLine: UIView = {
-        let view = UIView()
-        view.backgroundColor = .systemGray3
-        return view
-    }()
-    
-    private let rightLine: UIView = {
-        let view = UIView()
-        view.backgroundColor = .systemGray3
-        return view
-    }()
-    
-    private let transportIcon: UIImageView = {
-        let view = UIImageView()
-        view.image = UIImage(systemName: "airplane")
-        view.tintColor = .systemBlue
-        view.contentMode = .scaleAspectFit
-        return view
-    }()
-    
-    private let lineStack: UIStackView = {
+    private let tripDateStack: UIStackView = {
         let view = UIStackView()
         view.axis = .horizontal
         view.alignment = .center
-        view.spacing = 8
-        view.distribution = .fill
+        view.distribution = .equalSpacing
+        return view
+    }()
+    
+    private let lineView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBlue.withAlphaComponent(0.2)
         return view
     }()
     
     private let durationLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
         label.textColor = .systemBlue
+        label.textAlignment = .center
         return label
     }()
     
@@ -228,13 +240,16 @@ final class DateRangeCardView: BaseView {
         arriveStack.addArrangedSubview(arriveTitle)
         arriveStack.addArrangedSubview(arriveDateLabel)
         
-        lineStack.addArrangedSubview(departStack)
-        lineStack.addArrangedSubview(leftLine)
-        lineStack.addArrangedSubview(transportIcon)
-        lineStack.addArrangedSubview(rightLine)
-        lineStack.addArrangedSubview(arriveStack)
+        tripDateStack.addArrangedSubview(departStack)
         
-        dateStack.addArrangedSubview(lineStack)
+        transportIconContainer.addSubview(transportIcon)
+        tripDateStack.addArrangedSubview(transportIconContainer)
+
+        tripDateStack.addArrangedSubview(arriveStack)
+        
+        dateStack.addArrangedSubview(tripDateStack)
+        
+        dateStack.addArrangedSubview(lineView)
         
         dateStack.addArrangedSubview(durationLabel)
         
@@ -247,42 +262,53 @@ final class DateRangeCardView: BaseView {
     }
     
     override func configureLayout() {
+        headerStack.snp.makeConstraints { make in
+            make.top.equalToSuperview().inset(16)
+            make.leading.equalToSuperview().inset(22)
+        }
+
         headerIcon.snp.makeConstraints { make in
             make.size.equalTo(20)
+        }
+        
+        dashedBox.snp.makeConstraints { make in
+            make.top.equalTo(headerStack.snp.bottom).offset(16)
+            make.horizontalEdges.equalToSuperview().inset(22)
+            make.height.equalTo(140)
+        }
+        
+        placeholderStack.snp.makeConstraints { make in
+            make.center.equalToSuperview()
         }
         
         placeholderIcon.snp.makeConstraints { make in
             make.size.equalTo(28)
         }
         
-        leftLine.snp.makeConstraints { make in
-            make.height.equalTo(1)
-            make.width.greaterThanOrEqualTo(20)
-        }
-        rightLine.snp.makeConstraints { make in
-            make.height.equalTo(1)
-            make.width.greaterThanOrEqualTo(20)
-        }
-        transportIcon.snp.makeConstraints { make in
-            make.size.equalTo(24)
-        }
-        
-        headerStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().inset(16)
-            make.leading.equalToSuperview().inset(22)
-        }
-        
-        dashedBox.snp.makeConstraints { make in
-            make.top.equalTo(headerStack.snp.bottom).offset(16)
-            make.horizontalEdges.equalToSuperview().inset(22)
-            make.height.equalTo(120)
-        }
-        
-        placeholderStack.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-        }
         dateStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(16)
+        }
+        
+        tripDateStack.snp.makeConstraints { make in
+            make.top.horizontalEdges.equalToSuperview()
+        }
+        
+        transportIconContainer.snp.makeConstraints { make in
+            make.size.equalTo(32)
+        }
+        
+        transportIcon.snp.makeConstraints { make in
             make.center.equalToSuperview()
+            make.size.equalTo(16)
+        }
+        
+        lineView.snp.makeConstraints { make in
+            make.horizontalEdges.equalToSuperview()
+            make.height.equalTo(1)
+        }
+        
+        durationLabel.snp.makeConstraints { make in
+            make.bottom.horizontalEdges.equalToSuperview()
         }
         
         quickSelectTitle.snp.makeConstraints { make in
@@ -299,23 +325,11 @@ final class DateRangeCardView: BaseView {
     }
     
     override func configureView() {
+        super.configureView()
         dashedBox.addGestureRecognizer(tapGesture)
-        
-        backgroundColor = .white
-        layer.cornerRadius = 20
-        layer.borderWidth = 1
-        layer.borderColor = UIColor.systemGray5.cgColor
         
         // Dashed Box
         dashedBox.layer.addSublayer(dashedLayer)
-        dashedBox.layer.cornerRadius = 12
-        dashedBox.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.2)
-        
-        // Hugging & Compression
-        departStack.setContentHuggingPriority(.required, for: .horizontal)
-        arriveStack.setContentHuggingPriority(.required, for: .horizontal)
-        leftLine.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        rightLine.setContentHuggingPriority(.defaultLow, for: .horizontal)
         
         QUickSelectOption.allCases.forEach { option in
             let button = UIButton(type: .system)
@@ -344,6 +358,14 @@ final class DateRangeCardView: BaseView {
         
         placeholderStack.isHidden = true
         dateStack.isHidden = false
+        
+        dashedLayer.lineDashPattern = nil //점선 해제
+        dashedLayer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.2).cgColor
+        dashedLayer.lineWidth = 1.0
+        
+        dashedBox.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        
+        dashedLayer.path = UIBezierPath(roundedRect: dashedBox.bounds, cornerRadius: 12).cgPath
     }
     
     func updateTransportIcon(name: String){

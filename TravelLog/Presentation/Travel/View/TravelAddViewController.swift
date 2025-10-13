@@ -4,6 +4,7 @@ import RxSwift
 import RxCocoa
 
 final class TravelAddViewController: BaseViewController {
+    
     // MARK: - UI
     private let scrollView = UIScrollView()
     
@@ -60,14 +61,7 @@ final class TravelAddViewController: BaseViewController {
     }()
     
     // Transport Card
-    private let transportCard: UIView = {
-        let view = UIView()
-        view.backgroundColor = .white
-        view.layer.cornerRadius = 20
-        view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.systemGray5.cgColor
-        return view
-    }()
+    private let transportCard = BaseCardView()
     
     private let transportHeader: UIStackView = {
         let view = UIStackView()
@@ -78,7 +72,7 @@ final class TravelAddViewController: BaseViewController {
     }()
     
     private let transportHeaderIcon: UIImageView = {
-        let view = UIImageView(image: UIImage(systemName: "map"))
+        let view = UIImageView(image: UIImage(systemName: "road.lanes"))
         view.tintColor = .systemBlue
         return view
     }()
@@ -86,8 +80,8 @@ final class TravelAddViewController: BaseViewController {
     private let transportHeaderTitle: UILabel = {
         let label = UILabel()
         label.text = "교통수단 선택"
-        label.font = .systemFont(ofSize: 16, weight: .bold)
-        label.textColor = .darkGray
+        label.font = .boldSystemFont(ofSize: 16)
+        label.textColor = .black
         return label
     }()
     
