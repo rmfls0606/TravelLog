@@ -9,14 +9,8 @@ import RxSwift
 import RxCocoa
 import Foundation
 
-struct transportItem{
-    let transport: Transport
-    let isSelected: Bool
-}
-
 final class TravelAddViewModel: BaseViewModel {
     let selectedDateRelay = BehaviorRelay<(start: Date?, end: Date?)>(value: (start: nil, end: nil))
-    let selectedTransportRelay = BehaviorRelay<Transport>(value: .airplane)
     let departureRelay = PublishRelay<CityTable>()
     let destinationRelay = PublishRelay<CityTable>()
     
@@ -29,12 +23,11 @@ final class TravelAddViewModel: BaseViewModel {
     }
     
     struct Input{
-        let transportTapped: Observable<Transport>
+        let transportSelected: Observable<Transport>
         let createButtonTapped: ControlEvent<Void>
     }
     
     struct Output{
-        private(set) var transportItems: Driver<[transportItem]>
         private(set) var selectedTransport: Driver<Transport>
         private(set) var selectedDaterange: Driver<(start: Date?, end: Date?)>
         private(set) var saveCompleted: Signal<Void>
@@ -42,19 +35,11 @@ final class TravelAddViewModel: BaseViewModel {
     }
     
     func transform(input: Input) -> Output {
-        let selectedTransport = BehaviorRelay<Transport>(value: .airplane)
-        
-        input.transportTapped
-            .bind(to: selectedTransport)
+        let selectedTransportRelay = BehaviorRelay<Transport>(value: .airplane)
+
+        input.transportSelected
+            .bind(to: selectedTransportRelay)
             .disposed(by: disposeBag)
-        
-        let transportItems = selectedTransport
-            .map { selected in
-                Transport.allCases.map{
-                    transportItem(transport: $0, isSelected: $0 == selected)
-                }
-            }
-            .asDriver(onErrorDriveWith: .empty())
         
         let saveResult = input.createButtonTapped
             .withLatestFrom(Observable.combineLatest(
@@ -96,8 +81,7 @@ final class TravelAddViewModel: BaseViewModel {
             .asSignal(onErrorJustReturn: "저장 실패")
         
         return Output(
-            transportItems: transportItems,
-            selectedTransport: selectedTransport.asDriver(),
+            selectedTransport: selectedTransportRelay.asDriver(),
             selectedDaterange: selectedDateRelay.asDriver(),
             saveCompleted: saveCompleted,
             saveError: saveError

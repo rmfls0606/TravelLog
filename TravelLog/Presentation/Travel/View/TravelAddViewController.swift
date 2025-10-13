@@ -1,3 +1,10 @@
+//
+//  TravelAddViewController.swift
+//  TravelLog
+//
+//  Created by 이상민 on 9/29/25.
+//
+
 import UIKit
 import SnapKit
 import RxSwift
@@ -207,31 +214,25 @@ final class TravelAddViewController: BaseViewController {
     }
     
     override func configureBind() {
+        let transportSelected = Observable.merge(
+            transportButtons.enumerated().map{ index, button in
+                button.rx.tap.map{ Transport.allCases[index] }
+            }
+        )
+        
         let input = TravelAddViewModel.Input(
-            transportTapped: Observable.merge(
-                transportButtons.map({ button in
-                    button.rx.tap
-                        .map{ Transport.allCases[button.tag] }
-                })
-            ),
+            transportSelected: transportSelected,
             createButtonTapped: createButton.rx.tap
         )
         
         let output = viewModel.transform(input: input)
         
-        output.transportItems
-            .drive(with: self){ owner, items in
-                for (button, item) in zip(owner.transportButtons, items){
-                    button.isSelected = item.isSelected
-                }
-            }
-            .disposed(by: disposeBag)
-        
         output.selectedTransport
-            .drive(with: self){ owner, transport in
-                owner.dateRangeCard
-                    .updateTransportIcon(name: transport.iconName)
-                owner.viewModel.selectedTransportRelay.accept(transport)
+            .drive(with: self){ owner, selected in
+                for (button, type) in zip(owner.transportButtons, Transport.allCases){
+                    button.isSelected = (type == selected)
+                }
+                owner.dateRangeCard.updateTransportIcon(name: selected.iconName)
             }
             .disposed(by: disposeBag)
         
@@ -327,8 +328,9 @@ final class TravelAddViewController: BaseViewController {
     private func makeTransportButton(title: String, icon: String) -> UIButton {
         var config = UIButton.Configuration.filled()
         config.attributedTitle = AttributedString(title,
-                                                  attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 12)])
+                                                  attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 12, weight: .bold)])
         )
+        
         let imageConfig = UIImage.SymbolConfiguration(scale: .medium)
         config.preferredSymbolConfigurationForImage = imageConfig
         config.image = UIImage(systemName: icon)
