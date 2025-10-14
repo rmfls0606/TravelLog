@@ -249,20 +249,22 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
-        output.selectedDaterange
+        output.selectedDateRange
             .drive(with: self){ owner, range in
                 owner.dateRangeCard.updateRange(start: range.start, end: range.end)
             }
             .disposed(by: disposeBag)
         
         output.showCalendar
-            .withLatestFrom(output.selectedDaterange)
+            .withLatestFrom(output.selectedDateRange)
             .emit(with: self){ owner, range in
                 let vc = CalendarViewController()
                 vc.updateSelectedDate(start: range.start, end: range.end)
                 
                 vc.selectedDateRangeRelay
-                    .bind(to: owner.viewModel.selectedDateRelay)
+                    .bind(with: owner, onNext: { owner, range in
+                        owner.viewModel.updateDateRange(range: range)
+                    })
                     .disposed(by: vc.disposeBag)
                 
                 owner.navigationController?.pushViewController(vc, animated: true)

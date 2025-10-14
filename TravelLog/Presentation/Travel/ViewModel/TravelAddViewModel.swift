@@ -33,7 +33,7 @@ final class TravelAddViewModel: BaseViewModel {
     
     struct Output{
         private(set) var selectedTransport: Driver<Transport>
-        private(set) var selectedDaterange: Driver<(start: Date?, end: Date?)>
+        private(set) var selectedDateRange: Driver<(start: Date?, end: Date?)>
         private(set) var showCalendar: Signal<Void>
         private(set) var saveCompleted: Signal<Void>
         private(set) var saveError: Signal<String>
@@ -95,10 +95,14 @@ final class TravelAddViewModel: BaseViewModel {
         
         return Output(
             selectedTransport: selectedTransportRelay.asDriver(),
-            selectedDaterange: selectedDateRelay.asDriver(),
+            selectedDateRange: selectedDateRelay.asDriver(),
             showCalendar: showCalendar,
             saveCompleted: saveCompleted,
             saveError: saveError
         )
+    }
+    
+    func updateDateRange(range: (start: Date?, end: Date?)){
+        selectedDateRelay.accept(range)
     }
 }
