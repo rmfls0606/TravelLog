@@ -105,4 +105,12 @@ final class TravelAddViewModel: BaseViewModel {
     func updateDateRange(range: (start: Date?, end: Date?)){
         selectedDateRelay.accept(range)
     }
+    
+    func updateDeparture(_ city: CityTable) {
+        departureRelay.accept(city)
+    }
+
+    func updateDestination(_ city: CityTable) {
+        destinationRelay.accept(city)
+    }
 }

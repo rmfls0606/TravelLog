@@ -278,7 +278,7 @@ final class TravelAddViewController: BaseViewController {
                 vc.selectedCity
                     .bind(with: owner) { owner, city in
                         owner.departureCard.updateValue(city.name)
-                        owner.viewModel.departureRelay.accept(CityTable(from: city))
+                        owner.viewModel.updateDeparture(CityTable(from: city))
                     }
                     .disposed(by: vc.disposeBag)
                 
@@ -294,8 +294,7 @@ final class TravelAddViewController: BaseViewController {
                 vc.selectedCity
                     .bind(with: self) { owner, city in
                         owner.destinationCard.updateValue(city.name)
-                        owner.viewModel.destinationRelay
-                            .accept(CityTable(from: city))
+                        owner.viewModel.updateDestination(CityTable(from: city))
                     }
                     .disposed(by: vc.disposeBag)
                 
