@@ -133,7 +133,7 @@ final class DateRangeCardView: BaseCardView {
     //교통수단
     private let transportIconContainer: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBlue
+        view.backgroundColor = UIColor(red: 90/255, green: 140/255, blue: 255/255, alpha: 1)
         view.layer.cornerRadius = 16
         view.clipsToBounds = true
         return view

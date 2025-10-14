@@ -37,7 +37,6 @@ final class TravelAddViewController: BaseViewController {
         let view = UIView()
         view.layer.cornerRadius = 20
         view.clipsToBounds = true
-        view.backgroundColor = .systemBlue
         return view
     }()
     
@@ -122,6 +121,20 @@ final class TravelAddViewController: BaseViewController {
     
     private let viewModel = TravelAddViewModel()
     private let disposeBag = DisposeBag()
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        headerIconContainer
+            .applyGradient(
+                style: .bluePurple,
+                end: CGPoint(x: 1, y: 1)
+            )
+        
+        createButton.applyGradient(
+            style: .bluePurple
+        )
+    }
     
     override func configureHierarchy() {
         view.addSubview(scrollView)
@@ -337,9 +350,12 @@ final class TravelAddViewController: BaseViewController {
         
         button.configurationUpdateHandler = { btn in
             guard var newConfig = btn.configuration else { return }
+            
             if btn.isSelected {
-                newConfig.baseBackgroundColor = .systemBlue
+                newConfig.baseBackgroundColor = UIColor(red: 90/255, green: 140/255, blue: 255/255, alpha: 1)
                 newConfig.baseForegroundColor = .white
+                
+                
             } else {
                 newConfig.baseBackgroundColor = .systemGray6
                 newConfig.baseForegroundColor = .gray
