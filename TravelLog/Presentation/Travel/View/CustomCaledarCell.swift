@@ -26,13 +26,21 @@ final class CustomCalendarCell: FSCalendarCell {
         return label
     }()
     
+    private let dotView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .systemBlue
+        view.layer.cornerRadius = 3
+        view.isHidden = true
+        return view
+    }()
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         configureHierarchy()
         configureLayout()
     }
-
-    required init!(coder aDecoder: NSCoder!) {
+    
+    required init?(coder aDecoder: NSCoder!) {
         fatalError("init(coder:) has not been implemented")
     }
     
@@ -40,6 +48,8 @@ final class CustomCalendarCell: FSCalendarCell {
         contentView.addSubview(bgView)
         
         contentView.addSubview(dayLabel)
+        
+        contentView.addSubview(dotView)
     }
     
     private func configureLayout(){
@@ -49,6 +59,12 @@ final class CustomCalendarCell: FSCalendarCell {
         
         dayLabel.snp.makeConstraints { make in
             make.edges.equalToSuperview()
+        }
+        
+        dotView.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(dayLabel.snp.bottom).offset(3)
+            make.size.equalTo(6)
         }
     }
     
@@ -64,7 +80,10 @@ final class CustomCalendarCell: FSCalendarCell {
         dayLabel.text = formatter.string(from: date)
         
         bgView.backgroundColor = .clear
+        bgView.layer.borderWidth = 0
+        bgView.layer.borderColor = nil
         dayLabel.textColor = .black
+        dotView.isHidden = true
         
         if isStart || isEnd {
             bgView.backgroundColor = .systemBlue
@@ -73,7 +92,11 @@ final class CustomCalendarCell: FSCalendarCell {
             bgView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
             dayLabel.textColor = .systemBlue
         } else if isToday {
+            bgView.layer.borderWidth = 1.5
+            bgView.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.1).cgColor
+            bgView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.05)
             dayLabel.textColor = .systemBlue
+            dotView.isHidden = false
         } else if isWeekend {
             dayLabel.textColor = .red
         }
