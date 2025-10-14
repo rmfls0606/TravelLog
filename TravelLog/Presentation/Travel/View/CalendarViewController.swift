@@ -58,27 +58,33 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
     private let selectedTitleLabel: UILabel = {
         let label = UILabel()
         label.text = "선택된 기간"
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .systemFont(ofSize: 14)
         label.textColor = .systemBlue
-        label.textAlignment = .center // 중앙 정렬
+        label.textAlignment = .center
         return label
     }()
     
     private let selectedRangeLabel: UILabel = {
         let label = UILabel()
-        label.text = "아직 선택되지 않았습니다"
+        label.text = "여행 날짜를 선택해주세요"
         label.font = .systemFont(ofSize: 16, weight: .bold)
         label.textColor = UIColor(red: 26/255, green: 60/255, blue: 140/255, alpha: 1.0)
         label.textAlignment = .center
         return label
     }()
     
-    private let confirmButton = PrimaryButton(title: "확인")
+    private let confirmButton: PrimaryButton = {
+        let view = PrimaryButton(title: "확인")
+        view.layer.cornerRadius = 12
+        return view
+    }()
     
     private var selectedStartDate: Date?
     private var selectedEndDate: Date?
     
-    private(set) var selectedDateRangeRelay = PublishRelay<(start: Date?, end: Date?)>()
+    private(set) var selectedDateRangeRelay = BehaviorRelay<(start: Date?, end: Date?)>(
+        value: (nil, nil)
+    )
     
     let disposeBag = DisposeBag()
     
@@ -141,9 +147,10 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
     
     override func configureView() {
         view.backgroundColor = .white
+        
         travelCalendar.delegate = self
         travelCalendar.dataSource = self
-        travelCalendar.register(CustomCalendarCell.self, forCellReuseIdentifier: "cell")
+        travelCalendar.register(CustomCalendarCell.self, forCellReuseIdentifier: CustomCalendarCell.identifier)
         
         // 최초 진입 시 현재 값 반영
         updateSelectedPeriodLabel()
@@ -164,13 +171,13 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
     
     // MARK: - FSCalendar
     func calendar(_ calendar: FSCalendar, cellFor date: Date, at position: FSCalendarMonthPosition) -> FSCalendarCell {
-        guard let cell = calendar.dequeueReusableCell(withIdentifier: "cell", for: date, at: position) as? CustomCalendarCell else {
+        guard let cell = calendar.dequeueReusableCell(withIdentifier: CustomCalendarCell.identifier, for: date, at: position) as? CustomCalendarCell else {
             return FSCalendarCell()
         }
         
         let isToday = Calendar.current.isDateInToday(date)
-        let isStart = (selectedStartDate != nil && Calendar.current.isDate(date, inSameDayAs: selectedStartDate!))
-        let isEnd = (selectedEndDate != nil && Calendar.current.isDate(date, inSameDayAs: selectedEndDate!))
+        let isStart = selectedStartDate.map { Calendar.current.isDate(date, inSameDayAs: $0) } ?? false
+        let isEnd = selectedEndDate.map { Calendar.current.isDate(date, inSameDayAs: $0) } ?? false
         let inRange: Bool
         if let start = selectedStartDate, let end = selectedEndDate {
             inRange = (date > start && date < end)
@@ -206,7 +213,7 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
             selectedStartDate = date
             selectedEndDate = nil
         }
-        
+
         refreshCalendar(calendar)
         updateSelectedPeriodLabel()
         updateConfirmButtonState()
@@ -215,34 +222,6 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
     private func refreshCalendar(_ calendar: FSCalendar){
         let visibleIndexPaths = calendar.collectionView.indexPathsForVisibleItems
         calendar.collectionView.reloadItems(at: visibleIndexPaths)
-    }
-    
-    //현재 보이는 셀만 업데이트
-    private func refreshVisibleCells(_ calendar: FSCalendar) {
-        for case let cell as CustomCalendarCell in calendar.collectionView.visibleCells {
-            guard let date = calendar.date(for: cell) else { continue }
-            
-            let isToday = Calendar.current.isDateInToday(date)
-            let isStart = (selectedStartDate != nil && Calendar.current.isDate(date, inSameDayAs: selectedStartDate!))
-            let isEnd = (selectedEndDate != nil && Calendar.current.isDate(date, inSameDayAs: selectedEndDate!))
-            
-            let inRange: Bool
-            if let start = selectedStartDate, let end = selectedEndDate {
-                inRange = (date > start && date < end)
-            } else {
-                inRange = false
-            }
-            
-            let weekday = Calendar.current.component(.weekday, from: date)
-            let isWeekend = (weekday == 1 || weekday == 7)
-            
-            cell.configure(date: date,
-                           isToday: isToday,
-                           isStart: isStart,
-                           isEnd: isEnd,
-                           inRange: inRange,
-                           isWeekend: isWeekend)
-        }
     }
     
     private func updateSelectedPeriodLabel() {
