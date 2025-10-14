@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import FSCalendar
 
 protocol ReusableViewProtocol{
     static var identifier: String { get }
@@ -17,3 +18,8 @@ extension UITableViewCell: ReusableViewProtocol{
     }
 }
 
+extension FSCalendarCell: ReusableViewProtocol{
+    static var identifier: String{
+        return String(describing: self)
+    }
+}
