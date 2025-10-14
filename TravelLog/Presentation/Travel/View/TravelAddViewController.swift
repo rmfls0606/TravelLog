@@ -286,13 +286,12 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
-        
         destinationCard.tapGesture.rx.event
             .bind(with: self) { owner, _ in
                 let vc = DestinationSelectorViewController()
                 
                 vc.selectedCity
-                    .bind(with: self) { owner, city in
+                    .bind(with: owner) { owner, city in
                         owner.destinationCard.updateValue(city.name)
                         owner.viewModel.updateDestination(CityTable(from: city))
                     }
