@@ -11,6 +11,14 @@ import SnapKit
 final class CityTableViewCell: BaseTableViewCell {
     
     // MARK: - UI
+    private let cityContentView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .white
+        view.layer.cornerRadius = 12
+        view.clipsToBounds = true
+        return view
+    }()
+    
     private let cityLabel: UILabel = {
         let label = UILabel()
         label.font = .boldSystemFont(ofSize: 16)
@@ -43,14 +51,20 @@ final class CityTableViewCell: BaseTableViewCell {
     override func configureHierarchy() {
         stackView.addArrangedSubview(cityLabel)
         stackView.addArrangedSubview(countryLabel)
-        contentView.addSubview(stackView)
-        contentView.addSubview(chevronIcon)
+        cityContentView.addSubview(stackView)
+        cityContentView.addSubview(chevronIcon)
+        
+        contentView.addSubview(cityContentView)
     }
     
     override func configureLayout() {
+        cityContentView.snp.makeConstraints { make in
+            make.horizontalEdges.equalToSuperview().inset(16)
+            make.verticalEdges.equalToSuperview().inset(6)
+        }
         stackView.snp.makeConstraints {
-            $0.verticalEdges.equalToSuperview().inset(8)
             $0.horizontalEdges.equalToSuperview().inset(16)
+            $0.centerY.equalToSuperview()
         }
         chevronIcon.snp.makeConstraints {
             $0.centerY.equalToSuperview()
@@ -60,7 +74,7 @@ final class CityTableViewCell: BaseTableViewCell {
     }
     
     override func configureView() {
-        backgroundColor = .white
+        backgroundColor = .systemGray6
         selectionStyle = .none
     }
     

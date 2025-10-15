@@ -20,14 +20,13 @@ final class DestinationSelectorViewController: BaseViewController {
         let field = UITextField()
         field.placeholder = "도시명 검색"
         field.layer.cornerRadius = 12
-        field.layer.borderWidth = 1.0
-        field.layer.borderColor = UIColor.systemBlue.cgColor
         field.font = .systemFont(ofSize: 14)
         field.tintColor = .systemBlue
         field.clearButtonMode = .whileEditing
         field.textColor = .darkGray
         field.leftViewMode = .always
         field.rightViewMode = .always
+        field.backgroundColor = .systemGray5
         
         let iconContainer = UIView(frame: CGRect(x: 0, y: 0, width: 48, height: 20))
         let leftIcon = UIImageView(image: UIImage(systemName: "magnifyingglass"))
@@ -51,7 +50,7 @@ final class DestinationSelectorViewController: BaseViewController {
         let table = UITableView()
         table.backgroundColor = .clear
         table.separatorStyle = .none
-        table.rowHeight = 70
+        table.rowHeight = 100
         return table
     }()
     
@@ -85,7 +84,7 @@ final class DestinationSelectorViewController: BaseViewController {
     // MARK: - View
     override func configureView() {
         navigationItem.title = "여행 도시 선택"
-        view.backgroundColor = .white
+        view.backgroundColor = .systemGray6
         tableView.register(CityTableViewCell.self, forCellReuseIdentifier: CityTableViewCell.identifier)
     }
     
