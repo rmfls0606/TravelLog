@@ -314,17 +314,17 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
-        output.saveCompleted
-            .emit(with: self) { owner, _ in
-                print("여행 저장 완료!")
-                owner.navigationController?.popViewController(animated: true)
+        output.toastMessage
+            .distinctUntilChanged()
+            .emit(with: self) { owner, message in
+                print("저장 실패 : \(message)")
             }
             .disposed(by: disposeBag)
+
         
-        // 저장 실패 시 알림
-        output.saveError
-            .emit(with: self) { owner, message in
-                print("저장 실패:", message)
+        output.saveCompleted
+            .emit(with: self) { owner, _ in
+                owner.navigationController?.popViewController(animated: true)
             }
             .disposed(by: disposeBag)
     }
