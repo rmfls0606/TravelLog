@@ -16,4 +16,8 @@ protocol TripRepository{
         endDate: Date,
         transport: Transport
     ) -> Completable
+    
+    func fetchTrips() -> Observable<[TravelTable]>
+    
+    func deleteTrip(trip: TravelTable) -> Completable
 }

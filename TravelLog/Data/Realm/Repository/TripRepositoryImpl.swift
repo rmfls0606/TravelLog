@@ -29,4 +29,12 @@ final class TripRepositoryImpl: TripRepository{
             endDate: endDate,
             transport: transport)
     }
+    
+    func fetchTrips() -> Observable<[TravelTable]> {
+        return dataSource.fetchTrips()
+    }
+    
+    func deleteTrip(trip: TravelTable) -> Completable {
+        dataSource.deleteTrip(trip: trip)
+    }
 }
