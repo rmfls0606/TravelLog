@@ -13,15 +13,19 @@ final class TravelAddViewModel: BaseViewModel {
     
     private(set) var selectedDateRelay = BehaviorRelay<(start: Date?, end: Date?)>(value: (nil, nil))
     
-    let departureRelay = PublishRelay<CityTable>()
-    let destinationRelay = PublishRelay<CityTable>()
+    private let departureRelay = PublishRelay<CityTable>()
+    private let destinationRelay = PublishRelay<CityTable>()
     
-    private let repository: TravelRepositoryType
+    private let createTripUseCase: CreateTripUseCase
     
     private let disposeBag = DisposeBag()
     
-    init(repository: TravelRepositoryType = TravelRepository()) {
-        self.repository = repository
+    init(
+        createTripUseCase: CreateTripUseCase = CreateTripUseCaseImpl(
+            repository: TripRepositoryImpl()
+        )
+    ) {
+        self.createTripUseCase = createTripUseCase
     }
     
     struct Input{
@@ -36,12 +40,12 @@ final class TravelAddViewModel: BaseViewModel {
         private(set) var selectedDateRange: Driver<(start: Date?, end: Date?)>
         private(set) var showCalendar: Signal<Void>
         private(set) var saveCompleted: Signal<Void>
-        private(set) var saveError: Signal<String>
+        private(set) var toastMessage: Signal<String>
     }
     
     func transform(input: Input) -> Output {
         let selectedTransportRelay = BehaviorRelay<Transport>(value: .airplane)
-       
+        
         input.transportSelected
             .bind(to: selectedTransportRelay)
             .disposed(by: disposeBag)
@@ -54,51 +58,61 @@ final class TravelAddViewModel: BaseViewModel {
         let showCalendar = input.calendarTapped
             .asSignal(onErrorJustReturn: ())
         
-        let saveResult = input.createButtonTapped
-            .withLatestFrom(Observable.combineLatest(
-                departureRelay.compactMap { $0 },
-                destinationRelay.compactMap { $0 },
-                selectedDateRelay.compactMap { $0.start },
-                selectedDateRelay.compactMap { $0.end },
-                selectedTransportRelay
-            ))
-            .flatMapLatest { [weak self] (dep, dest, start, end, transport) -> Observable<Result<Void, Error>> in
+        let combinedInputs: Observable<(CityTable, CityTable, Date, Date, Transport)> = Observable.combineLatest(
+            departureRelay.compactMap { $0 },
+            destinationRelay.compactMap { $0 },
+            selectedDateRelay.compactMap { $0.start },
+            selectedDateRelay.compactMap { $0.end },
+            selectedTransportRelay
+        )
+        
+        let createTrigger = input.createButtonTapped
+            .withLatestFrom(combinedInputs)
+        
+        let saveResult: Observable<Result<Void, RealmError>> = createTrigger
+            .flatMapLatest { [weak self] (dep, dest, start, end, transport) -> Observable<Result<Void, RealmError>> in
                 guard let self else { return .empty() }
                 
-                return self.repository.createTravel(
+                // Realm 저장 로직 실행
+                let createProcess: Observable<Result<Void, RealmError>> =
+                self.createTripUseCase.execute(
                     departure: dep,
                     destination: dest,
                     startDate: start,
                     endDate: end,
                     transport: transport
                 )
-                .andThen(Observable.just(Result<Void, Error>.success(())))
+                .andThen(Observable.just(.success(())))
                 .catch { error in
-                    Observable.just(Result<Void, Error>.failure(error))
+                    return Observable.just(.failure(.saveFailure))
                 }
+                
+                return createProcess
             }
             .share()
         
-        // 저장 성공 / 실패 처리
         let saveCompleted = saveResult
-            .compactMap { if case .success = $0 { return () } else { return nil } }
+            .compactMap {
+                if case .success = $0 { return () }
+                else{ return nil }
+            }
             .asSignal(onErrorSignalWith: .empty())
         
-        let saveError = saveResult
+        let toastMessage = saveResult
             .compactMap { result -> String? in
                 if case let .failure(error) = result {
-                    return error.localizedDescription
+                    return error.errorDescription
                 }
                 return nil
             }
-            .asSignal(onErrorJustReturn: "저장 실패")
+            .asSignal(onErrorJustReturn: "데이터 저장 중 문제가 발생했어요.\n잠시 후 다시 시도해주세요.")
         
         return Output(
             selectedTransport: selectedTransportRelay.asDriver(),
             selectedDateRange: selectedDateRelay.asDriver(),
             showCalendar: showCalendar,
             saveCompleted: saveCompleted,
-            saveError: saveError
+            toastMessage: toastMessage
         )
     }
     
@@ -109,8 +123,9 @@ final class TravelAddViewModel: BaseViewModel {
     func updateDeparture(_ city: CityTable) {
         departureRelay.accept(city)
     }
-
+    
     func updateDestination(_ city: CityTable) {
         destinationRelay.accept(city)
     }
 }
+
