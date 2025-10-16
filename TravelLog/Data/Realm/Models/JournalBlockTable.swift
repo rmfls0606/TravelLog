@@ -5,7 +5,7 @@
 //  Created by 이상민 on 10/10/25.
 //
 
-import Foundation
+import UIKit
 import RealmSwift
 
 // MARK: - Enum
@@ -23,6 +23,21 @@ enum JournalBlockType: String, CaseIterable, PersistableEnum {
         case .location: return "location"
         case .link: return "link"
         case .voice: return "waveform"
+        }
+    }
+    
+    var color: UIColor{
+        switch self {
+        case .text:
+            return .systemBlue
+        case .photo:
+            return .systemPink
+        case .location:
+            return .green
+        case .link:
+            return .systemPurple
+        case .voice:
+            return .systemOrange
         }
     }
 }
