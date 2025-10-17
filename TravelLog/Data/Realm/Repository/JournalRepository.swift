@@ -14,6 +14,7 @@ protocol JournalRepositoryType {
     func fetchJournals(for tripId: ObjectId) -> Observable<[JournalTable]>
     func createJournal(for tripId: ObjectId) -> Single<JournalTable>
     func addJournalBlock(journalId: ObjectId, type: JournalBlockType, text: String?) -> Completable
+    func fetchJournalCount(tripId: ObjectId) -> Single<Int>
 }
 
 final class JournalRepository: JournalRepositoryType {
@@ -29,10 +30,8 @@ final class JournalRepository: JournalRepositoryType {
                 .filter("tripId == %@", tripId)
                 .sorted(byKeyPath: "createdAt", ascending: true)
             
-            // ✅ 초기값 즉시 방출
             observer.onNext(Array(results))
             
-            // ✅ Realm 변경 감시
             let token = results.observe { changes in
                 switch changes {
                 case .initial(let collection):
@@ -43,8 +42,7 @@ final class JournalRepository: JournalRepositoryType {
                     observer.onError(error)
                 }
             }
-            
-            // ✅ Token 관리 및 해제
+
             self.notificationTokens.append(token)
             
             return Disposables.create {
@@ -59,7 +57,7 @@ final class JournalRepository: JournalRepositoryType {
             guard let self else { return Disposables.create() }
             do {
                 let journal = JournalTable(tripId: tripId)
-                try self.realm.write { self.realm.add(journal) } // ✅ self.realm 명시
+                try self.realm.write { self.realm.add(journal) }
                 single(.success(journal))
             } catch {
                 single(.failure(error))
@@ -87,12 +85,28 @@ final class JournalRepository: JournalRepositoryType {
                     text: text
                 )
                 try self.realm.write {
-                    self.realm.add(block)         // ✅ 명시적으로 self.realm
+                    self.realm.add(block)
                     journal.blocks.append(block)
                 }
                 completable(.completed)
             } catch {
                 completable(.error(error))
+            }
+            return Disposables.create()
+        }
+    }
+    
+    //MARK: - Fetch Journal Count
+    func fetchJournalCount(tripId: ObjectId) -> Single<Int> {
+        return Single.create { single in
+            do{
+                let realm = try Realm()
+                let count = realm.objects(JournalTable.self)
+                    .filter("tripId == %@", tripId)
+                    .count
+                single(.success(count))
+            }catch{
+                single(.failure(error))
             }
             return Disposables.create()
         }
