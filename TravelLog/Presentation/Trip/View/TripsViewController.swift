@@ -73,8 +73,8 @@ final class TripsViewController: BaseViewController {
         }
         
         emptyView.snp.makeConstraints { make in
-            make.edges.equalTo(view.safeAreaLayoutGuide)
-            make.center.equalTo(view.safeAreaLayoutGuide)
+            make.edges.equalTo(view.safeAreaLayoutGuide).inset(16)
+            make.center.equalTo(view.safeAreaLayoutGuide).inset(16)
         }
     }
     
@@ -123,9 +123,8 @@ final class TripsViewController: BaseViewController {
         output.tripsRelay
             .drive(with: self) { owner, trips in
                 owner.headerView.isHidden = trips.isEmpty
-                owner.tableView.backgroundView = trips.isEmpty ? owner.emptyView : nil
+                owner.emptyView.isHidden = !trips.isEmpty // isHidden으로 제어
                 owner.tableView.isScrollEnabled = !trips.isEmpty
-                owner.tableView.layoutIfNeeded()
             }
             .disposed(by: disposeBag)
         

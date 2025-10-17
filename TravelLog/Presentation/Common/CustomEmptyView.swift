@@ -55,7 +55,7 @@ final class CustomEmptyView: BaseView {
         config.baseBackgroundColor = .clear // gradient 예정
         config.baseForegroundColor = .white
         config.preferredSymbolConfigurationForImage = imageConfig
-        config.imagePadding = 6
+        config.imagePadding = 10
         config.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 24, bottom: 12, trailing: 24)
 
         let button = UIButton(configuration: config)
