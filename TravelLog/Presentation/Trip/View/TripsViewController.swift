@@ -25,7 +25,7 @@ final class TripsViewController: BaseViewController {
     // MARK: - View Setup
     override func configureHierarchy() {
         view.addSubviews(titleLabel, subtitleLabel, tableView)
-        tableView.register(TripTextCell.self, forCellReuseIdentifier: TripTextCell.identifier)
+        tableView.register(TripCardCell.self, forCellReuseIdentifier: TripCardCell.identifier)
     }
     
     override func configureLayout() {
@@ -75,14 +75,14 @@ final class TripsViewController: BaseViewController {
         
         output.tripsRelay
             .drive(tableView.rx.items(
-                cellIdentifier: TripTextCell.identifier,
-                cellType: TripTextCell.self
-            )) { [weak self] index, trip, cell in
+                cellIdentifier: TripCardCell.identifier,
+                cellType: TripCardCell.self
+            )) { [weak self] index, element, cell in
                 guard let self = self else { return }
-                cell.configure(with: trip)
+                cell.configure(with: element.trip, journalCount: element.journalCount)
                 
                 cell.continueButton.rx.tap
-                    .map { trip }
+                    .map { element.trip }
                     .bind(to: self.tripSelectedRelay)
                     .disposed(by: cell.disposeBag)
             }

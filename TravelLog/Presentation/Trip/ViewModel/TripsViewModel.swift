@@ -10,36 +10,44 @@ import RxSwift
 import RxCocoa
 
 final class TripsViewModel: BaseViewModel {
-
+    
     private let disposeBag = DisposeBag()
     
     private let fetchTripUseCase: FetchTripUseCase
     private let deleteTripUseCase: DeleteTripUseCase
-
+    private let fetchJournalCountUseCase: FetchJournalCountUseCase
+    
     init(
         fetchTripUseCase: FetchTripUseCase = FetchTripUseCaseImpl(
             repository: TripRepositoryImpl()),
         deleteTripUseCase: DeleteTripUseCase = DeleteTripUseCaseImpl(
-            repository: TripRepositoryImpl())
+            repository: TripRepositoryImpl()),
+        fetchJournalCountUseCase: FetchJournalCountUseCase = FetchJournalCountUseCaseImpl(repository: JournalRepository())
     ) {
         self.fetchTripUseCase = fetchTripUseCase
         self.deleteTripUseCase = deleteTripUseCase
+        self.fetchJournalCountUseCase = fetchJournalCountUseCase
+    }
+    
+    struct TripSummary{
+        let trip: TravelTable
+        let journalCount: Int
     }
     
     struct Input {
         let viewWillAppear: Observable<Void>
         let tripDelete: ControlEvent<TravelTable>
     }
-
+    
     struct Output {
-        private(set) var tripsRelay: Driver<[TravelTable]>
+        private(set) var tripsRelay: Driver<[TripSummary]>
         private(set) var toastRelay: Signal<String>
     }
-
+    
     func transform(input: Input) -> Output {
-        let tripsRelay = BehaviorRelay<[TravelTable]>(value: [])
+        let tripsRelay = BehaviorRelay<[TripSummary]>(value: [])
         let toastRelay = PublishRelay<String>()
-
+        
         let fetchStream = fetchTripUseCase.execute()
             .do(onError: { error in
                 if let realmError = error as? RealmError{
@@ -51,8 +59,18 @@ final class TripsViewModel: BaseViewModel {
             .distinctUntilChanged{ $0 == $1}
         
         input.viewWillAppear
-            .flatMapLatest { _ in
-                fetchStream
+            .flatMapLatest { [weak self] _ -> Observable<[TripSummary]> in
+                guard let self = self else { return .empty() }
+                
+                return self.fetchTripUseCase.execute()
+                    .flatMap { trips -> Observable<[TripSummary]> in
+                        let countStreams = trips.map { trip in
+                            self.fetchJournalCountUseCase.execute(tripId: trip.id)
+                                .map { TripSummary(trip: trip, journalCount: $0) }
+                                .asObservable()
+                        }
+                        return Observable.zip(countStreams)
+                    }
             }
             .bind(to: tripsRelay)
             .disposed(by: disposeBag)
@@ -71,7 +89,7 @@ final class TripsViewModel: BaseViewModel {
                 }
             )
             .disposed(by: disposeBag)
-            
+        
         
         return Output(
             tripsRelay: tripsRelay.asDriver(),
