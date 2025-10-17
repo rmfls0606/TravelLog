@@ -13,7 +13,7 @@ import RealmSwift
 final class JournalAddViewModel: BaseViewModel {
     
     struct Input {
-        let saveTapped: Observable<[String]> // ✅ 여러 텍스트 블록의 내용을 한 번에 받음
+        let saveTapped: Observable<[String]> // 여러 텍스트 블록의 내용을 한 번에 받음
     }
     
     struct Output {
@@ -30,7 +30,7 @@ final class JournalAddViewModel: BaseViewModel {
     }
     
     func transform(input: Input) -> Output {
-        // ✅ 저장 버튼 누르면 전체 텍스트 배열 처리
+        // 저장 버튼 누르면 전체 텍스트 배열 처리
         let saveCompleted = input.saveTapped
             .flatMapLatest { [weak self] texts -> Observable<Void> in
                 guard let self = self else { return .empty() }

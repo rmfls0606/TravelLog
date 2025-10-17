@@ -111,7 +111,7 @@ final class JournalTextCell: UITableViewCell {
         locationLabel.text = block.placeName ?? "위치 없음"
         contentLabel.text = block.text ?? "(내용 없음)"
         
-        // ✅ 분홍색 계열 고정
+        // 분홍색 계열 고정
         blockView.backgroundColor = UIColor(
             red: 255/255,
             green: 120/255,

@@ -123,7 +123,7 @@ final class JournalTextBlockView: UIView, UITextViewDelegate {
         // Rx 바인딩
         textView.rx.text.orEmpty
             .map { text -> String in
-                // ⚠️ 엔터·공백만 입력한 경우는 빈 문자열로 처리
+                // 엔터·공백만 입력한 경우는 빈 문자열로 처리
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     return ""
                 }
@@ -131,10 +131,10 @@ final class JournalTextBlockView: UIView, UITextViewDelegate {
             }
             .distinctUntilChanged()
             .bind(with: self) { owner, text in
-                // ✅ placeholder 표시/숨김
+                // placeholder 표시/숨김
                 owner.placeholderLabel.isHidden = !text.isEmpty
                 
-                // ✅ 텍스트 변경 이벤트 전달
+                // 텍스트 변경 이벤트 전달
                 owner.textChanged.accept(text)
             }
             .disposed(by: disposeBag)
@@ -145,7 +145,7 @@ final class JournalTextBlockView: UIView, UITextViewDelegate {
     }
     
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-           // ✅ Return 키 누를 시 키보드 내리기
+           // Return 키 누를 시 키보드 내리기
            if text == "\n" {
                textView.resignFirstResponder()
                return false

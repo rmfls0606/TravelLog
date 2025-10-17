@@ -23,7 +23,7 @@ final class JournalAddViewController: BaseViewController {
     private let viewModel: JournalAddViewModel
     private let disposeBag = DisposeBag()
     
-    // ✅ ViewModel로 보낼 save 이벤트용 Relay
+    // ViewModel로 보낼 save 이벤트용 Relay
     private let saveTrigger = PublishRelay<[String]>()
     
     init(viewModel: JournalAddViewModel) {
@@ -102,32 +102,30 @@ final class JournalAddViewController: BaseViewController {
     }
     
     override func configureBind() {
-        // ✅ 블록 추가
+        // 블록 추가
         textButton.rx.tap
             .bind(with: self) { owner, _ in
                 owner.addTextBlock()
             }
             .disposed(by: disposeBag)
         
-        // ✅ 저장 버튼 탭 시 현재 블록들의 텍스트 전부 수집
+        // 저장 버튼 탭 시 현재 블록들의 텍스트 전부 수집
         saveButton.rx.tap
             .map { [weak self] _ -> [String] in
                 guard let self = self else { return [] }
                 return self.contentStack.arrangedSubviews
-                    .compactMap { ($0 as? JournalTextBlockView)?.textContent } // ✅ 변경
+                    .compactMap { ($0 as? JournalTextBlockView)?.textContent } // 변경
                     .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             }
             .bind(to: saveTrigger)
             .disposed(by: disposeBag)
         
-        // ✅ ViewModel transform
+        // ViewModel transform
         let input = JournalAddViewModel.Input(saveTapped: saveTrigger.asObservable())
         let output = viewModel.transform(input: input)
         
-        // ✅ 저장 완료 → 이전 화면으로 이동
         output.saveCompleted
             .emit(with: self) { owner, _ in
-                print("✅ 저장 완료 — 이전 화면으로 이동")
                 owner.navigationController?.popViewController(animated: true)
             }
             .disposed(by: disposeBag)
@@ -142,7 +140,7 @@ final class JournalAddViewController: BaseViewController {
         contentStack.addArrangedSubview(card)
         card.snp.makeConstraints { $0.height.greaterThanOrEqualTo(120) }
         
-        // ❌ index 없이: 단순히 UI에서 제거/추가
+        // index 없이: 단순히 UI에서 제거/추가
         card.removeTapped
             .bind(with: self) { owner, _ in
                 UIView.animate(withDuration: 0.25) {

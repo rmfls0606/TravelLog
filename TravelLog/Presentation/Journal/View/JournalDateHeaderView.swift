@@ -27,7 +27,7 @@ final class JournalDateHeaderView: UITableViewHeaderFooterView {
     private func setupView() {
         contentView.backgroundColor = .clear
         
-        // ✅ 작은 카드 스타일
+        // 작은 카드 스타일
         containerView.backgroundColor = .white
         containerView.layer.cornerRadius = 12
         containerView.layer.borderWidth = 1
@@ -38,7 +38,7 @@ final class JournalDateHeaderView: UITableViewHeaderFooterView {
         containerView.layer.shadowRadius = 2
         containerView.clipsToBounds = false
         
-        // ✅ 날짜 라벨
+        // 날짜 라벨
         dateLabel.font = .systemFont(ofSize: 16, weight: .bold)
         dateLabel.textColor = .darkGray
         dateLabel.textAlignment = .center
@@ -46,7 +46,7 @@ final class JournalDateHeaderView: UITableViewHeaderFooterView {
         contentView.addSubview(containerView)
         containerView.addSubview(dateLabel)
         
-        // ✅ 카드가 label 크기에 맞게 감싸지도록
+        // 카드가 label 크기에 맞게 감싸지도록
         containerView.snp.makeConstraints {
             $0.leading.equalToSuperview().inset(16)
             $0.top.bottom.equalToSuperview().inset(16)

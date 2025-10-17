@@ -87,7 +87,7 @@ final class JournalTimelineViewController: BaseViewController {
         
         let output = viewModel.transform(input: input)
         
-        // ✅ 일지 목록 표시
+        // 일지 목록 표시
         output.journals
             .drive(with: self) { owner, journals in
                 owner.updateGroupedData(from: journals)
@@ -97,7 +97,7 @@ final class JournalTimelineViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
-        // ✅ “추가하기” 버튼 → JournalAddViewController로 이동
+        // “추가하기” 버튼 → JournalAddViewController로 이동
         output.navigateToAdd
             .emit(with: self) { owner, tripId in
                 let addViewModel = JournalAddViewModel(tripId: tripId)
@@ -136,7 +136,7 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
     
     func tableView(_ tableView: UITableView, estimatedHeightForHeaderInSection section: Int) -> CGFloat { 50 }
     
-    // ✅ 스와이프 삭제 기능 추가 (Realm journal 정리 포함)
+    // 스와이프 삭제 기능 추가 (Realm journal 정리 포함)
     func tableView(
         _ tableView: UITableView,
         trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath
@@ -148,19 +148,19 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             
             do {
                 try self.realm.write {
-                    // ✅ block 삭제 전에 journal 참조를 미리 잡아둔다
+                    // block 삭제 전에 journal 참조를 미리 잡아둔다
                     let journal = block.journal.first
                     
-                    // 1️⃣ 블록 먼저 삭제
+                    // 블록 먼저 삭제
                     self.realm.delete(block)
                     
-                    // 2️⃣ 블록 삭제 이후, journal의 남은 블록이 없으면 journal도 삭제
+                    // 블록 삭제 이후, journal의 남은 블록이 없으면 journal도 삭제
                     if let journal, journal.isInvalidated == false, journal.blocks.isEmpty {
                         self.realm.delete(journal)
                     }
                 }
                 
-                // ✅ UI 업데이트 (Realm write 밖에서)
+                // UI 업데이트 (Realm write 밖에서)
                 self.groupedData[indexPath.section].blocks.remove(at: indexPath.row)
                 
                 if self.groupedData[indexPath.section].blocks.isEmpty {
@@ -177,7 +177,7 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
                 
                 completion(true)
             } catch {
-                print("❌ 삭제 실패: \(error)")
+                print("삭제 실패: \(error)")
                 completion(false)
             }
         }
