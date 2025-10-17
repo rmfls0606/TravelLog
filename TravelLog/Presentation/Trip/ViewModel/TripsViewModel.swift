@@ -9,6 +9,11 @@ import Foundation
 import RxSwift
 import RxCocoa
 
+struct TripSummary{
+    let trip: TravelTable
+    let journalCount: Int
+}
+
 final class TripsViewModel: BaseViewModel {
     
     private let disposeBag = DisposeBag()
@@ -28,15 +33,11 @@ final class TripsViewModel: BaseViewModel {
         self.deleteTripUseCase = deleteTripUseCase
         self.fetchJournalCountUseCase = fetchJournalCountUseCase
     }
-    
-    struct TripSummary{
-        let trip: TravelTable
-        let journalCount: Int
-    }
+
     
     struct Input {
         let viewWillAppear: Observable<Void>
-        let tripDelete: ControlEvent<TravelTable>
+        let tripDelete: ControlEvent<TripSummary>
     }
     
     struct Output {
@@ -69,16 +70,16 @@ final class TripsViewModel: BaseViewModel {
                                 .map { TripSummary(trip: trip, journalCount: $0) }
                                 .asObservable()
                         }
-                        return Observable.zip(countStreams)
+                        return Observable.combineLatest(countStreams)
                     }
             }
             .bind(to: tripsRelay)
             .disposed(by: disposeBag)
         
         input.tripDelete
-            .flatMapLatest { [weak self] trip -> Completable in
+            .flatMapLatest { [weak self] summary -> Completable in
                 guard let self else { return .empty() }
-                return self.deleteTripUseCase.execute(trip: trip)
+                return self.deleteTripUseCase.execute(trip: summary.trip)
             }
             .subscribe(
                 onError: { error in

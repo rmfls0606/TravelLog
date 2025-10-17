@@ -73,8 +73,8 @@ final class TripsViewController: BaseViewController {
         }
         
         emptyView.snp.makeConstraints { make in
-            make.edges.equalTo(tableView)
-            make.center.equalTo(tableView)
+            make.edges.equalTo(view.safeAreaLayoutGuide)
+            make.center.equalTo(view.safeAreaLayoutGuide)
         }
     }
     
@@ -100,7 +100,7 @@ final class TripsViewController: BaseViewController {
         let input = TripsViewModel.Input(
             viewWillAppear: rx.methodInvoked(#selector(UIViewController.viewWillAppear(_:)))
                 .map { _ in () },
-            tripDelete: tableView.rx.modelDeleted(TravelTable.self)
+            tripDelete: tableView.rx.modelDeleted(TripSummary.self)
         )
         
         let output = viewModel.transform(input: input)
