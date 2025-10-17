@@ -37,6 +37,7 @@ final class TripsViewController: BaseViewController {
     private let viewModel = TripsViewModel()
     private let disposeBag = DisposeBag()
     private let tripSelectedRelay = PublishRelay<TravelTable>()
+    private lazy var emptyView = CustomEmptyView()
     
     // MARK: - Lifecycle
     override func viewDidAppear(_ animated: Bool) {
@@ -47,6 +48,7 @@ final class TripsViewController: BaseViewController {
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(tableView)
+        view.addSubview(emptyView)
         
         headerView.addSubview(titleLabel)
         headerView.addSubview(subtitleLabel)
@@ -69,6 +71,11 @@ final class TripsViewController: BaseViewController {
             $0.top.equalTo(titleLabel.snp.bottom).offset(4)
             $0.centerX.equalToSuperview()
         }
+        
+        emptyView.snp.makeConstraints { make in
+            make.edges.equalTo(tableView)
+            make.center.equalTo(tableView)
+        }
     }
     
     // MARK: - View Setup
@@ -84,6 +91,8 @@ final class TripsViewController: BaseViewController {
         tableView.estimatedRowHeight = 160
         
         headerView.backgroundColor = .clear
+        
+        emptyView.configure(icon: UIImage(systemName: "airplane.departure"), iconTint: .white, gradientStyle: .bluePurple, title: "아직 여행 계획이 없어요", subtitle: "새로운 여행을 계획하고\n멋진 추억을 만들어보세요", buttonTitle: "첫 여행 계획하기", buttonImage: UIImage(systemName: "map"), buttonGradient: .bluePurple)
     }
     
     // MARK: - Binding
@@ -108,6 +117,15 @@ final class TripsViewController: BaseViewController {
                     .map { element.trip }
                     .bind(to: self.tripSelectedRelay)
                     .disposed(by: cell.disposeBag)
+            }
+            .disposed(by: disposeBag)
+        
+        output.tripsRelay
+            .drive(with: self) { owner, trips in
+                owner.headerView.isHidden = trips.isEmpty
+                owner.tableView.backgroundView = trips.isEmpty ? owner.emptyView : nil
+                owner.tableView.isScrollEnabled = !trips.isEmpty
+                owner.tableView.layoutIfNeeded()
             }
             .disposed(by: disposeBag)
         
