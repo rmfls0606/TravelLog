@@ -12,55 +12,78 @@ import RxCocoa
 
 final class TripsViewController: BaseViewController {
 
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
+    // MARK: - UI Components
+    private let headerView = UIView()
+    
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "소중한 여행 기록들"
+        label.font = .boldSystemFont(ofSize: 16)
+        label.textAlignment = .center
+        return label
+    }()
+    
+    private let subtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "당신만의 특별한 추억들을 간직하세요"
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .gray
+        label.textAlignment = .center
+        return label
+    }()
+    
     private let tableView = UITableView(frame: .zero, style: .plain)
     
     private let viewModel = TripsViewModel()
     private let disposeBag = DisposeBag()
-    
-    // 버튼 클릭 시 trip 전달용 Relay
     private let tripSelectedRelay = PublishRelay<TravelTable>()
     
-    // MARK: - View Setup
+    // MARK: - Lifecycle
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        configureTableHeaderView()
+    }
+    
+    // MARK: - Hierarchy
     override func configureHierarchy() {
-        view.addSubviews(titleLabel, subtitleLabel, tableView)
+        view.addSubview(tableView)
+        
+        headerView.addSubview(titleLabel)
+        headerView.addSubview(subtitleLabel)
+        
         tableView.register(TripCardCell.self, forCellReuseIdentifier: TripCardCell.identifier)
     }
     
+    // MARK: - Layout
     override func configureLayout() {
-        titleLabel.snp.makeConstraints {
-            $0.top.equalTo(view.safeAreaLayoutGuide).offset(16)
-            $0.centerX.equalToSuperview()
+        tableView.snp.makeConstraints {
+            $0.edges.equalTo(view.safeAreaLayoutGuide)
         }
         
+        // header 내부 layout은 SnapKit 유지
+        titleLabel.snp.makeConstraints {
+            $0.top.equalToSuperview().offset(16)
+            $0.centerX.equalToSuperview()
+        }
         subtitleLabel.snp.makeConstraints {
             $0.top.equalTo(titleLabel.snp.bottom).offset(4)
             $0.centerX.equalToSuperview()
         }
-        
-        tableView.snp.makeConstraints {
-            $0.top.equalTo(subtitleLabel.snp.bottom).offset(12)
-            $0.horizontalEdges.bottom.equalTo(view.safeAreaLayoutGuide)
-        }
     }
     
+    // MARK: - View Setup
     override func configureView() {
         view.backgroundColor = .systemGroupedBackground
         navigationItem.title = "나의 여행"
         navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .add)
-        
-        titleLabel.text = "소중한 여행 기록들"
-        titleLabel.font = .boldSystemFont(ofSize: 16)
-        subtitleLabel.text = "당신만의 특별한 추억들을 간직하세요"
-        subtitleLabel.font = .systemFont(ofSize: 12)
-        subtitleLabel.textColor = .gray
         
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
         tableView.showsVerticalScrollIndicator = false
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 160
+        
+        headerView.backgroundColor = .clear
     }
     
     // MARK: - Binding
@@ -104,13 +127,40 @@ final class TripsViewController: BaseViewController {
             .disposed(by: disposeBag)
         
         output.toastRelay
-            .emit(with: self){ owner, message in
+            .emit(with: self) { owner, message in
                 print("삭제 실패: \(message)")
             }
             .disposed(by: disposeBag)
     }
+    
+    // MARK: - Header Configuration (Frame 기반)
+    private func configureTableHeaderView() {
+        // SnapKit 내부 Layout 확정
+        headerView.setNeedsLayout()
+        headerView.layoutIfNeeded()
+        
+        // title + subtitle + spacing + padding 계산
+        let titleHeight = titleLabel.intrinsicContentSize.height
+        let subtitleHeight = subtitleLabel.intrinsicContentSize.height
+        let topPadding: CGFloat = 16
+        let spacing: CGFloat = 4
+        let bottomPadding: CGFloat = 16
+        
+        let totalHeight = titleHeight + subtitleHeight + topPadding + spacing + bottomPadding
+        
+        // frame 기반으로 headerView 높이 지정
+        headerView.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: tableView.bounds.width,
+            height: totalHeight
+        )
+        
+        tableView.tableHeaderView = headerView
+    }
 }
 
+// MARK: - Extensions
 extension UIView {
     func addSubviews(_ views: UIView...) {
         views.forEach { addSubview($0) }
