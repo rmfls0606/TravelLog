@@ -149,6 +149,13 @@ final class TripsViewController: BaseViewController {
                 print("삭제 실패: \(message)")
             }
             .disposed(by: disposeBag)
+        
+        emptyView.actionButton.rx.tap
+            .bind(with: self) { owner, _ in
+                let vc = TravelAddViewController()
+                owner.navigationController?.pushViewController(vc, animated: true)
+            }
+            .disposed(by: disposeBag)
     }
     
     // MARK: - Header Configuration (Frame 기반)
