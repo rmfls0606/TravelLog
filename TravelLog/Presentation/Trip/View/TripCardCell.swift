@@ -33,7 +33,7 @@ final class TripCardCell: BaseTableViewCell {
     
     private let overlayView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.2)
         return view
     }()
     
@@ -52,7 +52,6 @@ final class TripCardCell: BaseTableViewCell {
         let view = PaddedLabel()
         view.font = .systemFont(ofSize: 13, weight: .bold)
         view.textColor = .white
-//        view.layer.cornerRadius = 14
         view.clipsToBounds = true
         view.textInsets = UIEdgeInsets(top: 4, left: 12, bottom: 4, right: 12)
         return view
@@ -270,7 +269,7 @@ final class TripCardCell: BaseTableViewCell {
         
         cityImageView.snp.makeConstraints { make in
             make.top.horizontalEdges.equalToSuperview()
-            make.height.equalTo(cardView.snp.width).multipliedBy(0.5)
+            make.height.equalTo(cardView.snp.width).multipliedBy(0.6)
         }
         overlayView.snp.makeConstraints { make in
             make.edges.equalTo(cityImageView)
@@ -305,7 +304,7 @@ final class TripCardCell: BaseTableViewCell {
         routeContainer.snp.makeConstraints { make in
             make.top.equalTo(cityImageView.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview().inset(16)
-            make.height.equalTo(100)
+            make.height.equalTo(80)
         }
         departureStack.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(20)
@@ -374,7 +373,6 @@ final class TripCardCell: BaseTableViewCell {
     
     // MARK: - Configure
     func configure(with trip: TravelTable, journalCount: Int) {
-        cityImageView.image = UIImage(named: trip.destination?.name ?? "default")
         cityLabel.text = trip.destination?.name
         countryLabel.text = trip.destination?.country
         departureCityLabel.text = trip.departure?.name ?? "-"
@@ -406,32 +404,32 @@ final class TripCardCell: BaseTableViewCell {
         switch status {
         case .planned:
             statusBadge.text = "계획중"
-            statusBadge.backgroundColor = .systemBlue
-            cardView.layer.borderColor = UIColor.systemBlue.cgColor
+            statusBadge.backgroundColor = status.color
+            cardView.layer.borderColor = status.color.cgColor
             applyButtonConfiguration(
                 title: "여행 계속하기",
                 iconName: "map",
-                color: .systemBlue
+                color: status.color
             )
             
         case .ongoing:
             statusBadge.text = "여행중"
-            statusBadge.backgroundColor = .systemGreen
-            cardView.layer.borderColor = UIColor.systemGreen.cgColor
+            statusBadge.backgroundColor = status.color
+            cardView.layer.borderColor = status.color.cgColor
             applyButtonConfiguration(
                 title: "여행 계속하기",
                 iconName: "map",
-                color: .systemGreen
+                color: status.color
             )
             
         case .completed:
             statusBadge.text = "완료"
-            statusBadge.backgroundColor = .systemPink
-            cardView.layer.borderColor = UIColor.systemGray5.cgColor
+            statusBadge.backgroundColor = status.color
+            cardView.layer.borderColor = status.color.cgColor
             applyButtonConfiguration(
                 title: "추억 다시보기",
                 iconName: "heart",
-                color: .systemPink,
+                color: status.color,
                 border: true
             )
         }
@@ -441,7 +439,6 @@ final class TripCardCell: BaseTableViewCell {
         title: String,
         iconName: String,
         color: UIColor,
-        textColor: UIColor = .white,
         border: Bool = false
     ) {
         var config = continueButton.configuration

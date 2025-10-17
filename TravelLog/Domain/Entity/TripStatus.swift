@@ -15,11 +15,11 @@ enum TripStatus{
     var color: UIColor{
         switch self {
         case .planned:
-            return .systemBlue
+            return .systemBlue.withAlphaComponent(0.8)
         case .ongoing:
-            return .systemGreen
+            return .systemGreen.withAlphaComponent(0.8)
         case .completed:
-            return .systemPink
+            return .systemPurple.withAlphaComponent(0.8)
         }
     }
 }
