@@ -21,11 +21,30 @@ final class TripRealmDataSource{
             do{
                 let realm = try Realm()
                 try realm.write {
-                    realm.add([departure, destination], update: .modified)
+                    let departureCity: CityTable
+                    if let existingDeparture = realm.objects(CityTable.self)
+                        .filter("name == %@", departure.name)
+                        .first {
+                        departureCity = existingDeparture
+                    } else {
+                        realm.add(departure, update: .modified)
+                        departureCity = departure
+                    }
+                    
+                    //도착 도시: 이름 기준으로 중복 체크
+                    let destinationCity: CityTable
+                    if let existingDestination = realm.objects(CityTable.self)
+                        .filter("name == %@", destination.name)
+                        .first {
+                        destinationCity = existingDestination
+                    } else {
+                        realm.add(destination, update: .modified)
+                        destinationCity = destination
+                    }
                     
                     let travel = TravelTable(
-                        departure: departure,
-                        destination: destination,
+                        departure: departureCity,
+                        destination: destinationCity,
                         startDate: startDate,
                         endDate: endDate,
                         transport: transport,
@@ -57,13 +76,13 @@ final class TripRealmDataSource{
                 let token: NotificationToken = results.observe { changes in
                     switch changes {
                     case .initial(let collection),
-                         .update(let collection, _, _, _):
+                            .update(let collection, _, _, _):
                         observer.onNext(Array(collection))
                     case .error:
                         observer.onError(RealmError.fetchFailure)
                     }
                 }
-            
+                
                 return Disposables.create {
                     _ = token
                 }
