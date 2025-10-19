@@ -33,6 +33,7 @@ final class JournalTimelineViewController: BaseViewController {
     private let realm = try! Realm()
     private var groupedData: [(date: Date, blocks: [JournalBlockTable])] = []
     private var trip: TravelTable?
+    private let deleteTappedSubject = PublishSubject<(ObjectId, ObjectId)>()
     
     // MARK: - Init
     init(tripId: ObjectId) {
@@ -176,7 +177,8 @@ final class JournalTimelineViewController: BaseViewController {
     override func configureBind() {
         let input = JournalTimelineViewModel.Input(
             viewWillAppear: rx.methodInvoked(#selector(UIViewController.viewWillAppear(_:))).map { _ in () },
-            addTapped: addMemoryView.actionButton.rx.tap.asObservable()
+            addTapped: addMemoryView.actionButton.rx.tap.asObservable(),
+            deleteTapped: deleteTappedSubject.asObservable()
         )
         
         let output = viewModel.transform(input: input)
@@ -216,7 +218,7 @@ final class JournalTimelineViewController: BaseViewController {
             .disposed(by: disposeBag)
         
         output.navigateToAdd
-            .emit(with: self) { owner, tripId in
+            .bind(with: self) { owner, tripId in
                 let addVM = JournalAddViewModel(tripId: tripId, date: Date())
                 let addVC = JournalAddViewController(viewModel: addVM)
                 addVC.hidesBottomBarWhenPushed = true
@@ -233,6 +235,13 @@ final class JournalTimelineViewController: BaseViewController {
                    owner.navigationController?.pushViewController(addVC, animated: true)
                }
                .disposed(by: disposeBag)
+        
+        output.deleteCompleted
+            .observe(on: MainScheduler.instance)
+            .subscribe(with: self) { owner, _ in
+                owner.tableView.reloadData()
+            }
+            .disposed(by: disposeBag)
     }
     
     // MARK: - Realm 삭제 로직
@@ -296,8 +305,6 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
         footer.tapGesture.rx.event
                 .throttle(.milliseconds(400), scheduler: MainScheduler.instance)
                 .bind(with: self) { owner, _ in
-                    print("✅ footer tapped in VC")
-                    
                     guard let trip = owner.trip else { return }
                     let date = owner.groupedData[section].date
                     
@@ -329,5 +336,24 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
         guard let cell = cell as? JournalTextCell else { return }
         let isFirst = (indexPath.section == 0 && indexPath.row == 0)
         cell.setIsFirstInTimeline(isFirst)
+    }
+}
+extension JournalTimelineViewController {
+    func tableView(_ tableView: UITableView,
+                   trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath)
+    -> UISwipeActionsConfiguration? {
+
+        let deleteAction = UIContextualAction(style: .destructive, title: "삭제") { [weak self] _, _, completion in
+            guard let self else { return }
+            let block = self.groupedData[indexPath.section].blocks[indexPath.row]
+            guard let journal = block.journal.first else { return }
+
+            // ViewModel에 삭제 요청 전달
+            self.deleteTappedSubject.onNext((journal.id, block.id))
+            completion(true)
+        }
+
+        deleteAction.backgroundColor = .systemRed
+        return UISwipeActionsConfiguration(actions: [deleteAction])
     }
 }
