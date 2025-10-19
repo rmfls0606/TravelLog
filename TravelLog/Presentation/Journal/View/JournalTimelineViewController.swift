@@ -140,6 +140,7 @@ final class JournalTimelineViewController: BaseViewController {
         tripImageView.contentMode = .scaleAspectFill
         tripImageView.clipsToBounds = true
         tripImageView.backgroundColor = UIColor.black.withAlphaComponent(0.1)
+        tripImageView.image = .seoul
         
         cityLabel.font = .boldSystemFont(ofSize: 20)
         cityLabel.textColor = .white

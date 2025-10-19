@@ -27,6 +27,7 @@ final class TripCardCell: BaseTableViewCell {
     private let cityImageView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFill
+        view.image = .seoul
         view.clipsToBounds = true
         return view
     }()
