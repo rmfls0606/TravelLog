@@ -14,16 +14,16 @@ final class JournalAddViewController: BaseViewController {
     
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
-    private let emptyView = UIView()
-    private let emptyLabel = UILabel()
+    
+    private let emptyContainerView = UIView()
+    private let emptyView = CustomEmptyView()
+    
     private let addBar = UIStackView()
-    private let textButton = UIButton(type: .system)
-    private let saveButton = UIButton(type: .system)
+    private let textButton = UIButton(configuration: .filled())
+    private let saveButton = UIButton(configuration: .filled())
     
     private let viewModel: JournalAddViewModel
     private let disposeBag = DisposeBag()
-    
-    // ViewModel로 보낼 save 이벤트용 Relay
     private let saveTrigger = PublishRelay<[String]>()
     
     init(viewModel: JournalAddViewModel) {
@@ -32,95 +32,150 @@ final class JournalAddViewController: BaseViewController {
     }
     required init?(coder: NSCoder) { fatalError() }
     
+    // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubviews(scrollView, addBar, saveButton)
         scrollView.addSubview(contentStack)
         addBar.addArrangedSubview(textButton)
-        contentStack.addArrangedSubview(emptyView)
-        emptyView.addSubview(emptyLabel)
+        
+        // empty container
+        view.insertSubview(emptyContainerView, belowSubview: addBar)
+        emptyContainerView.addSubview(emptyView)
     }
     
+    // MARK: - Layout
     override func configureLayout() {
         scrollView.snp.makeConstraints {
             $0.top.leading.trailing.equalTo(view.safeAreaLayoutGuide)
             $0.bottom.equalTo(addBar.snp.top)
         }
+
         contentStack.snp.makeConstraints {
-            $0.edges.equalToSuperview().inset(16)
-            $0.width.equalTo(scrollView.snp.width).offset(-32)
+            $0.edges.equalTo(scrollView.contentLayoutGuide).inset(16)
+            $0.width.equalTo(scrollView.frameLayoutGuide).offset(-32)
         }
-        emptyView.snp.makeConstraints { $0.height.equalTo(220) }
-        emptyLabel.snp.makeConstraints { $0.center.equalToSuperview() }
+
+        emptyContainerView.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            $0.bottom.equalTo(addBar.snp.top)
+            $0.horizontalEdges.equalToSuperview().inset(16)
+        }
+
+        emptyView.snp.makeConstraints {
+            $0.center.equalToSuperview()
+            $0.width.lessThanOrEqualToSuperview().inset(16)
+        }
+
         addBar.snp.makeConstraints {
             $0.leading.trailing.equalToSuperview().inset(16)
             $0.bottom.equalTo(saveButton.snp.top).offset(-12)
             $0.height.equalTo(60)
         }
+
         saveButton.snp.makeConstraints {
             $0.leading.trailing.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
             $0.height.equalTo(52)
         }
     }
     
+    // MARK: - View
     override func configureView() {
         view.backgroundColor = .systemGroupedBackground
-        title = "추억 추가"
+        title = "추억 기록하기"
         
         scrollView.alwaysBounceVertical = true
         contentStack.axis = .vertical
         contentStack.spacing = 16
         
-        emptyLabel.text = "✏️ 아래 버튼을 눌러 블록을 추가하세요"
-        emptyLabel.textColor = .systemGray
+        // EmptyView
+        emptyView.configure(
+            icon: UIImage(systemName: "text.below.folder.fill"),
+            iconTint: .white,
+            gradientStyle: .bluePurple,
+            title: "첫 번째 블록을 추가해보세요",
+            subtitle: "아래 버튼을 눌러 추억을 기록할 수 있어요",
+            buttonTitle: nil
+        )
         
         addBar.axis = .horizontal
         addBar.distribution = .fillEqually
         addBar.spacing = 12
         
-        textButton.setTitle("✏️ 텍스트", for: .normal)
-        textButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-        textButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
-        textButton.layer.cornerRadius = 12
-        textButton.tintColor = .systemBlue
-        
-        saveButton.setTitle("저장하기", for: .normal)
-        saveButton.setTitleColor(.white, for: .normal)
-        saveButton.titleLabel?.font = .boldSystemFont(ofSize: 16)
-        saveButton.backgroundColor = .systemGray4
-        saveButton.layer.cornerRadius = 12
-        saveButton.isEnabled = false
-        
-        let tapGesture = UITapGestureRecognizer()
-            tapGesture.cancelsTouchesInView = false
-            view.addGestureRecognizer(tapGesture)
-            
-            tapGesture.rx.event
-                .bind(with: self) { owner, _ in
-                    owner.view.endEditing(true)
-                }
-                .disposed(by: disposeBag)
+        configureButtons()
+        configureKeyboardDismissGesture()
     }
     
+    // MARK: - 버튼 설정 (cornerRadius 정상 적용)
+    private func configureButtons() {
+        // 텍스트 버튼
+        var textConfig = UIButton.Configuration.filled()
+        textConfig.baseForegroundColor = .systemBlue
+        textConfig.image = UIImage(
+            systemName: "pencil.line",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        )
+        textConfig.imagePadding = 8
+        textConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        textConfig.attributedTitle = AttributedString(
+            "텍스트",
+            attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 15, weight: .semibold)])
+        )
+        
+        // UIBackgroundConfiguration.clear() 사용
+        var textBg = UIBackgroundConfiguration.clear()
+        textBg.cornerRadius = 12
+        textBg.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        textConfig.background = textBg
+        
+        textButton.configuration = textConfig
+        textButton.clipsToBounds = true
+        
+        
+        // 저장 버튼
+        var saveConfig = UIButton.Configuration.filled()
+        saveConfig.baseForegroundColor = .white
+        saveConfig.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 24, bottom: 14, trailing: 24)
+        saveConfig.attributedTitle = AttributedString(
+            "저장하기",
+            attributes: AttributeContainer([.font: UIFont.boldSystemFont(ofSize: 16)])
+        )
+        
+        // clear()로 초기화 후 설정
+        var saveBg = UIBackgroundConfiguration.clear()
+        saveBg.cornerRadius = 12
+        saveBg.backgroundColor = .systemGray4
+        saveConfig.background = saveBg
+        
+        saveButton.configuration = saveConfig
+        saveButton.clipsToBounds = true
+        saveButton.isEnabled = false
+    }
+    
+    private func configureKeyboardDismissGesture() {
+        let tapGesture = UITapGestureRecognizer()
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
+        tapGesture.rx.event
+            .bind(with: self) { owner, _ in owner.view.endEditing(true) }
+            .disposed(by: disposeBag)
+    }
+    
+    // MARK: - Binding
     override func configureBind() {
-        // 블록 추가
         textButton.rx.tap
-            .bind(with: self) { owner, _ in
-                owner.addTextBlock()
-            }
+            .bind(with: self) { owner, _ in owner.addTextBlock() }
             .disposed(by: disposeBag)
         
-        // 저장 버튼 탭 시 현재 블록들의 텍스트 전부 수집
         saveButton.rx.tap
             .map { [weak self] _ -> [String] in
                 guard let self = self else { return [] }
                 return self.contentStack.arrangedSubviews
-                    .compactMap { ($0 as? JournalTextBlockView)?.textContent } // 변경
+                    .compactMap { ($0 as? JournalTextBlockView)?.textContent }
                     .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             }
             .bind(to: saveTrigger)
             .disposed(by: disposeBag)
         
-        // ViewModel transform
         let input = JournalAddViewModel.Input(saveTapped: saveTrigger.asObservable())
         let output = viewModel.transform(input: input)
         
@@ -131,16 +186,24 @@ final class JournalAddViewController: BaseViewController {
             .disposed(by: disposeBag)
     }
     
+    // MARK: - 블록 추가
     private func addTextBlock() {
-        emptyView.isHidden = true
+        emptyContainerView.isHidden = true
         saveButton.isEnabled = true
-        saveButton.backgroundColor = .systemBlue
+        
+        // 버튼 색상 변경
+        if var config = saveButton.configuration {
+            var bg = config.background
+            bg.backgroundColor = .systemBlue
+            bg.cornerRadius = 12
+            config.background = bg
+            saveButton.configuration = config
+        }
         
         let card = JournalTextBlockView()
         contentStack.addArrangedSubview(card)
         card.snp.makeConstraints { $0.height.greaterThanOrEqualTo(120) }
         
-        // index 없이: 단순히 UI에서 제거/추가
         card.removeTapped
             .bind(with: self) { owner, _ in
                 UIView.animate(withDuration: 0.25) {
@@ -151,9 +214,16 @@ final class JournalAddViewController: BaseViewController {
                     
                     let remaining = owner.contentStack.arrangedSubviews.compactMap { $0 as? JournalTextBlockView }
                     if remaining.isEmpty {
-                        owner.emptyView.isHidden = false
+                        owner.emptyContainerView.isHidden = false
                         owner.saveButton.isEnabled = false
-                        owner.saveButton.backgroundColor = .systemGray4
+                        
+                        if var config = owner.saveButton.configuration {
+                            var bg = config.background
+                            bg.backgroundColor = .systemGray4
+                            bg.cornerRadius = 12
+                            config.background = bg
+                            owner.saveButton.configuration = config
+                        }
                     }
                 }
             }
