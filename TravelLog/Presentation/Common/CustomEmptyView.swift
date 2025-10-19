@@ -83,8 +83,8 @@ final class CustomEmptyView: BaseView {
     // MARK: - Layout
     override func configureLayout() {
         stackView.snp.makeConstraints {
-            $0.center.equalToSuperview()
-            $0.horizontalEdges.equalToSuperview().inset(24)
+            $0.verticalEdges.equalToSuperview().inset(16)
+            $0.horizontalEdges.equalToSuperview().inset(16)
         }
         
         iconContainer.snp.makeConstraints {

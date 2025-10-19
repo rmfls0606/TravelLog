@@ -73,7 +73,6 @@ final class TripsViewController: BaseViewController {
         }
         
         emptyView.snp.makeConstraints { make in
-            make.edges.equalTo(view.safeAreaLayoutGuide).inset(16)
             make.center.equalTo(view.safeAreaLayoutGuide).inset(16)
         }
     }
