@@ -13,18 +13,18 @@ final class JournalTable: Object {
     @Persisted(primaryKey: true) var id: ObjectId
     @Persisted var tripId: ObjectId
     @Persisted var blocks: List<JournalBlockTable>
-    @Persisted var createdAt: Date = Date()
-    @Persisted var updatedAt: Date = Date()
+    @Persisted var createdAt: Date
+    @Persisted var updatedAt: Date
     @Persisted var isSecret: Bool = false
     
     // 역참조
     @Persisted(originProperty: "journals") var travel: LinkingObjects<TravelTable>
     
-    convenience init(tripId: ObjectId, isSecret: Bool = false) {
+    convenience init(tripId: ObjectId, date: Date, isSecret: Bool = false) {
         self.init()
         self.tripId = tripId
         self.isSecret = isSecret
-        self.createdAt = Date()
-        self.updatedAt = Date()
+        self.createdAt = date
+        self.updatedAt = date
     }
 }
