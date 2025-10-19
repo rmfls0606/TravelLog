@@ -21,6 +21,10 @@ final class TripCardCell: BaseTableViewCell {
         view.layer.borderWidth = 1
         view.backgroundColor = .white
         view.clipsToBounds = true
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.08
+        view.layer.shadowOffset = CGSize(width: 0, height: 2)
+        view.layer.shadowRadius = 2
         return view
     }()
     
@@ -43,7 +47,6 @@ final class TripCardCell: BaseTableViewCell {
         view.font = .systemFont(ofSize: 13, weight: .semibold)
         view.textColor = .black
         view.backgroundColor = .white
-//        view.layer.cornerRadius = 14
         view.clipsToBounds = true
         view.textInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         return view
@@ -426,7 +429,7 @@ final class TripCardCell: BaseTableViewCell {
         case .completed:
             statusBadge.text = "완료"
             statusBadge.backgroundColor = status.color
-            cardView.layer.borderColor = status.color.cgColor
+            cardView.layer.borderColor = UIColor.systemGray5.cgColor
             applyButtonConfiguration(
                 title: "추억 다시보기",
                 iconName: "heart",

@@ -57,7 +57,6 @@ final class JournalTextCell: UITableViewCell {
         // 안쪽 블록뷰 (텍스트 카드)
         blockView.layer.cornerRadius = 12
         blockView.clipsToBounds = true
-        blockView.backgroundColor = UIColor.systemPink.withAlphaComponent(0.9)
         
         // 라벨
         timeLabel.font = .systemFont(ofSize: 12)
@@ -124,9 +123,9 @@ final class JournalTextCell: UITableViewCell {
         // 분홍색 계열 고정
         blockView.backgroundColor = UIColor(
             red: 255/255,
-            green: 120/255,
-            blue: 150/255,
-            alpha: 0.5
+            green: 160/255,
+            blue: 175/255,
+            alpha: 1.0
         )
     }
     

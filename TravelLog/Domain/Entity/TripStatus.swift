@@ -19,7 +19,7 @@ enum TripStatus{
         case .ongoing:
             return .systemGreen.withAlphaComponent(0.8)
         case .completed:
-            return .systemPurple.withAlphaComponent(0.8)
+            return .systemPink.withAlphaComponent(0.8)
         }
     }
 }
