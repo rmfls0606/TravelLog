@@ -205,16 +205,19 @@ final class JournalTimelineViewController: BaseViewController {
                         make.height.equalTo(owner.tableView.contentSize.height)
                     }
 
-                    owner.addMemoryContainerView.alpha = hasData ? 0 : 1
-                    owner.tableView.alpha = hasData ? 1 : 0
-                    owner.view.layoutIfNeeded()
+                    // 전환 애니메이션
+                    UIView.animate(withDuration: 0.25) {
+                        owner.addMemoryContainerView.alpha = hasData ? 0 : 1
+                        owner.tableView.alpha = hasData ? 1 : 0
+                        owner.view.layoutIfNeeded()
+                    }
                 }
             }
             .disposed(by: disposeBag)
         
         output.navigateToAdd
             .emit(with: self) { owner, tripId in
-                let addVM = JournalAddViewModel(tripId: tripId)
+                let addVM = JournalAddViewModel(tripId: tripId, date: Date())
                 let addVC = JournalAddViewController(viewModel: addVM)
                 addVC.hidesBottomBarWhenPushed = true
                 owner.navigationController?.pushViewController(addVC, animated: true)
@@ -224,7 +227,7 @@ final class JournalTimelineViewController: BaseViewController {
         navigationItem.rightBarButtonItem?.rx.tap
                .bind(with: self) { owner, _ in
                    guard let trip = owner.trip else { return }
-                   let addVM = JournalAddViewModel(tripId: trip.id)
+                   let addVM = JournalAddViewModel(tripId: trip.id, date: Date())
                    let addVC = JournalAddViewController(viewModel: addVM)
                    addVC.hidesBottomBarWhenPushed = true
                    owner.navigationController?.pushViewController(addVC, animated: true)
@@ -293,11 +296,12 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
         footer.tapGesture.rx.event
                 .throttle(.milliseconds(400), scheduler: MainScheduler.instance)
                 .bind(with: self) { owner, _ in
+                    print("✅ footer tapped in VC")
                     
                     guard let trip = owner.trip else { return }
                     let date = owner.groupedData[section].date
                     
-                    let addVM = JournalAddViewModel(tripId: trip.id)
+                    let addVM = JournalAddViewModel(tripId: trip.id, date: date)
                     let addVC = JournalAddViewController(viewModel: addVM)
                     addVC.hidesBottomBarWhenPushed = true
                     owner.navigationController?.pushViewController(addVC, animated: true)
