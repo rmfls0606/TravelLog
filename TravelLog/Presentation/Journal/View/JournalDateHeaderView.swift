@@ -49,7 +49,7 @@ final class JournalDateHeaderView: UITableViewHeaderFooterView {
         // 카드가 label 크기에 맞게 감싸지도록
         containerView.snp.makeConstraints {
             $0.leading.equalToSuperview().inset(16)
-            $0.top.bottom.equalToSuperview().inset(16)
+            $0.top.bottom.equalToSuperview()
         }
         
         dateLabel.snp.makeConstraints {
