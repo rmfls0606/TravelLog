@@ -9,6 +9,8 @@ import UIKit
 import SnapKit
 
 final class JournalTextCell: UITableViewCell {
+    private var timelineTopConstraint: Constraint?
+    private var dotTopConstraint: Constraint?
     
     private let timelineLine = UIView()
     private let dotView = UIView()
@@ -27,6 +29,12 @@ final class JournalTextCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        
+        setIsFirstInTimeline(false)
+    }
+    
     private func setupView() {
         selectionStyle = .none
         backgroundColor = .clear
@@ -36,7 +44,7 @@ final class JournalTextCell: UITableViewCell {
         
         // 점(circle)
         dotView.backgroundColor = UIColor.systemBlue
-        dotView.layer.cornerRadius = 5
+        dotView.layer.cornerRadius = 7
         
         // 흰색 카드뷰 (외곽)
         cardView.backgroundColor = .white
@@ -70,21 +78,23 @@ final class JournalTextCell: UITableViewCell {
         // 제약
         timelineLine.snp.makeConstraints {
             $0.width.equalTo(2)
-            $0.top.bottom.equalToSuperview()
             $0.leading.equalToSuperview().inset(24)
+            $0.bottom.equalToSuperview()
+            timelineTopConstraint = $0.top.equalToSuperview().constraint
+            
         }
         
         dotView.snp.makeConstraints {
             $0.centerX.equalTo(timelineLine)
-            $0.top.equalToSuperview().inset(20)
-            $0.size.equalTo(10)
+            dotTopConstraint = $0.top.equalToSuperview().inset(20).constraint
+            $0.size.equalTo(14)
         }
         
         cardView.snp.makeConstraints {
             $0.leading.equalTo(timelineLine.snp.trailing).offset(16)
             $0.trailing.equalToSuperview().inset(16)
             $0.top.equalToSuperview().inset(16)
-            $0.bottom.equalToSuperview().inset(16)
+            $0.bottom.equalToSuperview().inset(8)
         }
         
         timeLabel.snp.makeConstraints {
@@ -116,7 +126,7 @@ final class JournalTextCell: UITableViewCell {
             red: 255/255,
             green: 120/255,
             blue: 150/255,
-            alpha: 0.92
+            alpha: 0.5
         )
     }
     
@@ -125,5 +135,15 @@ final class JournalTextCell: UITableViewCell {
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "a hh:mm" // 오전 04:21
         return formatter.string(from: date)
+    }
+    
+    func setIsFirstInTimeline(_ isFirst: Bool) {
+        // 라인은 첫 셀만 16 내려서 시작 (아닌 경우 0으로 붙임)
+        timelineTopConstraint?.update(offset: isFirst ? 16 : 0)
+        // 점은 라인보다 살짝 내려오게(시각적으로 20이 보기 좋음)
+        dotTopConstraint?.update(offset: isFirst ? 36 : 36)
+        // 필요하면 즉시 레이아웃
+        setNeedsLayout()
+        layoutIfNeeded()
     }
 }
