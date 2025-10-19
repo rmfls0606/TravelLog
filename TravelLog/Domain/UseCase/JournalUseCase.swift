@@ -12,7 +12,9 @@ import RealmSwift
 protocol JournalUseCaseType {
     func fetchJournals(tripId: ObjectId) -> Observable<[JournalTable]>
     func addJournal(tripId: ObjectId, text: String, date: Date) -> Completable
+    func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable
 }
+
 
 final class JournalUseCase: JournalUseCaseType {
     private let repository: JournalRepositoryType
@@ -71,6 +73,30 @@ final class JournalUseCase: JournalUseCaseType {
                 completable(.error(error))
             }
             
+            return Disposables.create()
+        }
+    }
+    
+    func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable {
+        return Completable.create { completable in
+            do {
+                let realm = try Realm()
+                guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId),
+                      let block = realm.object(ofType: JournalBlockTable.self, forPrimaryKey: blockId) else {
+                    throw NSError(domain: "NotFound", code: 404)
+                }
+                
+                try realm.write {
+                    realm.delete(block)
+                    if journal.blocks.count == 0 {
+                        realm.delete(journal)
+                    }
+                }
+                realm.refresh()
+                completable(.completed)
+            } catch {
+                completable(.error(error))
+            }
             return Disposables.create()
         }
     }
