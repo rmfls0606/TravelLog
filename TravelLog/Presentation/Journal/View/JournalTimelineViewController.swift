@@ -205,12 +205,9 @@ final class JournalTimelineViewController: BaseViewController {
                         make.height.equalTo(owner.tableView.contentSize.height)
                     }
 
-                    // 전환 애니메이션
-                    UIView.animate(withDuration: 0.25) {
-                        owner.addMemoryContainerView.alpha = hasData ? 0 : 1
-                        owner.tableView.alpha = hasData ? 1 : 0
-                        owner.view.layoutIfNeeded()
-                    }
+                    owner.addMemoryContainerView.alpha = hasData ? 0 : 1
+                    owner.tableView.alpha = hasData ? 1 : 0
+                    owner.view.layoutIfNeeded()
                 }
             }
             .disposed(by: disposeBag)
@@ -294,11 +291,19 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
         ) as? JournalAddFooterView else { return nil }
         
         footer.tapGesture.rx.event
-            .bind(with: self) { owner, _ in
-                let date = owner.groupedData[section].date
-                print("[\(date)] 섹션의 추억 추가하기 탭 발생")
-            }
-            .disposed(by: disposeBag)
+                .throttle(.milliseconds(400), scheduler: MainScheduler.instance)
+                .bind(with: self) { owner, _ in
+                    
+                    guard let trip = owner.trip else { return }
+                    let date = owner.groupedData[section].date
+                    
+                    let addVM = JournalAddViewModel(tripId: trip.id)
+                    let addVC = JournalAddViewController(viewModel: addVM)
+                    addVC.hidesBottomBarWhenPushed = true
+                    owner.navigationController?.pushViewController(addVC, animated: true)
+                }
+                .disposed(by: footer.disposeBag)
+
         
         return footer
     }
