@@ -177,6 +177,8 @@ final class JournalTimelineViewController: BaseViewController {
         tableView.register(JournalAddFooterView.self, forHeaderFooterViewReuseIdentifier: JournalAddFooterView.identifier)
         tableView.dataSource = self
         tableView.delegate = self
+        
+        navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .add)
     }
     
     // MARK: - Binding (Rx)
@@ -230,6 +232,16 @@ final class JournalTimelineViewController: BaseViewController {
                 owner.navigationController?.pushViewController(addVC, animated: true)
             }
             .disposed(by: disposeBag)
+        
+        navigationItem.rightBarButtonItem?.rx.tap
+               .bind(with: self) { owner, _ in
+                   guard let trip = owner.trip else { return }
+                   let addVM = JournalAddViewModel(tripId: trip.id)
+                   let addVC = JournalAddViewController(viewModel: addVM)
+                   addVC.hidesBottomBarWhenPushed = true
+                   owner.navigationController?.pushViewController(addVC, animated: true)
+               }
+               .disposed(by: disposeBag)
     }
     
     // MARK: - Realm 삭제 로직
