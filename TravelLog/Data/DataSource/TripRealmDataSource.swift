@@ -94,26 +94,30 @@ final class TripRealmDataSource{
         }
     }
     
-    func deleteTrip(trip: TravelTable) -> Completable{
+    func deleteTrip(trip: TravelTable) -> Completable {
         return Completable.create { completable in
-            do{
+            do {
                 let realm = try Realm()
                 try realm.write {
+                    // trip.id와 연결된 모든 journal 조회
                     let journals = realm.objects(JournalTable.self)
                         .filter("tripId == %@", trip.id)
                     
-                    for journal in journals{
+                    // 각 journal의 blocks까지 같이 삭제
+                    for journal in journals {
+                        let blocks = realm.objects(JournalBlockTable.self)
+                            .filter("journalId == %@", journal.id)
+                        realm.delete(blocks)
                         realm.delete(journal)
                     }
                     
-                    realm.delete(journals)
+                    // trip 삭제
                     realm.delete(trip)
                 }
                 completable(.completed)
-            }catch{
+            } catch {
                 completable(.error(RealmError.deleteFailure))
             }
-            
             return Disposables.create()
         }
     }
