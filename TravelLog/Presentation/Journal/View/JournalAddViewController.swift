@@ -89,7 +89,7 @@ final class JournalAddViewController: BaseViewController {
         
         // EmptyView
         emptyView.configure(
-            icon: UIImage(systemName: "text.below.folder.fill"),
+            icon: UIImage(systemName: "folder.fill"),
             iconTint: .white,
             gradientStyle: .bluePurple,
             title: "첫 번째 블록을 추가해보세요",
