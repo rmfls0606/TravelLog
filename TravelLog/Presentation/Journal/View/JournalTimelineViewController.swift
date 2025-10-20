@@ -42,7 +42,7 @@ final class JournalTimelineViewController: BaseViewController {
         fetchTrip(tripId)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-        
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
@@ -186,15 +186,15 @@ final class JournalTimelineViewController: BaseViewController {
         output.journals
             .drive(with: self) { owner, journals in
                 owner.updateGroupedData(from: journals)
-
+                
                 DispatchQueue.main.async {
                     let hasData = !journals.isEmpty
-
+                    
                     owner.addMemoryContainerView.isHidden = hasData
                     owner.tableView.isHidden = !hasData
                     owner.tableView.reloadData()
                     owner.tableView.layoutIfNeeded()
-
+                    
                     // 핵심: 데이터 있을 때는 tableView를 headerContainer 바로 아래로 붙이기
                     owner.tableView.snp.remakeConstraints { make in
                         if hasData {
@@ -206,13 +206,10 @@ final class JournalTimelineViewController: BaseViewController {
                         make.bottom.equalToSuperview()
                         make.height.equalTo(owner.tableView.contentSize.height)
                     }
-
-                    // 전환 애니메이션
-                    UIView.animate(withDuration: 0.25) {
-                        owner.addMemoryContainerView.alpha = hasData ? 0 : 1
-                        owner.tableView.alpha = hasData ? 1 : 0
-                        owner.view.layoutIfNeeded()
-                    }
+                    
+                    owner.addMemoryContainerView.alpha = hasData ? 0 : 1
+                    owner.tableView.alpha = hasData ? 1 : 0
+                    owner.view.layoutIfNeeded()
                 }
             }
             .disposed(by: disposeBag)
@@ -227,14 +224,14 @@ final class JournalTimelineViewController: BaseViewController {
             .disposed(by: disposeBag)
         
         navigationItem.rightBarButtonItem?.rx.tap
-               .bind(with: self) { owner, _ in
-                   guard let trip = owner.trip else { return }
-                   let addVM = JournalAddViewModel(tripId: trip.id, date: Date())
-                   let addVC = JournalAddViewController(viewModel: addVM)
-                   addVC.hidesBottomBarWhenPushed = true
-                   owner.navigationController?.pushViewController(addVC, animated: true)
-               }
-               .disposed(by: disposeBag)
+            .bind(with: self) { owner, _ in
+                guard let trip = owner.trip else { return }
+                let addVM = JournalAddViewModel(tripId: trip.id, date: Date())
+                let addVC = JournalAddViewController(viewModel: addVM)
+                addVC.hidesBottomBarWhenPushed = true
+                owner.navigationController?.pushViewController(addVC, animated: true)
+            }
+            .disposed(by: disposeBag)
         
         output.deleteCompleted
             .observe(on: MainScheduler.instance)
@@ -303,18 +300,18 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
         ) as? JournalAddFooterView else { return nil }
         
         footer.tapGesture.rx.event
-                .throttle(.milliseconds(400), scheduler: MainScheduler.instance)
-                .bind(with: self) { owner, _ in
-                    guard let trip = owner.trip else { return }
-                    let date = owner.groupedData[section].date
-                    
-                    let addVM = JournalAddViewModel(tripId: trip.id, date: date)
-                    let addVC = JournalAddViewController(viewModel: addVM)
-                    addVC.hidesBottomBarWhenPushed = true
-                    owner.navigationController?.pushViewController(addVC, animated: true)
-                }
-                .disposed(by: footer.disposeBag)
-
+            .throttle(.milliseconds(400), scheduler: MainScheduler.instance)
+            .bind(with: self) { owner, _ in
+                guard let trip = owner.trip else { return }
+                let date = owner.groupedData[section].date
+                
+                let addVM = JournalAddViewModel(tripId: trip.id, date: date)
+                let addVC = JournalAddViewController(viewModel: addVM)
+                addVC.hidesBottomBarWhenPushed = true
+                owner.navigationController?.pushViewController(addVC, animated: true)
+            }
+            .disposed(by: footer.disposeBag)
+        
         
         return footer
     }
@@ -342,17 +339,17 @@ extension JournalTimelineViewController {
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath)
     -> UISwipeActionsConfiguration? {
-
+        
         let deleteAction = UIContextualAction(style: .destructive, title: "삭제") { [weak self] _, _, completion in
             guard let self else { return }
             let block = self.groupedData[indexPath.section].blocks[indexPath.row]
             guard let journal = block.journal.first else { return }
-
+            
             // ViewModel에 삭제 요청 전달
             self.deleteTappedSubject.onNext((journal.id, block.id))
             completion(true)
         }
-
+        
         deleteAction.backgroundColor = .systemRed
         return UISwipeActionsConfiguration(actions: [deleteAction])
     }
