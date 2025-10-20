@@ -189,6 +189,10 @@ final class TravelAddViewController: BaseViewController {
             make.horizontalEdges.equalToSuperview().inset(16)
         }
         
+        headerView.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(16)
+        }
+        
         headerIconContainer.snp.makeConstraints { make in
             make.size.equalTo(70)
         }
