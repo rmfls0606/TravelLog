@@ -165,6 +165,7 @@ final class JournalTimelineViewController: BaseViewController {
         tableView.estimatedRowHeight = 160
         tableView.showsVerticalScrollIndicator = false
         tableView.register(JournalTextCell.self, forCellReuseIdentifier: JournalTextCell.identifier)
+        tableView.register(JournalLinkCell.self, forCellReuseIdentifier: JournalLinkCell.identifier)
         tableView.register(JournalDateHeaderView.self, forHeaderFooterViewReuseIdentifier: JournalDateHeaderView.identifier)
         tableView.register(JournalAddFooterView.self, forHeaderFooterViewReuseIdentifier: JournalAddFooterView.identifier)
         tableView.dataSource = self
@@ -319,20 +320,39 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat { 84 }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(
-            withIdentifier: JournalTextCell.identifier,
-            for: indexPath
-        ) as? JournalTextCell else {
-            return UITableViewCell()
+        let block = groupedData[indexPath.section].blocks[indexPath.row]
+        
+        switch block.type {
+        case .text:
+            guard let cell = tableView.dequeueReusableCell(
+                withIdentifier: JournalTextCell.identifier,
+                for: indexPath
+            ) as? JournalTextCell else {
+                return UITableViewCell()
+            }
+            cell.configure(with: block)
+            return cell
+        case .link:
+            guard let cell = tableView.dequeueReusableCell(
+                withIdentifier: JournalLinkCell.identifier,
+                for: indexPath
+            ) as? JournalLinkCell else {
+                return UITableViewCell()
+            }
+            cell.configure(with: block)
+            return cell
+        default:
+            return UITableViewCell() // Handle other types or return an empty cell
         }
-        cell.configure(with: groupedData[indexPath.section].blocks[indexPath.row])
-        return cell
     }
     
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        guard let cell = cell as? JournalTextCell else { return }
         let isFirst = (indexPath.section == 0 && indexPath.row == 0)
-        cell.setIsFirstInTimeline(isFirst)
+        if let textCell = cell as? JournalTextCell {
+            textCell.setIsFirstInTimeline(isFirst)
+        } else if let linkCell = cell as? JournalLinkCell {
+            linkCell.setIsFirstInTimeline(isFirst)
+        }
     }
 }
 extension JournalTimelineViewController {
