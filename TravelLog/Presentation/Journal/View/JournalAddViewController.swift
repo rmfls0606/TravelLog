@@ -20,6 +20,8 @@ final class JournalAddViewController: BaseViewController {
     
     private let addBar = UIStackView()
     private let textButton = UIButton(configuration: .filled())
+    private let linkButton = UIButton(configuration: .filled())
+    
     private let saveButton = UIButton(configuration: .filled())
     
     private let viewModel: JournalAddViewModel
@@ -37,6 +39,7 @@ final class JournalAddViewController: BaseViewController {
         view.addSubviews(scrollView, addBar, saveButton)
         scrollView.addSubview(contentStack)
         addBar.addArrangedSubview(textButton)
+        addBar.addArrangedSubview(linkButton)
         
         // empty container
         view.insertSubview(emptyContainerView, belowSubview: addBar)
@@ -109,7 +112,7 @@ final class JournalAddViewController: BaseViewController {
     private func configureButtons() {
         // 텍스트 버튼
         var textConfig = UIButton.Configuration.filled()
-        textConfig.baseForegroundColor = .systemBlue
+        textConfig.baseForegroundColor = .white
         textConfig.image = UIImage(
             systemName: "pencil.line",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
@@ -124,12 +127,34 @@ final class JournalAddViewController: BaseViewController {
         // UIBackgroundConfiguration.clear() 사용
         var textBg = UIBackgroundConfiguration.clear()
         textBg.cornerRadius = 12
-        textBg.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        textBg.backgroundColor = UIColor.systemBlue
         textConfig.background = textBg
         
         textButton.configuration = textConfig
         textButton.clipsToBounds = true
         
+        //링크 버튼
+        var linkConfig = UIButton.Configuration.filled()
+        linkConfig.baseForegroundColor = .white
+        linkConfig.image = UIImage(
+            systemName: "link",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        )
+        linkConfig.imagePadding = 8
+        linkConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        linkConfig.attributedTitle = AttributedString(
+            "링크",
+            attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 15, weight: .semibold)])
+        )
+        
+        // UIBackgroundConfiguration.clear() 사용
+        var linkBg = UIBackgroundConfiguration.clear()
+        linkBg.cornerRadius = 12
+        linkBg.backgroundColor = UIColor.systemGreen
+        linkConfig.background = linkBg
+        
+        linkButton.configuration = linkConfig
+        linkButton.clipsToBounds = true
         
         // 저장 버튼
         var saveConfig = UIButton.Configuration.filled()
@@ -166,12 +191,21 @@ final class JournalAddViewController: BaseViewController {
             .bind(with: self) { owner, _ in owner.addTextBlock() }
             .disposed(by: disposeBag)
         
+        linkButton.rx.tap
+            .bind(with: self) { owner, _ in
+                owner.addLinkBlock()
+            }
+            .disposed(by: disposeBag)
+        
         saveButton.rx.tap
             .map { [weak self] _ -> [String] in
                 guard let self = self else { return [] }
-                return self.contentStack.arrangedSubviews
-                    .compactMap { ($0 as? JournalTextBlockView)?.textContent }
-                    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                return self.contentStack.arrangedSubviews.compactMap {
+                    if let textBlock = $0 as? JournalTextBlockView {
+                        return textBlock.textContent
+                    }
+                    return nil
+                }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             }
             .bind(to: saveTrigger)
             .disposed(by: disposeBag)
@@ -186,19 +220,21 @@ final class JournalAddViewController: BaseViewController {
             .disposed(by: disposeBag)
     }
     
-    // MARK: - 블록 추가
-    private func addTextBlock() {
-        emptyContainerView.isHidden = true
-        saveButton.isEnabled = true
-        
-        // 버튼 색상 변경
+    private func updateSaveButton(enabled: Bool) {
+        saveButton.isEnabled = enabled
         if var config = saveButton.configuration {
             var bg = config.background
-            bg.backgroundColor = .systemBlue
+            bg.backgroundColor = enabled ? .systemBlue : .systemGray4
             bg.cornerRadius = 12
             config.background = bg
             saveButton.configuration = config
         }
+    }
+
+    // MARK: - 블록 추가
+    private func addTextBlock() {
+        emptyContainerView.isHidden = true
+        updateSaveButton(enabled: true)
         
         let card = JournalTextBlockView()
         contentStack.addArrangedSubview(card)
@@ -212,18 +248,33 @@ final class JournalAddViewController: BaseViewController {
                     owner.contentStack.removeArrangedSubview(card)
                     card.removeFromSuperview()
                     
-                    let remaining = owner.contentStack.arrangedSubviews.compactMap { $0 as? JournalTextBlockView }
-                    if remaining.isEmpty {
+                    if owner.contentStack.arrangedSubviews.isEmpty {
                         owner.emptyContainerView.isHidden = false
-                        owner.saveButton.isEnabled = false
-                        
-                        if var config = owner.saveButton.configuration {
-                            var bg = config.background
-                            bg.backgroundColor = .systemGray4
-                            bg.cornerRadius = 12
-                            config.background = bg
-                            owner.saveButton.configuration = config
-                        }
+                        owner.updateSaveButton(enabled: false)
+                    }
+                }
+            }
+            .disposed(by: card.disposeBag)
+    }
+    
+    private func addLinkBlock() {
+        emptyContainerView.isHidden = true
+        updateSaveButton(enabled: true)
+        
+        let card = JournalLinkBlockView()
+        contentStack.addArrangedSubview(card)
+        
+        card.removeTapped
+            .bind(with: self) { owner, _ in
+                UIView.animate(withDuration: 0.25) {
+                    card.alpha = 0
+                } completion: { _ in
+                    owner.contentStack.removeArrangedSubview(card)
+                    card.removeFromSuperview()
+                    
+                    if owner.contentStack.arrangedSubviews.isEmpty {
+                        owner.emptyContainerView.isHidden = false
+                        owner.updateSaveButton(enabled: false)
                     }
                 }
             }
