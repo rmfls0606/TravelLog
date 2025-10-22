@@ -26,7 +26,7 @@ final class JournalAddViewController: BaseViewController {
     
     private let viewModel: JournalAddViewModel
     private let disposeBag = DisposeBag()
-    private let saveTrigger = PublishRelay<[String]>()
+    private let saveTrigger = PublishRelay<[JournalAddViewModel.JournalBlockData]>()
     
     init(viewModel: JournalAddViewModel) {
         self.viewModel = viewModel
@@ -198,14 +198,17 @@ final class JournalAddViewController: BaseViewController {
             .disposed(by: disposeBag)
         
         saveButton.rx.tap
-            .map { [weak self] _ -> [String] in
+            .map { [weak self] _ -> [JournalAddViewModel.JournalBlockData] in
                 guard let self = self else { return [] }
                 return self.contentStack.arrangedSubviews.compactMap {
-                    if let textBlock = $0 as? JournalTextBlockView {
-                        return textBlock.textContent
+                    if let textBlock = $0 as? JournalTextBlockView, !textBlock.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        let content = textBlock.textContent
+                        return JournalAddViewModel.JournalBlockData(type: .text, text: content, linkURL: nil)
+                    } else if let linkBlock = $0 as? JournalLinkBlockView, let content = linkBlock.textContent, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        return JournalAddViewModel.JournalBlockData(type: .link, text: nil, linkURL: content)
                     }
                     return nil
-                }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                }
             }
             .bind(to: saveTrigger)
             .disposed(by: disposeBag)

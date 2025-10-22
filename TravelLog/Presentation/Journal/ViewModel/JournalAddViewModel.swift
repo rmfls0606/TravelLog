@@ -12,8 +12,14 @@ import RealmSwift
 
 final class JournalAddViewModel: BaseViewModel {
 
+    struct JournalBlockData {
+        let type: JournalBlockType
+        let text: String?
+        let linkURL: String?
+    }
+
     struct Input {
-        let saveTapped: Observable<[String]>
+        let saveTapped: Observable<[JournalBlockData]>
     }
 
     struct Output {
@@ -33,14 +39,14 @@ final class JournalAddViewModel: BaseViewModel {
 
     func transform(input: Input) -> Output {
         let saveCompleted = input.saveTapped
-            .flatMapLatest { [weak self] texts -> Observable<Void> in
+            .flatMapLatest { [weak self] blockDataArray -> Observable<Void> in
                 guard let self else { return .empty() }
 
-                let validTexts = texts.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                guard !validTexts.isEmpty else { return .empty() }
+                let validBlockData = blockDataArray.filter { ($0.text != nil && !$0.text!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || ($0.linkURL != nil && !$0.linkURL!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+                guard !validBlockData.isEmpty else { return .empty() }
 
-                let ops = validTexts.map {
-                    self.useCase.addJournal(tripId: self.tripId, text: $0, date: self.selectedDate)
+                let ops = validBlockData.map {
+                    self.useCase.addJournal(tripId: self.tripId, type: $0.type, text: $0.text, linkURL: $0.linkURL, date: self.selectedDate)
                 }
 
                 return Completable.zip(ops).andThen(Observable.just(()))

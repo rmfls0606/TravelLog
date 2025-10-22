@@ -77,7 +77,7 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
         return view
     }()
     
-    private let urlTextField: UITextField = {
+    private(set) var urlTextField: UITextField = {
         let textField = UITextField()
         
         let placeholderText = "링크 URL을 입력하세요"
@@ -105,6 +105,10 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
     // 현재 입력 필드의 텍스트 Observable
     var urlText: ControlProperty<String?> {
         return urlTextField.rx.text
+    }
+
+    var textContent: String? {
+        return urlTextField.text
     }
     
     override func configureHierarchy() {

@@ -11,7 +11,7 @@ import RealmSwift
 
 protocol JournalUseCaseType {
     func fetchJournals(tripId: ObjectId) -> Observable<[JournalTable]>
-    func addJournal(tripId: ObjectId, text: String, date: Date) -> Completable
+    func addJournal(tripId: ObjectId, type: JournalBlockType, text: String?, linkURL: String?, date: Date) -> Completable
     func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable
 }
 
@@ -27,7 +27,7 @@ final class JournalUseCase: JournalUseCaseType {
         repository.fetchJournals(for: tripId)
     }
     
-    func addJournal(tripId: ObjectId, text: String, date: Date) -> Completable {
+    func addJournal(tripId: ObjectId, type: JournalBlockType, text: String?, linkURL: String?, date: Date) -> Completable {
         return Completable.create { [weak self] completable in
             guard let self else {
                 completable(.error(NSError(domain: "JournalUseCaseNil", code: -1)))
@@ -50,8 +50,9 @@ final class JournalUseCase: JournalUseCaseType {
                     .first {
                     self.repository.addJournalBlock(
                         journalId: existingJournal.id,
-                        type: .text,
-                        text: text
+                        type: type,
+                        text: text,
+                        linkURL: linkURL
                     )
                     .subscribe(completable)
                     .disposed(by: DisposeBag())
@@ -61,8 +62,9 @@ final class JournalUseCase: JournalUseCaseType {
                         .flatMapCompletable { journal in
                             self.repository.addJournalBlock(
                                 journalId: journal.id,
-                                type: .text,
-                                text: text
+                                type: type,
+                                text: text,
+                                linkURL: linkURL
                             )
                         }
                         .subscribe(completable)

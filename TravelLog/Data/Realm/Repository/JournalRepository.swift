@@ -13,7 +13,7 @@ internal import Realm
 protocol JournalRepositoryType {
     func fetchJournals(for tripId: ObjectId) -> Observable<[JournalTable]>
     func createJournal(for tripId: ObjectId, date: Date) -> Single<JournalTable>
-    func addJournalBlock(journalId: ObjectId, type: JournalBlockType, text: String?) -> Completable
+    func addJournalBlock(journalId: ObjectId, type: JournalBlockType, text: String?, linkURL: String?) -> Completable
     func fetchJournalCount(tripId: ObjectId) -> Single<Int>
 }
 
@@ -42,7 +42,7 @@ final class JournalRepository: JournalRepositoryType {
                     observer.onError(error)
                 }
             }
-
+            
             self.notificationTokens.append(token)
             
             return Disposables.create {
@@ -73,7 +73,8 @@ final class JournalRepository: JournalRepositoryType {
     func addJournalBlock(
         journalId: ObjectId,
         type: JournalBlockType,
-        text: String?
+        text: String?,
+        linkURL: String?
     ) -> Completable {
         return Completable.create { [weak self] completable in
             guard let self else { return Disposables.create() }
@@ -82,12 +83,14 @@ final class JournalRepository: JournalRepositoryType {
                     throw NSError(domain: "JournalNotFound", code: 404)
                 }
                 let block = JournalBlockTable(
-                                journalId: journalId,
-                                type: type,
-                                order: journal.blocks.count,
-                                text: text,
-                                createdAt: journal.createdAt
-                            )
+                    journalId: journalId,
+                    type: type,
+                    order: journal.blocks.count,
+                    text: text,
+                    linkURL: linkURL,
+                    createdAt: journal.createdAt
+                )
+                
                 try self.realm.write {
                     self.realm.add(block)
                     journal.blocks.append(block)
