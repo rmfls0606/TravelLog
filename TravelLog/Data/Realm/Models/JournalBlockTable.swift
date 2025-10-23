@@ -56,6 +56,11 @@ final class JournalBlockTable: Object {
     @Persisted var longitude: Double?
     @Persisted var placeName: String?
     @Persisted var linkURL: String?
+    
+    @Persisted var linkTitle: String?
+    @Persisted var linkDescription: String?
+    @Persisted var linkImagePath: String?
+    
     @Persisted var voiceURL: String?
     @Persisted var createdAt: Date
     
@@ -72,6 +77,9 @@ final class JournalBlockTable: Object {
         longitude: Double? = nil,
         placeName: String? = nil,
         linkURL: String? = nil,
+        linkTitle: String? = nil,
+        linkDescription: String? = nil,
+        linkImagePath: String? = nil,
         voiceURL: String? = nil,
         createdAt: Date
     ) {
