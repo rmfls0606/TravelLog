@@ -103,11 +103,10 @@ final class JournalAddViewModel: BaseViewModel {
     -> Single<(String?, String?, UIImage?)> {
         return Single.create { single in
             // URL 정규화
-            guard let url = URL(string: urlString.hasPrefix("http") ? urlString : "https://" + urlString)
-            else {
-                single(.success((nil, nil, nil)))
-                return Disposables.create()
-            }
+            guard let url = URLNormalizer.normalized(urlString) else {
+                        single(.success((nil, nil, nil)))
+                        return Disposables.create()
+                    }
             
             let provider = LPMetadataProvider()
             provider.startFetchingMetadata(for: url) { metadata, error in

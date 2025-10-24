@@ -344,13 +344,9 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             
             cell.linkTapped
                 .bind(with: self) { owner, urlString in
-                    print(urlString)
-                    var normalized = urlString
-                    if !urlString.lowercased().hasPrefix("http") {
-                        normalized = "https://" + urlString
-                    }
-                    guard let url = URL(string: normalized) else { return }
-                    let safariVC = SFSafariViewController(url: url)
+                    guard let normalized = URLNormalizer.normalized(urlString) else { return }
+
+                    let safariVC = SFSafariViewController(url: normalized)
                     safariVC.preferredControlTintColor = .systemGreen
                     owner.present(safariVC, animated: true)
                 }
