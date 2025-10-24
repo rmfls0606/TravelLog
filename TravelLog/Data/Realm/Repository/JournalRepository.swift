@@ -8,12 +8,21 @@
 import Foundation
 import RealmSwift
 import RxSwift
+import UIKit
 internal import Realm
 
 protocol JournalRepositoryType {
     func fetchJournals(for tripId: ObjectId) -> Observable<[JournalTable]>
     func createJournal(for tripId: ObjectId, date: Date) -> Single<JournalTable>
-    func addJournalBlock(journalId: ObjectId, type: JournalBlockType, text: String?, linkURL: String?) -> Completable
+    func addJournalBlock(
+            journalId: ObjectId,
+            type: JournalBlockType,
+            text: String?,
+            linkURL: String?,
+            linkTitle: String?,
+            linkDescription: String?,
+            linkImage: UIImage?
+        ) -> Completable
     func fetchJournalCount(tripId: ObjectId) -> Single<Int>
 }
 
@@ -71,37 +80,45 @@ final class JournalRepository: JournalRepositoryType {
     
     // MARK: - Add Journal Block
     func addJournalBlock(
-        journalId: ObjectId,
-        type: JournalBlockType,
-        text: String?,
-        linkURL: String?
-    ) -> Completable {
-        return Completable.create { [weak self] completable in
-            guard let self else { return Disposables.create() }
-            do {
-                guard let journal = self.realm.object(ofType: JournalTable.self, forPrimaryKey: journalId) else {
-                    throw NSError(domain: "JournalNotFound", code: 404)
-                }
-                let block = JournalBlockTable(
-                    journalId: journalId,
-                    type: type,
-                    order: journal.blocks.count,
-                    text: text,
-                    linkURL: linkURL,
-                    createdAt: journal.createdAt
-                )
-                
-                try self.realm.write {
-                    self.realm.add(block)
-                    journal.blocks.append(block)
-                }
-                completable(.completed)
-            } catch {
-                completable(.error(error))
-            }
-            return Disposables.create()
-        }
-    }
+           journalId: ObjectId,
+           type: JournalBlockType,
+           text: String?,
+           linkURL: String?,
+           linkTitle: String?,
+           linkDescription: String?,
+           linkImage: UIImage?
+       ) -> Completable {
+           return Completable.create { completable in
+               do {
+                   let realm = try Realm()
+                   guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId) else {
+                       throw NSError(domain: "JournalNotFound", code: 404)
+                   }
+                   
+                   let block = JournalBlockTable()
+                   block.type = type
+                   block.text = text
+                   block.linkURL = linkURL
+                   block.linkTitle = linkTitle
+                   block.linkDescription = linkDescription
+                   
+                   // 이미지 저장
+                   if let image = linkImage {
+                       let filename = "\(block.id.stringValue)_preview"
+                       LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
+                       block.linkImagePath = filename
+                   }
+                   
+                   try realm.write {
+                       journal.blocks.append(block)
+                   }
+                   completable(.completed)
+               } catch {
+                   completable(.error(error))
+               }
+               return Disposables.create()
+           }
+       }
     
     //MARK: - Fetch Journal Count
     func fetchJournalCount(tripId: ObjectId) -> Single<Int> {
