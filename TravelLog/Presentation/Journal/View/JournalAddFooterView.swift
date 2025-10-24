@@ -133,6 +133,8 @@ final class JournalAddFooterView: UITableViewHeaderFooterView {
     
     override func layoutSubviews() {
         super.layoutSubviews()
+        containerView.layoutIfNeeded()
+        
         let strokeColor = UIColor(red: 120/255, green: 130/255, blue: 255/255, alpha: 0.7)
         dashedBorderLayer.strokeColor = strokeColor.cgColor
         dashedBorderLayer.fillColor = nil
