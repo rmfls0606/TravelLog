@@ -8,10 +8,20 @@
 import Foundation
 import RxSwift
 import RealmSwift
+import UIKit
 
 protocol JournalUseCaseType {
     func fetchJournals(tripId: ObjectId) -> Observable<[JournalTable]>
-    func addJournal(tripId: ObjectId, type: JournalBlockType, text: String?, linkURL: String?, date: Date) -> Completable
+    func addJournal(
+            tripId: ObjectId,
+            type: JournalBlockType,
+            text: String?,
+            linkURL: String?,
+            linkTitle: String?,
+            linkDescription: String?,
+            linkImage: UIImage?,
+            date: Date
+        ) -> Completable
     func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable
 }
 
@@ -27,57 +37,70 @@ final class JournalUseCase: JournalUseCaseType {
         repository.fetchJournals(for: tripId)
     }
     
-    func addJournal(tripId: ObjectId, type: JournalBlockType, text: String?, linkURL: String?, date: Date) -> Completable {
-        return Completable.create { [weak self] completable in
-            guard let self else {
-                completable(.error(NSError(domain: "JournalUseCaseNil", code: -1)))
-                return Disposables.create()
-            }
-            
-            do {
-                let realm = try Realm()
-                let startOfDay = Calendar.current.startOfDay(for: date)
-                let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
-                
-                // Trip 존재 확인
-                guard realm.object(ofType: TravelTable.self, forPrimaryKey: tripId) != nil else {
-                    throw NSError(domain: "TripNotFound", code: 404)
+    func addJournal(
+            tripId: ObjectId,
+            type: JournalBlockType,
+            text: String?,
+            linkURL: String?,
+            linkTitle: String?,
+            linkDescription: String?,
+            linkImage: UIImage?,
+            date: Date
+        ) -> Completable {
+            return Completable.create { [weak self] completable in
+                guard let self else {
+                    completable(.error(NSError(domain: "JournalUseCaseNil", code: -1)))
+                    return Disposables.create()
                 }
                 
-                // 기존 Journal 있는지 확인 (범위 쿼리 사용)
-                if let existingJournal = realm.objects(JournalTable.self)
-                    .filter("tripId == %@ AND createdAt >= %@ AND createdAt < %@", tripId, startOfDay, endOfDay)
-                    .first {
-                    self.repository.addJournalBlock(
-                        journalId: existingJournal.id,
-                        type: type,
-                        text: text,
-                        linkURL: linkURL
-                    )
-                    .subscribe(completable)
-                    .disposed(by: DisposeBag())
+                do {
+                    let realm = try Realm()
+                    let startOfDay = Calendar.current.startOfDay(for: date)
+                    let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
                     
-                } else {
-                    self.repository.createJournal(for: tripId, date: startOfDay)
-                        .flatMapCompletable { journal in
-                            self.repository.addJournalBlock(
-                                journalId: journal.id,
-                                type: type,
-                                text: text,
-                                linkURL: linkURL
-                            )
-                        }
+                    // Trip 존재 확인
+                    guard realm.object(ofType: TravelTable.self, forPrimaryKey: tripId) != nil else {
+                        throw NSError(domain: "TripNotFound", code: 404)
+                    }
+                    
+                    // 기존 Journal 여부
+                    if let existingJournal = realm.objects(JournalTable.self)
+                        .filter("tripId == %@ AND createdAt >= %@ AND createdAt < %@", tripId, startOfDay, endOfDay)
+                        .first {
+                        self.repository.addJournalBlock(
+                            journalId: existingJournal.id,
+                            type: type,
+                            text: text,
+                            linkURL: linkURL,
+                            linkTitle: linkTitle,
+                            linkDescription: linkDescription,
+                            linkImage: linkImage
+                        )
                         .subscribe(completable)
                         .disposed(by: DisposeBag())
+                        
+                    } else {
+                        self.repository.createJournal(for: tripId, date: startOfDay)
+                            .flatMapCompletable { journal in
+                                self.repository.addJournalBlock(
+                                    journalId: journal.id,
+                                    type: type,
+                                    text: text,
+                                    linkURL: linkURL,
+                                    linkTitle: linkTitle,
+                                    linkDescription: linkDescription,
+                                    linkImage: linkImage
+                                )
+                            }
+                            .subscribe(completable)
+                            .disposed(by: DisposeBag())
+                    }
+                } catch {
+                    completable(.error(error))
                 }
-                
-            } catch {
-                completable(.error(error))
+                return Disposables.create()
             }
-            
-            return Disposables.create()
         }
-    }
     
     func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable {
         return Completable.create { completable in
