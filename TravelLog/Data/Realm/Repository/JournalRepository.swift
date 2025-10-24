@@ -25,17 +25,15 @@ protocol JournalRepositoryType {
         ) -> Completable
     func fetchJournalCount(tripId: ObjectId) -> Single<Int>
 }
-
 final class JournalRepository: JournalRepositoryType {
-    private let realm = try! Realm()
+    // ⚠️ 전역 Realm 인스턴스 삭제 — 스레드별로 새로 생성
     private var notificationTokens: [NotificationToken] = []
     
-    // MARK: - Fetch Journals (Realm Notification 기반)
+    // MARK: - Fetch Journals
     func fetchJournals(for tripId: ObjectId) -> Observable<[JournalTable]> {
-        return Observable.create { [weak self] observer in
-            guard let self else { return Disposables.create() }
-            
-            let results = self.realm.objects(JournalTable.self)
+        return Observable.create { observer in
+            let realm = try! Realm()
+            let results = realm.objects(JournalTable.self)
                 .filter("tripId == %@", tripId)
                 .sorted(byKeyPath: "createdAt", ascending: true)
             
@@ -52,8 +50,6 @@ final class JournalRepository: JournalRepositoryType {
                 }
             }
             
-            self.notificationTokens.append(token)
-            
             return Disposables.create {
                 token.invalidate()
             }
@@ -62,13 +58,13 @@ final class JournalRepository: JournalRepositoryType {
     
     // MARK: - Create Journal
     func createJournal(for tripId: ObjectId, date: Date) -> Single<JournalTable> {
-        return Single.create { [weak self] single in
-            guard let self else { return Disposables.create() }
+        return Single.create { single in
             do {
+                let realm = try Realm()
                 let journal = JournalTable(tripId: tripId, date: date)
-                try self.realm.write {
+                try realm.write {
                     journal.createdAt = date
-                    self.realm.add(journal)
+                    realm.add(journal)
                 }
                 single(.success(journal))
             } catch {
@@ -78,58 +74,85 @@ final class JournalRepository: JournalRepositoryType {
         }
     }
     
-    // MARK: - Add Journal Block
+    // MARK: - Add Journal Block (완벽한 버전)
     func addJournalBlock(
-           journalId: ObjectId,
-           type: JournalBlockType,
-           text: String?,
-           linkURL: String?,
-           linkTitle: String?,
-           linkDescription: String?,
-           linkImage: UIImage?
-       ) -> Completable {
-           return Completable.create { completable in
-               do {
-                   let realm = try Realm()
-                   guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId) else {
-                       throw NSError(domain: "JournalNotFound", code: 404)
-                   }
-                   
-                   let block = JournalBlockTable()
-                   block.type = type
-                   block.text = text
-                   block.linkURL = linkURL
-                   block.linkTitle = linkTitle
-                   block.linkDescription = linkDescription
-                   
-                   // 이미지 저장
-                   if let image = linkImage {
-                       let filename = "\(block.id.stringValue)_preview"
-                       LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
-                       block.linkImagePath = filename
-                   }
-                   
-                   try realm.write {
-                       journal.blocks.append(block)
-                   }
-                   completable(.completed)
-               } catch {
-                   completable(.error(error))
-               }
-               return Disposables.create()
-           }
-       }
+        journalId: ObjectId,
+        type: JournalBlockType,
+        text: String?,
+        linkURL: String?,
+        linkTitle: String?,
+        linkDescription: String?,
+        linkImage: UIImage?
+    ) -> Completable {
+        return Completable.create { completable in
+            do {
+                let realm = try Realm()
+                guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId) else {
+                    throw NSError(domain: "JournalNotFound", code: 404)
+                }
+
+                // 새 블록 생성
+                let block = JournalBlockTable()
+                block.type = type
+                block.text = text
+                
+                // URL 정규화
+                let normalized = URLNormalizer.normalized(linkURL)?.absoluteString
+                block.linkURL = normalized
+                block.linkTitle = linkTitle
+                block.linkDescription = linkDescription
+
+                // 이미지 저장
+                if let image = linkImage {
+                    let filename = "\(block.id.stringValue)_preview"
+                    LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
+                    block.linkImagePath = filename
+                }
+
+                // Realm에 write
+                try realm.write {
+                    journal.blocks.append(block)
+                }
+
+                // Realm 객체를 빠져나오기 전에 id만 캡처
+                let blockId = block.id
+                let urlForFetch = normalized
+
+                // ✅ Realm write 블록 종료 후, 백그라운드에서 안전하게 LinkMetadata 호출
+                if let url = urlForFetch, !url.isEmpty {
+                    DispatchQueue.global(qos: .background).async {
+                        LinkMetadataRepositoryImpl()
+                            .fetchAndSaveMetadata(url: url, blockId: blockId)
+                            .subscribe(
+                                onSuccess: { entity in
+                                    print("✅ Metadata fetched:", entity.url)
+                                },
+                                onFailure: { error in
+                                    print("⚠️ Metadata fetch failed:", error.localizedDescription)
+                                }
+                            )
+                            .disposed(by: DisposeBag())
+                    }
+                }
+
+                completable(.completed)
+            } catch {
+                completable(.error(error))
+            }
+            return Disposables.create()
+        }
+    }
     
-    //MARK: - Fetch Journal Count
+    // MARK: - Fetch Journal Count
     func fetchJournalCount(tripId: ObjectId) -> Single<Int> {
         return Single.create { single in
-            do{
+            do {
                 let realm = try Realm()
                 let count = realm.objects(JournalTable.self)
                     .filter("tripId == %@", tripId)
                     .count
                 single(.success(count))
-            }catch{
+            } catch {
                 single(.failure(error))
             }
             return Disposables.create()
