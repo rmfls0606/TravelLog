@@ -9,18 +9,21 @@ import Foundation
 
 enum URLNormalizer {
     static func normalized(_ raw: String?) -> URL? {
-        guard let text = raw, !text.isEmpty else { return nil }
-        let pattern = "(https?://[\\S]+)|(www\\.[\\S]+)"
-        let regex = try? NSRegularExpression(pattern: pattern, options: [])
-        if let match = regex?.firstMatch(in: text, range: NSRange(location: 0, length: text.count)) {
-            let nsText = text as NSString
-            let found = nsText.substring(with: match.range)
-            if found.lowercased().hasPrefix("http") {
-                return URL(string: found)
-            } else {
-                return URL(string: "https://" + found)
-            }
+        guard let text = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return nil }
+
+        let components = text.split(separator: " ").map(String.init)
+        guard let first = components.first(where: { $0.contains(".") }) else { return nil }
+
+        var candidate = first.replacingOccurrences(of: " ", with: "")
+        
+        //대소문자 구분 없는 도메인 규격화를 위해 소문자화
+        candidate = candidate.lowercased()
+
+        if candidate.hasPrefix("http") {
+            return URL(string: candidate)
+        } else {
+            return URL(string: "https://" + candidate)
         }
-        return nil
     }
 }
