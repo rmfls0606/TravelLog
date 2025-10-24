@@ -10,6 +10,7 @@ import SnapKit
 import RxSwift
 import RxCocoa
 import RealmSwift
+import SafariServices
 
 final class JournalTimelineViewController: BaseViewController {
     
@@ -340,6 +341,20 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
                 return UITableViewCell()
             }
             cell.configure(with: block)
+            
+            cell.linkTapped
+                .bind(with: self) { owner, urlString in
+                    print(urlString)
+                    var normalized = urlString
+                    if !urlString.lowercased().hasPrefix("http") {
+                        normalized = "https://" + urlString
+                    }
+                    guard let url = URL(string: normalized) else { return }
+                    let safariVC = SFSafariViewController(url: url)
+                    safariVC.preferredControlTintColor = .systemGreen
+                    owner.present(safariVC, animated: true)
+                }
+                .disposed(by: cell.disposeBag)
             return cell
         default:
             return UITableViewCell() // Handle other types or return an empty cell
