@@ -101,6 +101,11 @@ final class JournalRepository: JournalRepositoryType {
                 block.linkURL = normalized
                 block.linkTitle = linkTitle
                 block.linkDescription = linkDescription
+                
+                //TTL 비교를 위해 생성 시각 기록
+                if type == .link{
+                    block.metadataUpdatedAt = Date()
+                }
 
                 // 이미지 저장
                 if let image = linkImage {
@@ -118,17 +123,17 @@ final class JournalRepository: JournalRepositoryType {
                 let blockId = block.id
                 let urlForFetch = normalized
 
-                // ✅ Realm write 블록 종료 후, 백그라운드에서 안전하게 LinkMetadata 호출
+                //Realm write 블록 종료 후, 백그라운드에서 안전하게 LinkMetadata 호출
                 if let url = urlForFetch, !url.isEmpty {
                     DispatchQueue.global(qos: .background).async {
                         LinkMetadataRepositoryImpl()
                             .fetchAndSaveMetadata(url: url, blockId: blockId)
                             .subscribe(
                                 onSuccess: { entity in
-                                    print("✅ Metadata fetched:", entity.url)
+                                    print("Metadata fetched:", entity.url)
                                 },
                                 onFailure: { error in
-                                    print("⚠️ Metadata fetch failed:", error.localizedDescription)
+                                    print("Metadata fetch failed:", error.localizedDescription)
                                 }
                             )
                             .disposed(by: DisposeBag())
