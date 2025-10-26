@@ -63,6 +63,7 @@ final class JournalBlockTable: Object {
     
     @Persisted var voiceURL: String?
     @Persisted var createdAt: Date
+    @Persisted var metadataUpdatedAt: Date?
     
     // 역참조
     @Persisted(originProperty: "blocks") var journal: LinkingObjects<JournalTable>
@@ -80,6 +81,7 @@ final class JournalBlockTable: Object {
         linkTitle: String? = nil,
         linkDescription: String? = nil,
         linkImagePath: String? = nil,
+        metadataUpdatedAt: Date? = nil,
         voiceURL: String? = nil,
         createdAt: Date
     ) {
@@ -93,6 +95,7 @@ final class JournalBlockTable: Object {
         self.longitude = longitude
         self.placeName = placeName
         self.linkURL = linkURL
+        self.metadataUpdatedAt = metadataUpdatedAt
         self.voiceURL = voiceURL
         self.createdAt = createdAt
     }
