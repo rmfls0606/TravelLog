@@ -64,6 +64,7 @@ final class JournalBlockTable: Object {
     @Persisted var voiceURL: String?
     @Persisted var createdAt: Date
     @Persisted var metadataUpdatedAt: Date?
+    @Persisted var fetchFailCount: Int = 0 //실패 회수 및 마지막 실패 시각 추가
     
     // 역참조
     @Persisted(originProperty: "blocks") var journal: LinkingObjects<JournalTable>
@@ -82,6 +83,7 @@ final class JournalBlockTable: Object {
         linkDescription: String? = nil,
         linkImagePath: String? = nil,
         metadataUpdatedAt: Date? = nil,
+        fetchFailCount: Int = 0,
         voiceURL: String? = nil,
         createdAt: Date
     ) {
