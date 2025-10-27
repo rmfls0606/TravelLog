@@ -5,171 +5,125 @@
 //  Created by 이상민 on 10/24/25.
 //
 
-import RxSwift
-import RealmSwift
+import Foundation
 import LinkPresentation
+import RealmSwift
+import RxSwift
 import UIKit
 internal import Realm
 
-final class LinkMetadataRepositoryImpl: LinkMetadataRepository {
+final class LinkMetadataRepositoryImpl {
+    private let provider = LPMetadataProvider()
+    private let maxRetryCount = 3
     
-    // MARK: - Properties
-    private let cache = LinkMetadataCache.shared
-    private let realmQueue = DispatchQueue(label: "realm.linkmetadata.queue", qos: .userInitiated)
+    // MARK: - Fetch & Save
     
-    // 메타데이터 갱신 완료 이벤트 (UI 갱신 트리거)
-    static let metadataUpdatedSubject = PublishSubject<ObjectId>()
-    
-    
-    // MARK: - 캐시 조회 (Memory → Realm)
-    func fetchCachedMetadata(url: String) -> Single<LinkPreviewEntity?> {
-        return Single.create { single in
-            let canonical = url.lowercased() as NSString
-            
-            // NSCache hit
-            if let cached = self.cache.object(forKey: canonical) {
-                print("[Cache] Memory hit for \(url)")
-                single(.success(cached))
-                return Disposables.create()
-            }
-            
-            // Realm hit
-            self.realmQueue.async {
-                autoreleasepool {
-                    do {
-                        let realm = try Realm()
-                        if let block = realm.objects(JournalBlockTable.self)
-                            .filter("linkURL == %@", url.lowercased())
-                            .first {
-                            
-                            let entity = LinkPreviewEntity(
-                                url: block.linkURL ?? url,
-                                title: block.linkTitle,
-                                description: block.linkDescription,
-                                imageFilename: block.linkImagePath
-                            )
-                            self.cache.setObject(entity, forKey: canonical)
-                            
-                            DispatchQueue.main.async {
-                                print("[Cache] Restored from Realm → Memory (\(url))")
-                                single(.success(entity))
-                            }
-                        } else {
-                            DispatchQueue.main.async { single(.success(nil)) }
-                        }
-                    } catch {
-                        DispatchQueue.main.async { single(.failure(error)) }
-                    }
-                }
-            }
-            
-            return Disposables.create()
-        }
-    }
-    
-    
-    // MARK: - 메타데이터 요청 + Realm + Cache 저장
     func fetchAndSaveMetadata(url: String, blockId: ObjectId) -> Single<LinkPreviewEntity> {
-        return Single.create { single in
-            // URL 정규화
-            guard let targetURL = URLNormalizer.normalized(url) else {
+        return Single<LinkPreviewEntity>.create { single in
+            guard let normalized = URLNormalizer.normalized(url) else {
                 single(.failure(NSError(domain: "InvalidURL", code: -1)))
                 return Disposables.create()
             }
             
-            let canonical = targetURL.absoluteString.lowercased()
-            let provider = LPMetadataProvider()
-            
-            print("Fetching new metadata for \(canonical)")
-            
-            // LPMetadataProvider로 메타데이터 요청
-            provider.startFetchingMetadata(for: targetURL) { metadata, error in
-                guard let metadata = metadata, error == nil else {
-                    DispatchQueue.main.async {
-                        single(.failure(error ?? NSError(domain: "NoMetadata", code: -2)))
-                    }
+            self.provider.startFetchingMetadata(for: normalized) { metadata, error in
+                if let error = error {
+                    self.recordFetchFailure(blockId: blockId, error: error)
+                    single(.failure(error))
                     return
                 }
                 
-                let title = metadata.title ?? targetURL.host ?? "링크 미리보기"
-                let desc = metadata.value(forKey: "summary") as? String ?? targetURL.absoluteString
-                
-                func save(filename: String?) {
-                    DispatchQueue(label: "realm.linkmetadata.write", qos: .userInitiated).async {
-                        autoreleasepool {
-                            do {
-                                let realm = try Realm()
-                                if let block = realm.object(ofType: JournalBlockTable.self, forPrimaryKey: blockId) {
-                                    try realm.write {
-                                        block.linkURL = canonical
-                                        block.linkTitle = title
-                                        block.linkDescription = desc
-                                        block.linkImagePath = filename
-                                        block.metadataUpdatedAt = Date()
-                                    }
-                                }
-                                
-                                let entity = LinkPreviewEntity(
-                                    url: canonical,
-                                    title: title,
-                                    description: desc,
-                                    imageFilename: filename
-                                )
-                                
-                                // 캐시에 저장
-                                self.cache.setObject(entity, forKey: canonical as NSString)
-                                
-                                // UI 갱신 이벤트 전파
-                                DispatchQueue.main.async {
-                                    print("Metadata saved & Realm updated for \(canonical)")
-                                    single(.success(entity))
-                                    LinkMetadataRepositoryImpl.metadataUpdatedSubject.onNext(blockId)
-                                }
-                            } catch {
-                                DispatchQueue.main.async { single(.failure(error)) }
-                            }
-                        }
-                    }
+                guard let metadata = metadata else {
+                    let error = NSError(domain: "NoMetadata", code: -2)
+                    self.recordFetchFailure(blockId: blockId, error: error)
+                    single(.failure(error))
+                    return
                 }
                 
-                // 이미지 처리
-                if let itemProvider = metadata.imageProvider {
-                    itemProvider.loadObject(ofClass: UIImage.self) { image, _ in
-                        var filename: String?
-                        if let uiImage = image as? UIImage {
-                            filename = "\(blockId.stringValue)_preview"
-                            Self.saveImageToDocuments(uiImage, filename: filename!)
-                        }
-                        save(filename: filename)
-                    }
-                } else {
-                    save(filename: nil)
-                }
+                self.saveMetadata(metadata, blockId: blockId)
+                
+                let entity = LinkPreviewEntity(
+                    url: normalized.absoluteString,
+                    title: metadata.title,
+                    description: metadata.value(forKey: "summary") as? String,
+                    imageFilename: nil
+                )
+                single(.success(entity))
             }
-            
             return Disposables.create()
         }
     }
-}
-
-
-// MARK: - FileManager Utilities
-extension LinkMetadataRepositoryImpl {
-    static func saveImageToDocuments(_ image: UIImage, filename: String) {
-        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
-              let data = image.jpegData(compressionQuality: 0.7)
-        else { return }
-        
-        let fileURL = dir.appendingPathComponent("\(filename).jpg")
-        if !FileManager.default.fileExists(atPath: fileURL.path) {
-            try? data.write(to: fileURL)
+    
+    // MARK: - Realm Write Helpers
+    
+    private func saveMetadata(_ metadata: LPLinkMetadata, blockId: ObjectId) {
+        DispatchQueue.global(qos: .background).async {
+            autoreleasepool {
+                do {
+                    let realm = try Realm()
+                    guard let block = realm.object(ofType: JournalBlockTable.self, forPrimaryKey: blockId) else { return }
+                    
+                    try realm.write {
+                        block.linkTitle = metadata.title
+                        block.linkDescription = metadata.value(forKey: "summary") as? String
+                        if let provider = metadata.imageProvider {
+                            let filename = "\(blockId.stringValue)_preview.png"
+                            self.saveImage(provider: provider, filename: filename)
+                            block.linkImagePath = filename
+                        }
+                        block.metadataUpdatedAt = Date()
+                        block.fetchFailCount = 0
+                    }
+                } catch {
+                    print("Realm saveMetadata error:", error.localizedDescription)
+                }
+            }
         }
     }
-
-    static func loadImageFromDocuments(filename: String?) -> UIImage? {
-        guard let filename,
-              let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        else { return nil }
-        return UIImage(contentsOfFile: dir.appendingPathComponent("\(filename).jpg").path)
+    
+    private func recordFetchFailure(blockId: ObjectId, error: Error) {
+        DispatchQueue.global(qos: .background).async {
+            autoreleasepool {
+                do {
+                    let realm = try Realm()
+                    guard let block = realm.object(ofType: JournalBlockTable.self, forPrimaryKey: blockId) else { return }
+                    try realm.write {
+                        block.fetchFailCount += 1
+                        if block.fetchFailCount >= self.maxRetryCount {
+                            block.metadataUpdatedAt = Date() // 3회 초과 시 쿨다운
+                            print("[Cooldown] \(blockId.stringValue): max retries reached")
+                        }
+                    }
+                } catch {
+                    print("Realm recordFetchFailure error:", error.localizedDescription)
+                }
+            }
+        }
+    }
+    
+    private func saveImage(provider: NSItemProvider, filename: String) {
+        provider.loadObject(ofClass: UIImage.self) { image, _ in
+            guard let uiImage = image as? UIImage,
+                  let data = uiImage.pngData() else { return }
+            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent(filename)
+            try? data.write(to: url)
+        }
+    }
+    
+    static func saveImageToDocuments(_ image: UIImage, filename: String) {
+            if let data = image.pngData() {
+                let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+                    .first!
+                    .appendingPathComponent(filename)
+                do {
+                    try data.write(to: url)
+                } catch {
+                    print("saveImageToDocuments failed:", error.localizedDescription)
+                }
+            }
+        }
+    
+    static func loadImageFromDocuments(filename: String) -> UIImage? {
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent(filename)
+        return UIImage(contentsOfFile: url.path)
     }
 }
