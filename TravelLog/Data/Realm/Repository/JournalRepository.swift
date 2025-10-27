@@ -97,15 +97,15 @@ final class JournalRepository: JournalRepositoryType {
                 block.text = text
                 
                 // URL 정규화
-                let normalized = URLNormalizer.normalized(linkURL)?.absoluteString
+                let normalized = URLNormalizer.normalized(linkURL)?.absoluteString ?? linkURL
                 block.linkURL = normalized
                 block.linkTitle = linkTitle
                 block.linkDescription = linkDescription
                 
                 //TTL 비교를 위해 생성 시각 기록
-                if type == .link{
-                    block.metadataUpdatedAt = Date()
-                }
+//                if type == .link{
+//                    block.metadataUpdatedAt = Date()
+//                }
 
                 // 이미지 저장
                 if let image = linkImage {
