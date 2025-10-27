@@ -25,10 +25,86 @@ protocol JournalRepositoryType {
         ) -> Completable
     func fetchJournalCount(tripId: ObjectId) -> Single<Int>
 }
+
 final class JournalRepository: JournalRepositoryType {
-    // ⚠️ 전역 Realm 인스턴스 삭제 — 스레드별로 새로 생성
-    private var notificationTokens: [NotificationToken] = []
-    
+
+    // MARK: - Add Journal Block
+    func addJournalBlock(
+        journalId: ObjectId,
+        type: JournalBlockType,
+        text: String?,
+        linkURL: String?,
+        linkTitle: String?,
+        linkDescription: String?,
+        linkImage: UIImage?
+    ) -> Completable {
+        return Completable.create { completable in
+            do {
+                let realm = try Realm()
+                guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId) else {
+                    throw NSError(domain: "JournalNotFound", code: 404)
+                }
+
+                // 새 블록
+                let block = JournalBlockTable()
+                block.journalId = journalId
+                block.type = type
+                block.text = text
+
+                // 정규화 실패해도 원본 저장
+                let normalized = URLNormalizer.normalized(linkURL)?.absoluteString ?? linkURL
+                block.linkURL = normalized
+                block.linkTitle = linkTitle
+                block.linkDescription = linkDescription
+
+                if type == .link {
+                    if URLNormalizer.normalized(linkURL) == nil {
+                        // 유효하지 않은 도메인은 바로 TTL 제외 처리
+                        block.metadataUpdatedAt = Date()
+                    } else {
+                        block.metadataUpdatedAt = nil // 정상 링크 → 추후 갱신 대상
+                    }
+                }
+
+                if let image = linkImage {
+                    let filename = "\(block.id.stringValue)_preview"
+                    LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
+                    block.linkImagePath = filename
+                }
+
+                try realm.write {
+                    journal.blocks.append(block)
+                }
+
+                // Thread-safe: ObjectId만 넘김
+                let blockId = block.id
+
+                // 유효한 URL 형식이면 백그라운드 fetch
+                if let url = normalized,
+                   let u = URL(string: url),
+                   u.scheme != nil, u.host != nil {
+                    DispatchQueue.global(qos: .background).async {
+                        LinkMetadataRepositoryImpl()
+                            .fetchAndSaveMetadata(url: url, blockId: blockId)
+                            .subscribe(
+                                onSuccess: { _ in },
+                                onFailure: { error in
+                                    print("Initial fetch failed:", error.localizedDescription)
+                                }
+                            )
+                            .disposed(by: DisposeBag())
+                    }
+                }
+
+                completable(.completed)
+            } catch {
+                completable(.error(error))
+            }
+
+            return Disposables.create()
+        }
+    }
+
     // MARK: - Fetch Journals
     func fetchJournals(for tripId: ObjectId) -> Observable<[JournalTable]> {
         return Observable.create { observer in
@@ -36,26 +112,22 @@ final class JournalRepository: JournalRepositoryType {
             let results = realm.objects(JournalTable.self)
                 .filter("tripId == %@", tripId)
                 .sorted(byKeyPath: "createdAt", ascending: true)
-            
+
             observer.onNext(Array(results))
-            
+
             let token = results.observe { changes in
                 switch changes {
-                case .initial(let collection):
-                    observer.onNext(Array(collection))
-                case .update(let collection, _, _, _):
-                    observer.onNext(Array(collection))
+                case .initial(let col), .update(let col, _, _, _):
+                    observer.onNext(Array(col))
                 case .error(let error):
                     observer.onError(error)
                 }
             }
-            
-            return Disposables.create {
-                token.invalidate()
-            }
+
+            return Disposables.create { token.invalidate() }
         }
     }
-    
+
     // MARK: - Create Journal
     func createJournal(for tripId: ObjectId, date: Date) -> Single<JournalTable> {
         return Single.create { single in
@@ -73,81 +145,7 @@ final class JournalRepository: JournalRepositoryType {
             return Disposables.create()
         }
     }
-    
-    // MARK: - Add Journal Block (완벽한 버전)
-    func addJournalBlock(
-        journalId: ObjectId,
-        type: JournalBlockType,
-        text: String?,
-        linkURL: String?,
-        linkTitle: String?,
-        linkDescription: String?,
-        linkImage: UIImage?
-    ) -> Completable {
-        return Completable.create { completable in
-            do {
-                let realm = try Realm()
-                guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId) else {
-                    throw NSError(domain: "JournalNotFound", code: 404)
-                }
 
-                // 새 블록 생성
-                let block = JournalBlockTable()
-                block.type = type
-                block.text = text
-                
-                // URL 정규화
-                let normalized = URLNormalizer.normalized(linkURL)?.absoluteString ?? linkURL
-                block.linkURL = normalized
-                block.linkTitle = linkTitle
-                block.linkDescription = linkDescription
-                
-                //TTL 비교를 위해 생성 시각 기록
-//                if type == .link{
-//                    block.metadataUpdatedAt = Date()
-//                }
-
-                // 이미지 저장
-                if let image = linkImage {
-                    let filename = "\(block.id.stringValue)_preview"
-                    LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
-                    block.linkImagePath = filename
-                }
-
-                // Realm에 write
-                try realm.write {
-                    journal.blocks.append(block)
-                }
-
-                // Realm 객체를 빠져나오기 전에 id만 캡처
-                let blockId = block.id
-                let urlForFetch = normalized
-
-                //Realm write 블록 종료 후, 백그라운드에서 안전하게 LinkMetadata 호출
-                if let url = urlForFetch, !url.isEmpty {
-                    DispatchQueue.global(qos: .background).async {
-                        LinkMetadataRepositoryImpl()
-                            .fetchAndSaveMetadata(url: url, blockId: blockId)
-                            .subscribe(
-                                onSuccess: { entity in
-                                    print("Metadata fetched:", entity.url)
-                                },
-                                onFailure: { error in
-                                    print("Metadata fetch failed:", error.localizedDescription)
-                                }
-                            )
-                            .disposed(by: DisposeBag())
-                    }
-                }
-
-                completable(.completed)
-            } catch {
-                completable(.error(error))
-            }
-            return Disposables.create()
-        }
-    }
-    
     // MARK: - Fetch Journal Count
     func fetchJournalCount(tripId: ObjectId) -> Single<Int> {
         return Single.create { single in
