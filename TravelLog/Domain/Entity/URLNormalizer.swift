@@ -12,14 +12,14 @@ enum URLNormalizer {
         guard let text = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else { return nil }
 
-        let components = text.split(separator: " ").map(String.init)
-        guard let first = components.first(where: { $0.contains(".") }) else { return nil }
+        // 도메인 구조 체크: 알파벳+점+최소 2글자 TLD
+        let domainPattern = #"^(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$"#
+        guard text.range(of: domainPattern, options: .regularExpression) != nil else {
+            print("Invalid domain format:", text)
+            return nil
+        }
 
-        var candidate = first.replacingOccurrences(of: " ", with: "")
-        
-        //대소문자 구분 없는 도메인 규격화를 위해 소문자화
-        candidate = candidate.lowercased()
-
+        let candidate = text.lowercased()
         if candidate.hasPrefix("http") {
             return URL(string: candidate)
         } else {
