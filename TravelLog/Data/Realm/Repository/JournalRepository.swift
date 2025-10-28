@@ -152,10 +152,12 @@ final class JournalRepository: JournalRepositoryType {
         return Single.create { single in
             do {
                 let realm = try Realm()
-                let count = realm.objects(JournalTable.self)
+                let journals = realm.objects(JournalTable.self)
                     .filter("tripId == %@", tripId)
-                    .count
-                single(.success(count))
+                
+                let totalBlocks = journals.reduce(0) { $0 + $1.blocks.count }
+                            
+                single(.success(totalBlocks))
             } catch {
                 single(.failure(error))
             }
