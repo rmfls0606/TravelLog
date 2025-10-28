@@ -98,6 +98,9 @@ final class TripRealmDataSource{
         return Completable.create { completable in
             do {
                 let realm = try Realm()
+                let fileManager = FileManager.default
+                let docURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+                
                 try realm.write {
                     // trip.id와 연결된 모든 journal 조회
                     let journals = realm.objects(JournalTable.self)
@@ -107,6 +110,19 @@ final class TripRealmDataSource{
                     for journal in journals {
                         let blocks = realm.objects(JournalBlockTable.self)
                             .filter("journalId == %@", journal.id)
+                        
+                        //블록 이미지 파일 삭제
+                        for block in blocks {
+                            if let filename = block.linkImagePath {
+                                let fileURL = docURL.appendingPathComponent("\(filename).jpg")
+                                if fileManager.fileExists(atPath: fileURL.path) {
+                                    try? fileManager.removeItem(at: fileURL)
+                                    print("🗑️ Deleted image:", fileURL.lastPathComponent)
+                                }
+                            }
+                        }
+                        
+                        //Realm 데이터 삭제
                         realm.delete(blocks)
                         realm.delete(journal)
                     }
@@ -114,6 +130,7 @@ final class TripRealmDataSource{
                     // trip 삭제
                     realm.delete(trip)
                 }
+                
                 completable(.completed)
             } catch {
                 completable(.error(RealmError.deleteFailure))
