@@ -9,21 +9,27 @@ import Foundation
 
 enum URLNormalizer {
     static func normalized(_ raw: String?) -> URL? {
-        guard let text = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard var text = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else { return nil }
 
-        // 도메인 구조 체크: 알파벳+점+최소 2글자 TLD
-        let domainPattern = #"^(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$"#
-        guard text.range(of: domainPattern, options: .regularExpression) != nil else {
-            print("Invalid domain format:", text)
+        // 중간 공백 제거 (연속 스페이스 포함)
+        text = text.replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+
+        // http/https가 없으면 https 붙이기
+        if !text.lowercased().hasPrefix("http://") && !text.lowercased().hasPrefix("https://") {
+            text = "https://" + text
+        }
+
+        // URLComponents로 검증 (도메인+스킴 필수)
+        guard let comps = URLComponents(string: text),
+              let scheme = comps.scheme,
+              (scheme == "http" || scheme == "https"),
+              comps.host != nil
+        else {
+            print("❌ Invalid URL:", text)
             return nil
         }
 
-        let candidate = text.lowercased()
-        if candidate.hasPrefix("http") {
-            return URL(string: candidate)
-        } else {
-            return URL(string: "https://" + candidate)
-        }
+        return comps.url
     }
 }
