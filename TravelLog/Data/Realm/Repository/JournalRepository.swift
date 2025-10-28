@@ -50,6 +50,7 @@ final class JournalRepository: JournalRepositoryType {
                 block.journalId = journalId
                 block.type = type
                 block.text = text
+                block.createdAt = journal.createdAt
 
                 // 정규화 실패해도 원본 저장
                 let normalized = URLNormalizer.normalized(linkURL)?.absoluteString ?? linkURL

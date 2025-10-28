@@ -58,8 +58,10 @@ final class JournalTimelineViewController: BaseViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if let tripId = trip?.id {
-            NetworkMonitor.shared.startMonitoring(for: tripId)                 // 네트워크 복원 시 미완 링크 갱신
-            AppLifecycleManager.shared.refreshExpiredLinkMetadataIfNeeded(for: tripId) // 하루 1회 TTL 갱신
+            // 네트워크 복구 시: 최초 미시도만 복구(오늘 몇 번 와도 중복 호출 안 나게 NWPathMonitor가 보장)
+            NetworkMonitor.shared.startMonitoring(for: tripId)
+            // TTL: 오늘은 한 번만, 30일 지난 데이터들만 갱신
+            AppLifecycleManager.shared.refreshExpiredLinkMetadataIfNeeded(for: tripId)
         }
     }
 

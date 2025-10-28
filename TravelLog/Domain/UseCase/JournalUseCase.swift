@@ -111,12 +111,6 @@ final class JournalUseCase: JournalUseCaseType {
                     throw NSError(domain: "NotFound", code: 404)
                 }
                 
-                //NSCache 무효화
-                if let url = block.linkURL {
-                    LinkMetadataCache.shared.removeObject(forKey: url as NSString)
-                    print("NSCache removed for:", url)
-                }
-                
                 if let filename = block.linkImagePath {
                     let fileManager = FileManager.default
                     if let dir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
