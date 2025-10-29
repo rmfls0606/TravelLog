@@ -247,6 +247,12 @@ final class JournalAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
+        photoButton.rx.tap
+            .bind(with: self) { owner, _ in
+                owner.addPhotoBlock()
+            }
+            .disposed(by: disposeBag)
+        
         saveButton.rx.tap
             .map { [weak self] _ -> [JournalAddViewModel.JournalBlockData] in
                 guard let self = self else { return [] }
@@ -315,6 +321,30 @@ final class JournalAddViewController: BaseViewController {
         updateSaveButton(enabled: true)
         
         let card = JournalLinkBlockView()
+        contentStack.addArrangedSubview(card)
+        
+        card.removeTapped
+            .bind(with: self) { owner, _ in
+                UIView.animate(withDuration: 0.25) {
+                    card.alpha = 0
+                } completion: { _ in
+                    owner.contentStack.removeArrangedSubview(card)
+                    card.removeFromSuperview()
+                    
+                    if owner.contentStack.arrangedSubviews.isEmpty {
+                        owner.emptyContainerView.isHidden = false
+                        owner.updateSaveButton(enabled: false)
+                    }
+                }
+            }
+            .disposed(by: card.disposeBag)
+    }
+    
+    private func addPhotoBlock() {
+        emptyContainerView.isHidden = true
+        updateSaveButton(enabled: true)
+        
+        let card = JournalPhotoBlockView()
         contentStack.addArrangedSubview(card)
         
         card.removeTapped
