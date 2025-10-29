@@ -365,7 +365,7 @@ final class TripCardCell: BaseTableViewCell {
         continueButton.snp.makeConstraints { make in
             make.top.equalTo(memorySummaryCard.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview().inset(16)
-            make.height.equalTo(48)
+//            make.height.equalTo(48)
             make.bottom.equalToSuperview().inset(16)
         }
     }
