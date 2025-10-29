@@ -18,15 +18,16 @@ final class LinkMetadataRepositoryImpl {
     // MARK: - 메타데이터 가져오기 및 저장
     func fetchAndSaveMetadata(url: String, blockId: ObjectId) -> Single<LinkPreviewEntity> {
         return Single<LinkPreviewEntity>.create { single in
-            guard let normalized = URLNormalizer.normalized(url) else {
+            guard let normalizedResult = URLNormalizer.normalized(url) else {
                 single(.failure(NSError(domain: "InvalidURL", code: -1)))
                 return Disposables.create()
             }
 
-            // 매 요청마다 새 provider 생성 (한 번만 fetch 가능)
+            let targetURL = normalizedResult.url
             let provider = LPMetadataProvider()
 
-            provider.startFetchingMetadata(for: normalized) { metadata, error in
+            provider.startFetchingMetadata(for: targetURL) { metadata, error in
+                // 에러 처리
                 if let error = error {
                     DispatchQueue.global(qos: .background).async {
                         self.recordFetchFailure(blockId: blockId, error: error)
@@ -35,6 +36,7 @@ final class LinkMetadataRepositoryImpl {
                     return
                 }
 
+                // 메타데이터 없음
                 guard let metadata = metadata else {
                     let err = NSError(domain: "NoMetadata", code: -2)
                     DispatchQueue.global(qos: .background).async {
@@ -44,7 +46,7 @@ final class LinkMetadataRepositoryImpl {
                     return
                 }
 
-                // Realm에 저장
+                // Realm 저장 (background-safe)
                 DispatchQueue.global(qos: .background).async {
                     autoreleasepool {
                         do {
@@ -55,36 +57,41 @@ final class LinkMetadataRepositoryImpl {
                             try realm.write {
                                 block.linkTitle = metadata.title
                                 block.linkDescription = metadata.value(forKey: "summary") as? String
-                                
+
                                 if let provider = metadata.imageProvider {
                                     let filename = "\(blockId.stringValue)_preview"
                                     self.saveImage(provider: provider, filename: filename)
-                                    block.linkImagePath = filename // 확장자 제외 (삭제 시 일관성 유지)
+                                    block.linkImagePath = filename
                                 }
-                                
+
                                 block.metadataUpdatedAt = Date()
                                 block.fetchFailCount = 0
                             }
 
+                            // 결과 객체 생성 후 성공 반환
+                            let entity = LinkPreviewEntity(
+                                url: targetURL.absoluteString,
+                                title: metadata.title,
+                                description: metadata.value(forKey: "summary") as? String,
+                                imageFilename: nil
+                            )
+
                             DispatchQueue.main.async {
-                                let entity = LinkPreviewEntity(
-                                    url: normalized.absoluteString,
-                                    title: metadata.title,
-                                    description: metadata.value(forKey: "summary") as? String,
-                                    imageFilename: nil
-                                )
                                 single(.success(entity))
                             }
+
                         } catch {
-                            DispatchQueue.main.async { single(.failure(error)) }
+                            DispatchQueue.main.async {
+                                single(.failure(error))
+                            }
                         }
                     }
                 }
             }
+
             return Disposables.create()
         }
     }
-
     // MARK: - 실패 기록
     private func recordFetchFailure(blockId: ObjectId, error: Error) {
         autoreleasepool {
@@ -117,9 +124,9 @@ final class LinkMetadataRepositoryImpl {
                     .first!.appendingPathComponent("\(filename).jpg")
                 do {
                     try data.write(to: url)
-                    print("✅ Saved preview:", url.lastPathComponent)
+                    print("Saved preview:", url.lastPathComponent)
                 } catch {
-                    print("❌ saveImage error:", error.localizedDescription)
+                    print("saveImage error:", error.localizedDescription)
                 }
             }
         }
@@ -132,9 +139,9 @@ final class LinkMetadataRepositoryImpl {
                 .first!.appendingPathComponent("\(filename).jpg")
             do {
                 try data.write(to: url)
-                print("✅ Saved manual preview:", url.lastPathComponent)
+                print("Saved manual preview:", url.lastPathComponent)
             } catch {
-                print("❌ saveImageToDocuments error:", error.localizedDescription)
+                print("saveImageToDocuments error:", error.localizedDescription)
             }
         }
     }
@@ -152,7 +159,7 @@ final class LinkMetadataRepositoryImpl {
         let fileURL = dir.appendingPathComponent("\(filename).jpg")
         if fileManager.fileExists(atPath: fileURL.path) {
             try? fileManager.removeItem(at: fileURL)
-            print("🗑️ Deleted:", fileURL.lastPathComponent)
+            print("Deleted:", fileURL.lastPathComponent)
         }
     }
 }
