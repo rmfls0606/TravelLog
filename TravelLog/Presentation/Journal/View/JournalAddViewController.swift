@@ -18,9 +18,24 @@ final class JournalAddViewController: BaseViewController {
     private let emptyContainerView = UIView()
     private let emptyView = CustomEmptyView()
     
+    private let addBlockContainer: UIView = {
+        let view = UIView()
+        view.backgroundColor = .white
+        return view
+    }()
+    
     private let addBar = UIStackView()
+    private let blockTitle: UILabel = {
+        let label = UILabel()
+        label.text = "블록 추가하기"
+        label.textColor = .black
+        label.font = .systemFont(ofSize: 16, weight: .bold)
+        return label
+    }()
+    
     private let textButton = UIButton(configuration: .filled())
     private let linkButton = UIButton(configuration: .filled())
+    private let photoButton = UIButton(configuration: .filled())
     
     private let saveButton = UIButton(configuration: .filled())
     
@@ -36,11 +51,13 @@ final class JournalAddViewController: BaseViewController {
     
     // MARK: - Hierarchy
     override func configureHierarchy() {
-        view.addSubviews(scrollView, addBar, saveButton)
+        view.addSubviews(scrollView, addBlockContainer, saveButton)
         scrollView.addSubview(contentStack)
         addBar.addArrangedSubview(textButton)
         addBar.addArrangedSubview(linkButton)
-        
+        addBar.addArrangedSubview(photoButton)
+        addBlockContainer.addSubview(blockTitle)
+        addBlockContainer.addSubview(addBar)
         // empty container
         view.insertSubview(emptyContainerView, belowSubview: addBar)
         emptyContainerView.addSubview(emptyView)
@@ -69,10 +86,19 @@ final class JournalAddViewController: BaseViewController {
             $0.width.lessThanOrEqualToSuperview().inset(16)
         }
 
+        addBlockContainer.snp.makeConstraints { make in
+            make.leading.trailing.equalToSuperview().inset(16)
+            make.bottom.equalTo(saveButton.snp.top).offset(-12)
+        }
+        
         addBar.snp.makeConstraints {
-            $0.leading.trailing.equalToSuperview().inset(16)
-            $0.bottom.equalTo(saveButton.snp.top).offset(-12)
-            $0.height.equalTo(60)
+            $0.top.equalTo(blockTitle.snp.bottom).offset(16)
+            $0.horizontalEdges.equalToSuperview().inset(16)
+            $0.bottom.equalToSuperview().inset(16)
+        }
+        
+        blockTitle.snp.makeConstraints { make in
+            make.top.horizontalEdges.equalToSuperview().inset(16)
         }
 
         saveButton.snp.makeConstraints {
@@ -100,6 +126,7 @@ final class JournalAddViewController: BaseViewController {
             buttonTitle: nil
         )
         
+        addBlockContainer.layer.cornerRadius = 12
         addBar.axis = .horizontal
         addBar.distribution = .fillEqually
         addBar.spacing = 12
@@ -155,6 +182,29 @@ final class JournalAddViewController: BaseViewController {
         
         linkButton.configuration = linkConfig
         linkButton.clipsToBounds = true
+        
+        //포토 버튼
+        var photoConfig = UIButton.Configuration.filled()
+        photoConfig.baseForegroundColor = .white
+        photoConfig.image = UIImage(
+            systemName: "camera",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        )
+        photoConfig.imagePadding = 8
+        photoConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        photoConfig.attributedTitle = AttributedString(
+            "사진",
+            attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 15, weight: .semibold)])
+        )
+        
+        // UIBackgroundConfiguration.clear() 사용
+        var photoBg = UIBackgroundConfiguration.clear()
+        photoBg.cornerRadius = 12
+        photoBg.backgroundColor = UIColor.systemPink
+        photoConfig.background = photoBg
+        
+        photoButton.configuration = photoConfig
+        photoButton.clipsToBounds = true
         
         // 저장 버튼
         var saveConfig = UIButton.Configuration.filled()
