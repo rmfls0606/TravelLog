@@ -103,11 +103,13 @@ final class JournalAddViewModel: BaseViewModel {
     -> Single<(String?, String?, UIImage?)> {
         return Single.create { single in
             // URL 정규화
-            guard let url = URLNormalizer.normalized(urlString) else {
-                        single(.success((nil, nil, nil)))
-                        return Disposables.create()
-                    }
-            
+            guard let normalized = URLNormalizer.normalized(urlString) else {
+                single(.success((nil, nil, nil)))
+                return Disposables.create()
+            }
+
+            let url = normalized.url   // 실제 URL 추출
+
             let provider = LPMetadataProvider()
             provider.startFetchingMetadata(for: url) { metadata, error in
                 if let error = error {
@@ -115,29 +117,27 @@ final class JournalAddViewModel: BaseViewModel {
                     single(.success((nil, nil, nil)))
                     return
                 }
+
                 guard let metadata = metadata else {
                     single(.success((nil, nil, nil)))
                     return
                 }
-                
+
                 // 기본 정보
                 let title = metadata.title ?? url.host ?? "링크 미리보기"
                 let desc = metadata.value(forKey: "summary") as? String ?? url.absoluteString
-                
+
                 // 이미지 로드
                 if let imageProvider = metadata.imageProvider {
                     imageProvider.loadObject(ofClass: UIImage.self) { imageObj, _ in
-                        if let image = imageObj as? UIImage {
-                            single(.success((title, desc, image)))
-                        } else {
-                            single(.success((title, desc, nil)))
-                        }
+                        let image = imageObj as? UIImage
+                        single(.success((title, desc, image)))
                     }
                 } else {
                     single(.success((title, desc, nil)))
                 }
             }
-            
+
             return Disposables.create()
         }
     }

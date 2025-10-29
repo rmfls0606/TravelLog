@@ -171,8 +171,9 @@ final class JournalLinkCell: UITableViewCell {
         linkTapGesture.rx.event
             .bind(with: self) { owner, _ in
                 guard let raw = owner.currentBlock?.linkURL, !raw.isEmpty else { return }
+                
                 if let normalized = URLNormalizer.normalized(raw) {
-                    owner.linkTapped.accept(normalized.absoluteString)
+                    owner.linkTapped.accept(normalized.url.absoluteString) // 수정
                 } else {
                     owner.linkTapped.accept(raw)
                 }
@@ -183,8 +184,9 @@ final class JournalLinkCell: UITableViewCell {
         linkButton.rx.tap
             .bind(with: self) { owner, _ in
                 guard let raw = owner.currentBlock?.linkURL, !raw.isEmpty else { return }
+                
                 if let normalized = URLNormalizer.normalized(raw) {
-                    owner.linkTapped.accept(normalized.absoluteString)
+                    owner.linkTapped.accept(normalized.url.absoluteString) // 수정
                 } else {
                     owner.linkTapped.accept(raw)
                 }

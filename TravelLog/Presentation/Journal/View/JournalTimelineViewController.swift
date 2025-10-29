@@ -128,10 +128,11 @@ final class JournalTimelineViewController: BaseViewController {
             make.edges.equalToSuperview()
         }
 
+        // ✅ 수정된 핵심: tableView 높이 고정 제거, contentView bottom에 연결
         tableView.snp.makeConstraints { make in
             make.top.equalTo(addMemoryContainerView.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview()
-            make.bottom.equalToSuperview()
+            make.bottom.equalToSuperview() // scrollView contentView bottom에 연결
         }
     }
 
@@ -175,7 +176,8 @@ final class JournalTimelineViewController: BaseViewController {
         tableView.backgroundColor = .clear
         tableView.isScrollEnabled = false
         tableView.rowHeight = UITableView.automaticDimension
-        tableView.estimatedRowHeight = 160
+        tableView.estimatedRowHeight = 180
+        tableView.tableFooterView = UIView()
         tableView.showsVerticalScrollIndicator = false
         tableView.register(JournalTextCell.self, forCellReuseIdentifier: JournalTextCell.identifier)
         tableView.register(JournalLinkCell.self, forCellReuseIdentifier: JournalLinkCell.identifier)
@@ -356,16 +358,19 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             // 링크 탭 → 항상 SafariVC 시도 (형식 불량이어도 최대한 열기)
             cell.linkTapped
                 .bind(with: self) { owner, urlString in
-                    let url: URL?
+                    var openURL: URL?
+
                     if let normalized = URLNormalizer.normalized(urlString) {
-                        url = normalized
+                        openURL = normalized.url
                     } else if let fallback = URL(string: "https://\(urlString)") {
-                        url = fallback
+                        openURL = fallback
                     } else {
-                        url = URL(string: urlString)
+                        openURL = URL(string: urlString)
                     }
-                    guard let openURL = url else { return }
-                    let vc = SFSafariViewController(url: openURL)
+
+                    guard let finalURL = openURL else { return }
+
+                    let vc = SFSafariViewController(url: finalURL)
                     vc.preferredControlTintColor = .systemGreen
                     owner.present(vc, animated: true)
                 }
