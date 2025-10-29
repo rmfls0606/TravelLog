@@ -45,28 +45,29 @@ final class JournalRepository: JournalRepositoryType {
                     throw NSError(domain: "JournalNotFound", code: 404)
                 }
 
-                // 새 블록
+                // 새 블록 생성
                 let block = JournalBlockTable()
                 block.journalId = journalId
                 block.type = type
                 block.text = text
                 block.createdAt = journal.createdAt
 
-                // 정규화 실패해도 원본 저장
-                let normalized = URLNormalizer.normalized(linkURL)?.absoluteString ?? linkURL
-                block.linkURL = normalized
+                // URL 정규화
+                let normalizedResult = URLNormalizer.normalized(linkURL)
+                block.linkURL = normalizedResult?.url.absoluteString ?? linkURL
                 block.linkTitle = linkTitle
                 block.linkDescription = linkDescription
 
+                // TTL 관리
                 if type == .link {
-                    if URLNormalizer.normalized(linkURL) == nil {
-                        // 유효하지 않은 도메인은 바로 TTL 제외 처리
-                        block.metadataUpdatedAt = Date()
+                    if let normalized = URLNormalizer.normalized(linkURL), normalized.isValidDomain {
+                        block.metadataUpdatedAt = nil // 정상 도메인 → 갱신 대상
                     } else {
-                        block.metadataUpdatedAt = nil // 정상 링크 → 추후 갱신 대상
+                        block.metadataUpdatedAt = Date() // 잘못된 도메인 → 즉시 TTL 제외
                     }
                 }
 
+                // 이미지 저장
                 if let image = linkImage {
                     let filename = "\(block.id.stringValue)_preview"
                     LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
@@ -77,16 +78,15 @@ final class JournalRepository: JournalRepositoryType {
                     journal.blocks.append(block)
                 }
 
-                // Thread-safe: ObjectId만 넘김
+                // Thread-safe 전달용 id
                 let blockId = block.id
 
-                // 유효한 URL 형식이면 백그라운드 fetch
-                if let url = normalized,
-                   let u = URL(string: url),
-                   u.scheme != nil, u.host != nil {
+                // 정상 도메인일 때만 백그라운드 fetch
+                if let result = normalizedResult,
+                   result.isValidDomain {
                     DispatchQueue.global(qos: .background).async {
                         LinkMetadataRepositoryImpl()
-                            .fetchAndSaveMetadata(url: url, blockId: blockId)
+                            .fetchAndSaveMetadata(url: result.url.absoluteString, blockId: blockId)
                             .subscribe(
                                 onSuccess: { _ in },
                                 onFailure: { error in
@@ -98,6 +98,7 @@ final class JournalRepository: JournalRepositoryType {
                 }
 
                 completable(.completed)
+
             } catch {
                 completable(.error(error))
             }
