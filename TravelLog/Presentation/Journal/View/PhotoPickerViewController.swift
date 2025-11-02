@@ -26,6 +26,16 @@ final class PhotoPickerViewController: UIViewController {
         return collectionView
     }()
     
+    private lazy var dismissButton: UIBarButtonItem = {
+        let button = UIBarButtonItem(image: UIImage(systemName: "chevron.left"), style: .plain, target: self, action: #selector(didTapLeftBarButton))
+        return button
+    }()
+    
+    private lazy var allSelectButton: UIBarButtonItem = {
+        let button = UIBarButtonItem(title: "전체선택", style: .plain, target: self, action: #selector(didTapLeftBarButton))
+        return button
+    }()
+    
     private lazy var selectButton: UIBarButtonItem = {
         let button = UIBarButtonItem(title: "선택", style: .plain, target: self, action: #selector(didTapSelect))
         return button
@@ -57,6 +67,7 @@ final class PhotoPickerViewController: UIViewController {
     private func configureView(){
         title = "최근 항목"
         view.backgroundColor = .systemBackground
+        navigationItem.leftBarButtonItem = dismissButton
         navigationItem.rightBarButtonItem = selectButton
         collectionView.delegate = self
         collectionView.dataSource = self
@@ -66,9 +77,20 @@ final class PhotoPickerViewController: UIViewController {
         viewModel.onSelectionModeChanged = { [weak self] isSelecting in
             self?.selectButton.title = isSelecting ? "취소" : "선택"
             self?.collectionView.allowsMultipleSelection = isSelecting
+            
+            if isSelecting{
+                self?.navigationItem.leftBarButtonItem = self?.allSelectButton
+            }else{
+                self?.navigationItem.leftBarButtonItem = self?.dismissButton
+            }
         }
         
         viewModel.onAssetsChanged = { [weak self] _ in
+            self?.collectionView.reloadData()
+        }
+        
+        viewModel.onSelectAllToggled = { [weak self] isAllSelected in
+            self?.allSelectButton.title = isAllSelected ? "전체해제" : "전체선택"
             self?.collectionView.reloadData()
         }
         
@@ -94,6 +116,15 @@ final class PhotoPickerViewController: UIViewController {
     @objc
     private func didTapRemoveAllSelectedAsset(){
         viewModel.clearSelections()
+    }
+    
+    @objc
+    private func didTapLeftBarButton(){
+        if viewModel.isSelectionMode{
+            viewModel.toggleSelectAll()
+        }else{
+            dismiss(animated: true)
+        }
     }
 }
 
