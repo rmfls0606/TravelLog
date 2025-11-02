@@ -26,6 +26,11 @@ final class PhotoPickerViewController: UIViewController {
         return collectionView
     }()
     
+    private lazy var selectButton: UIBarButtonItem = {
+        let button = UIBarButtonItem(title: "선택", style: .plain, target: self, action: #selector(didTapSelect))
+        return button
+    }()
+    
     private var dataSource: UICollectionViewDiffableDataSource<Int, PHAsset>!
     
     override func viewDidLoad() {
@@ -33,7 +38,6 @@ final class PhotoPickerViewController: UIViewController {
         configureHierarchy()
         configureLayout()
         configureView()
-        configureDataSource()
         configureBind()
         Task{
             await viewModel.checkPermission()
@@ -53,11 +57,19 @@ final class PhotoPickerViewController: UIViewController {
     private func configureView(){
         title = "최근 항목"
         view.backgroundColor = .systemBackground
+        navigationItem.rightBarButtonItem = selectButton
+        collectionView.delegate = self
+        collectionView.dataSource = self
     }
     
     private func configureBind() {
-        viewModel.onAssetsChanged = { [weak self] assets in
-            self?.applySnapshot(assets)
+        viewModel.onSelectionModeChanged = { [weak self] isSelecting in
+            self?.selectButton.title = isSelecting ? "취소" : "선택"
+            self?.collectionView.allowsMultipleSelection = isSelecting
+        }
+        
+        viewModel.onAssetsChanged = { [weak self] _ in
+            self?.collectionView.reloadData()
         }
         
         viewModel.onPermissionDenied = { [weak self] in
@@ -74,31 +86,48 @@ final class PhotoPickerViewController: UIViewController {
         }
     }
     
-    private func configureDataSource() {
-        dataSource = UICollectionViewDiffableDataSource(
-            collectionView: collectionView
-        ) { [weak self] collectionView, indexPath, asset in
-            guard let self = self,
-                  let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoThumbnailCell.identifier, for: indexPath) as? PhotoThumbnailCell else {
-                      return UICollectionViewCell()
-                  }
-            
-            Task {
-                let itemSize = (collectionView.bounds.width - 4) / 3
-                let size = CGSize(width: itemSize * UIScreen.main.scale,
-                                  height: itemSize * UIScreen.main.scale)
-                if let image = await self.viewModel.requestThumbnail(for: asset, targetSize: size) {
-                    cell.configure(image: image)
-                }
-            }
-            return cell
-        }
+    @objc
+    private func didTapSelect(){
+        viewModel.toggleSelectionMode()
     }
     
-    private func applySnapshot(_ assets: [PHAsset]) {
-        var snapshot = NSDiffableDataSourceSnapshot<Int, PHAsset>()
-        snapshot.appendSections([0])
-        snapshot.appendItems(assets)
-        dataSource.apply(snapshot)
+    @objc
+    private func didTapRemoveAllSelectedAsset(){
+        viewModel.clearSelections()
+    }
+}
+
+extension PhotoPickerViewController: UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        viewModel.numberOfItems()
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoThumbnailCell.identifier, for: indexPath) as? PhotoThumbnailCell else {
+            return UICollectionViewCell()
+        }
+        
+        let asset = viewModel.asset(at: indexPath)
+        Task {
+            let scale = UIScreen.main.scale
+            let itemSize = (collectionView.bounds.width - 4) / 3
+            let size = CGSize(width: itemSize * scale, height: itemSize * scale)
+            let image = await viewModel.requestThumbnail(for: asset, targetSize: size)
+            let isSelected = viewModel.isSelected(asset.localIdentifier)
+            cell.configure(image: image, isSelected: isSelected)
+        }
+        return cell
+    }
+}
+
+extension PhotoPickerViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        if viewModel.isSelectionMode{
+            let asset = viewModel.asset(at: indexPath)
+            viewModel.toggleSelection(for: asset.localIdentifier)
+            UIView.performWithoutAnimation {
+                collectionView.reloadItems(at: [indexPath])
+            }
+        }
     }
 }
