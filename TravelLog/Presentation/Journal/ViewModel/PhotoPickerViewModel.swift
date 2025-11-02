@@ -19,11 +19,17 @@ final class PhotoPickerViewModel{
             onSelectionModeChanged?(isSelectionMode)
         }
     }
+    private(set) var isAllSelected: Bool = false{
+        didSet{
+            onSelectAllToggled?(isAllSelected)
+        }
+    }
     
     // 뷰컨에 보낼 콜백
     var onAssetsChanged: (([PHAsset]) -> Void)?
     var onPermissionDenied: (() -> Void)?
     var onSelectionModeChanged: ((Bool) -> Void)?
+    var onSelectAllToggled: ((Bool) -> Void)?
     
     init() {
         // 옵저버에서 변화 감지
@@ -69,6 +75,10 @@ final class PhotoPickerViewModel{
     //선택 모드 전환
     func toggleSelectionMode(){
         isSelectionMode.toggle()
+        if !isSelectionMode{
+            clearSelections()
+            isAllSelected = false
+        }
     }
     
     func clearSelections(){
@@ -81,6 +91,18 @@ final class PhotoPickerViewModel{
         }else{
             selectedAssets.insert(identifier)
         }
+        isAllSelected = (selectedAssets.count == assets.count)
+    }
+    
+    func toggleSelectAll(){
+        if isAllSelected{
+            selectedAssets.removeAll()
+            isAllSelected = false
+        }else{
+            selectedAssets = Set(assets.map{ $0.localIdentifier })
+            isAllSelected = true
+        }
+        onAssetsChanged?(assets)
     }
     
     func isSelected(_ identifier: String) -> Bool{
