@@ -12,16 +12,23 @@ import UIKit
 final class PhotoPickerViewModel{
     
     private let observer = PhotoLibraryObserver()
-    private(set) var allAssets: [PHAsset] = []
+    private var assets: [PHAsset] = []
+    private var selectedAssets: Set<String> = []
+    private(set) var isSelectionMode: Bool = false{
+        didSet{
+            onSelectionModeChanged?(isSelectionMode)
+        }
+    }
     
     // 뷰컨에 보낼 콜백
     var onAssetsChanged: (([PHAsset]) -> Void)?
     var onPermissionDenied: (() -> Void)?
+    var onSelectionModeChanged: ((Bool) -> Void)?
     
     init() {
         // 옵저버에서 변화 감지
         observer.changeHandler = { [weak self] updated in
-            self?.allAssets = updated
+            self?.assets = updated
             self?.onAssetsChanged?(updated)
         }
     }
@@ -57,5 +64,34 @@ final class PhotoPickerViewModel{
                 continuation.resume(returning: image)
             }
         }
+    }
+    
+    //선택 모드 전환
+    func toggleSelectionMode(){
+        isSelectionMode.toggle()
+    }
+    
+    func clearSelections(){
+        selectedAssets.removeAll()
+    }
+    
+    func toggleSelection(for identifier : String){
+        if selectedAssets.contains(identifier){
+            selectedAssets.remove(identifier)
+        }else{
+            selectedAssets.insert(identifier)
+        }
+    }
+    
+    func isSelected(_ identifier: String) -> Bool{
+        selectedAssets.contains(identifier)
+    }
+    
+    func numberOfItems() -> Int {
+        return assets.count
+    }
+    
+    func asset(at indexPath: IndexPath) -> PHAsset {
+        return assets[indexPath.item]
     }
 }
