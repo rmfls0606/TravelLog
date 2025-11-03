@@ -24,12 +24,14 @@ final class PhotoPickerViewModel{
             onSelectAllToggled?(isAllSelected)
         }
     }
+    private(set) var isLimitedAccess = false
     
     // 뷰컨에 보낼 콜백
     var onAssetsChanged: (([PHAsset]) -> Void)?
     var onPermissionDenied: (() -> Void)?
     var onSelectionModeChanged: ((Bool) -> Void)?
     var onSelectAllToggled: ((Bool) -> Void)?
+    var onLimitedAccessDetected: (() -> Void)?
     
     init() {
         // 옵저버에서 변화 감지
@@ -45,15 +47,23 @@ final class PhotoPickerViewModel{
         switch status {
         case .notDetermined:
             let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-            if newStatus == .authorized || newStatus == .limited {
-                observer.fetchAssets()
-            } else {
-                self.onPermissionDenied?()
-            }
-        case .authorized, .limited:
-            observer.fetchAssets()
+            handleAuthStatus(newStatus)
         default:
-            self.onPermissionDenied?()
+            handleAuthStatus(status)
+        }
+    }
+    
+    private func handleAuthStatus(_ status: PHAuthorizationStatus){
+        switch status{
+        case .authorized:
+            isLimitedAccess = false
+            observer.fetchAssets()
+        case .limited:
+            isLimitedAccess = true
+            observer.fetchAssets()
+            onLimitedAccessDetected?()
+        default:
+            onPermissionDenied?()
         }
     }
     
