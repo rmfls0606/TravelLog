@@ -9,21 +9,32 @@ import Foundation
 import PhotosUI
 import UIKit
 
+//사진 접근 권한, 페이징 로딩, 선택 상대 관리, 이미지 캐싱 등을 담당.
 final class PhotoPickerViewModel{
     
-    private let observer = PhotoLibraryObserver()
-    private var assets: [PHAsset] = []
-    private var selectedAssets: Set<String> = []
+    private let observer = PhotoLibraryObserver() //PHPhotoLibrary 변경 감시자
+    private var fetchResult: PHFetchResult<PHAsset>? //전체 PHAsset 목록
+    private var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
+    private var selectedAssets: Set<String> = [] //선택된 Asset Identifier 집합
+    private var pageSize = 300 //한 번에 불러올 개수
+    private var isFetching = false
+    private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
+    
+    //선택 모드 상태
     private(set) var isSelectionMode: Bool = false{
         didSet{
             onSelectionModeChanged?(isSelectionMode)
         }
     }
+    
+    //전체 선택 상태
     private(set) var isAllSelected: Bool = false{
         didSet{
             onSelectAllToggled?(isAllSelected)
         }
     }
+    
+    //제한 접근 여부
     private(set) var isLimitedAccess = false
     
     // 뷰컨에 보낼 콜백
@@ -33,15 +44,25 @@ final class PhotoPickerViewModel{
     var onSelectAllToggled: ((Bool) -> Void)?
     var onLimitedAccessDetected: (() -> Void)?
     
+    private let imageManager = PHCachingImageManager()
+    private let imageOptions: PHImageRequestOptions = {
+        let opt = PHImageRequestOptions()
+        opt.deliveryMode = .highQualityFormat //고화질 조정
+        opt.resizeMode = .exact
+        opt.isSynchronous = false
+        return opt
+    }()
+    
     init() {
-        // 옵저버에서 변화 감지
-        observer.changeHandler = { [weak self] updated in
-            self?.assets = updated
-            self?.onAssetsChanged?(updated)
+        //포토라이브러리 변경 감시 - 사진 추가/삭제 시 자동 갱신
+        observer.changeHandler = { [weak self] result in
+            self?.fetchResult = result
+            self?.loadedAssets.removeAll()
+            self?.loadMoreAssetsIfNeeded()
         }
     }
     
-    // MARK: - 권한 확인
+    // MARK: - 권한 확인 및 초기 Fetch
     func checkPermission() async {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         switch status {
@@ -53,6 +74,7 @@ final class PhotoPickerViewModel{
         }
     }
     
+    //권한 상태에 따른 처리
     private func handleAuthStatus(_ status: PHAuthorizationStatus){
         switch status{
         case .authorized:
@@ -67,17 +89,74 @@ final class PhotoPickerViewModel{
         }
     }
     
-    // MARK: - 썸네일
-    func requestThumbnail(for asset: PHAsset, targetSize: CGSize) async -> UIImage? {
-        await withCheckedContinuation { continuation in
-            let manager = PHCachingImageManager.default()
-            let options = PHImageRequestOptions()
-            options.isNetworkAccessAllowed = true
-            options.resizeMode = .fast
-            options.deliveryMode = .opportunistic
+    //MARK: - 페이지네이션
+    func loadMoreAssetsIfNeeded() {
+        guard !isFetching, let result = fetchResult else { return }
+        guard loadedAssets.count < result.count else { return }
+        
+        isFetching = true
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            let nextEnd = min(self.loadedAssets.count + self.pageSize, result.count)
+            let range = IndexSet(self.loadedAssets.count..<nextEnd)
+            let newAssets = result.objects(at: range)
+            DispatchQueue.main.async {
+                self.loadedAssets.append(contentsOf: newAssets)
+                self.onAssetsChanged?(self.loadedAssets)
+                self.isFetching = false
+            }
+        }
+    }
+    
+    func prefetchImages(for indexes: [Int], targetSize: CGSize) {
+            guard let result = fetchResult else { return }
+            let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
+            imageManager.startCachingImages(
+                for: assets,
+                targetSize: targetSize,
+                contentMode: .aspectFill,
+                options: imageOptions
+            )
+        }
+    
+    func cancelPrefetch(for indexes: [Int], targetSize: CGSize) {
+            guard let result = fetchResult else { return }
+            let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
+            imageManager.stopCachingImages(
+                for: assets,
+                targetSize: targetSize,
+                contentMode: .aspectFill,
+                options: imageOptions
+            )
+        }
+    
+    // MARK: - 썸네일 요청
+    //AsyncStream으로 안전하게 이미지 스트리밍(저화질 -> 고화질)
+    func requestThumbnail(for asset: PHAsset, targetSize: CGSize) -> AsyncStream<UIImage?> {
+        AsyncStream { continuation in
+            final class State { var finished = false }
+            let state = State()
             
-            manager.requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFill, options: options) { image, _ in
-                continuation.resume(returning: image)
+            let requestID = imageManager.requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: .aspectFill,
+                options: imageOptions
+            ) { image, info in
+                guard let image = image, !state.finished else { return }
+                
+                continuation.yield(image)
+                
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if !isDegraded {
+                    state.finished = true
+                    continuation.finish()
+                }
+            }
+            
+            continuation.onTermination = { [weak self] _ in
+                self?.imageManager.cancelImageRequest(requestID)
+                state.finished = true
             }
         }
     }
@@ -101,7 +180,7 @@ final class PhotoPickerViewModel{
         }else{
             selectedAssets.insert(identifier)
         }
-        isAllSelected = (selectedAssets.count == assets.count)
+        isAllSelected = (selectedAssets.count == loadedAssets.count)
     }
     
     func toggleSelectAll(){
@@ -109,10 +188,10 @@ final class PhotoPickerViewModel{
             selectedAssets.removeAll()
             isAllSelected = false
         }else{
-            selectedAssets = Set(assets.map{ $0.localIdentifier })
+            selectedAssets = Set(loadedAssets.map{ $0.localIdentifier })
             isAllSelected = true
         }
-        onAssetsChanged?(assets)
+        onAssetsChanged?(loadedAssets)
     }
     
     func isSelected(_ identifier: String) -> Bool{
@@ -120,10 +199,10 @@ final class PhotoPickerViewModel{
     }
     
     func numberOfItems() -> Int {
-        return assets.count
+        return loadedAssets.count
     }
     
     func asset(at indexPath: IndexPath) -> PHAsset {
-        return assets[indexPath.item]
+        return loadedAssets[indexPath.item]
     }
 }
