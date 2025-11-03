@@ -143,14 +143,16 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
         }
         
         let asset = viewModel.asset(at: indexPath)
-        Task {
-            let scale = UIScreen.main.scale
-            let itemSize = (collectionView.bounds.width - 4) / 3
-            let size = CGSize(width: itemSize * scale, height: itemSize * scale)
-            let image = await viewModel.requestThumbnail(for: asset, targetSize: size)
-            let isSelected = viewModel.isSelected(asset.localIdentifier)
-            cell.configure(image: image, isSelected: isSelected)
-        }
+        let isSelected = viewModel.isSelected(asset.localIdentifier)
+        cell.updateSelectionState(isSelected)
+        
+        // AsyncStream 기반 안전한 이미지 로딩
+        let scale = UIScreen.main.scale
+        let itemSize = (collectionView.bounds.width - 4) / 3
+        let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
+        let stream = viewModel.requestThumbnail(for: asset, targetSize: targetSize)
+        cell.applyThumbnailStream(stream)
+        
         return cell
     }
     
@@ -207,5 +209,37 @@ extension PhotoPickerViewController: UICollectionViewDelegateFlowLayout{
         let height = headerView.systemLayoutSizeFitting(targetSize).height
         
         return CGSize(width: fittingWidth, height: height)
+    }
+}
+
+extension PhotoPickerViewController: UICollectionViewDataSourcePrefetching{
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        let indexs = indexPaths.map(\.item)
+        let scale = UIScreen.main.scale
+        let itemSize = (collectionView.bounds.width - 4) / 3
+        let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
+        
+        viewModel.prefetchImages(for: indexs, targetSize: targetSize)
+        
+        if let maxIndex = indexs.max(), maxIndex >= viewModel.numberOfItems() - 30{
+            viewModel.loadMoreAssetsIfNeeded()
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
+        let indexs = indexPaths.map(\.item)
+        let scale = UIScreen.main.scale
+        let itemSize = (collectionView.bounds.width - 4) / 3
+        let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
+        viewModel.cancelPrefetch(for: indexs, targetSize: targetSize)
+    }
+}
+
+extension PhotoPickerViewController: UIScrollViewDelegate{
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard let maxIndex = collectionView.indexPathsForVisibleItems.map(\.item).max() else { return }
+        if maxIndex >= viewModel.numberOfItems() - 30 {
+            viewModel.loadMoreAssetsIfNeeded()
+        }
     }
 }
