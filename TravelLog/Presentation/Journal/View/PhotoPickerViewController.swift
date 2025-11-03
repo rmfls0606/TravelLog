@@ -7,7 +7,7 @@
 
 import UIKit
 import SnapKit
-import Photos
+import PhotosUI
 
 final class PhotoPickerViewController: UIViewController {
     
@@ -22,7 +22,11 @@ final class PhotoPickerViewController: UIViewController {
         
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .systemBackground
-        collectionView.register(PhotoThumbnailCell.self, forCellWithReuseIdentifier: PhotoThumbnailCell.identifier)
+        collectionView.register(PhotoThumbnailCell.self,
+                                forCellWithReuseIdentifier: PhotoThumbnailCell.identifier)
+        collectionView.register(PhotoPickerHeaderView.self,
+                                forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+                                withReuseIdentifier: PhotoPickerHeaderView.identifier)
         return collectionView
     }()
     
@@ -149,6 +153,31 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
         }
         return cell
     }
+    
+    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+        guard kind == UICollectionView.elementKindSectionHeader,
+              let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: PhotoPickerHeaderView.identifier, for: indexPath) as? PhotoPickerHeaderView else {
+            return UICollectionReusableView()
+        }
+        
+        if viewModel.isLimitedAccess{
+            header.onSelectMore = { [weak self] in
+                guard let self = self else { return }
+                PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: self)
+            }
+            
+            header.onOpenSetting = {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            
+            return header
+        }else{
+            header.isHidden = true
+            return header
+        }
+    }
 }
 
 extension PhotoPickerViewController: UICollectionViewDelegate {
@@ -160,5 +189,23 @@ extension PhotoPickerViewController: UICollectionViewDelegate {
                 collectionView.reloadItems(at: [indexPath])
             }
         }
+    }
+}
+
+extension PhotoPickerViewController: UICollectionViewDelegateFlowLayout{
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
+        guard viewModel.isLimitedAccess else { return .zero }
+        
+        // 안전하게 헤더뷰 인스턴스 생성 후 높이 계산
+        let fittingWidth = collectionView.bounds.width
+        let headerView = PhotoPickerHeaderView(frame: CGRect(x: 0, y: 0, width: fittingWidth, height: 0))
+        headerView.setNeedsLayout()
+        headerView.layoutIfNeeded()
+        
+        // 콘텐츠 사이즈 계산
+        let targetSize = CGSize(width: fittingWidth, height: UIView.layoutFittingCompressedSize.height)
+        let height = headerView.systemLayoutSizeFitting(targetSize).height
+        
+        return CGSize(width: fittingWidth, height: height)
     }
 }
