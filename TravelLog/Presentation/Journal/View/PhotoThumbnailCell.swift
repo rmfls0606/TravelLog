@@ -10,7 +10,7 @@ import SnapKit
 
 final class PhotoThumbnailCell: UICollectionViewCell {
     static let identifier = "PhotoThumbnailCell"
-    
+    private var loadTask: Task<Void, Never>?
     private let imageView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFill
@@ -42,6 +42,15 @@ final class PhotoThumbnailCell: UICollectionViewCell {
     
     required init?(coder: NSCoder) { fatalError() }
     
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        loadTask?.cancel()
+        loadTask = nil
+        imageView.image = nil
+        overlayView.isHidden = true
+        checkMark.isHidden = true
+    }
+    
     private func configureHierarchy(){
         contentView.addSubview(imageView)
         imageView.addSubview(overlayView)
@@ -60,13 +69,29 @@ final class PhotoThumbnailCell: UICollectionViewCell {
         checkMark.snp.makeConstraints { make in
             make.trailing.equalToSuperview().inset(6)
             make.bottom.equalToSuperview().inset(6)
-            make.size.equalTo(30)
+            make.size.equalTo(25)
         }
     }
     
-    func configure(image: UIImage?, isSelected: Bool) {
-        imageView.image = image
-        overlayView.isHidden = !isSelected
-        checkMark.isHidden = !isSelected
-    }
+    func updateSelectionState(_ isSelected: Bool) {
+            checkMark.isHidden = !isSelected
+            overlayView.isHidden = !isSelected
+        }
+    
+    func applyThumbnailStream(_ stream: AsyncStream<UIImage?>) {
+            loadTask = Task {
+                var isFirst = true
+                for await image in stream {
+                    guard !Task.isCancelled else { return }
+                    if isFirst {
+                        imageView.image = image
+                        isFirst = false
+                    } else {
+                        UIView.transition(with: imageView, duration: 0.15, options: .transitionCrossDissolve) {
+                            self.imageView.image = image
+                        }
+                    }
+                }
+            }
+        }
 }
