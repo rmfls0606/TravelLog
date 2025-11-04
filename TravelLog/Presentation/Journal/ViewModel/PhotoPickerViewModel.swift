@@ -44,7 +44,11 @@ final class PhotoPickerViewModel{
     var onSelectAllToggled: ((Bool) -> Void)?
     var onLimitedAccessDetected: (() -> Void)?
     
-    private let imageManager = PHCachingImageManager()
+    private let imageManager = {
+        let manager = PHCachingImageManager()
+        manager.allowsCachingHighQualityImages = true
+        return manager
+    }()
     private let imageOptions: PHImageRequestOptions = {
         let opt = PHImageRequestOptions()
         opt.deliveryMode = .highQualityFormat //고화질 조정
@@ -191,7 +195,6 @@ final class PhotoPickerViewModel{
             selectedAssets = Set(loadedAssets.map{ $0.localIdentifier })
             isAllSelected = true
         }
-        onAssetsChanged?(loadedAssets)
     }
     
     func isSelected(_ identifier: String) -> Bool{
