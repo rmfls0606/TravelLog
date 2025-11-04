@@ -21,7 +21,14 @@ final class PhotoPickerViewController: UIViewController {
         layout.minimumInteritemSpacing = spacing
         
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .systemBackground
+        collectionView.backgroundColor = .white
+        
+        collectionView.isPrefetchingEnabled = true
+        collectionView.layer.drawsAsynchronously = true
+        collectionView.layer.shouldRasterize = true
+        collectionView.layer.rasterizationScale = UIScreen.main.scale
+        collectionView.isOpaque = true
+        
         collectionView.register(PhotoThumbnailCell.self,
                                 forCellWithReuseIdentifier: PhotoThumbnailCell.identifier)
         collectionView.register(PhotoPickerHeaderView.self,
@@ -95,7 +102,12 @@ final class PhotoPickerViewController: UIViewController {
         
         viewModel.onSelectAllToggled = { [weak self] isAllSelected in
             self?.allSelectButton.title = isAllSelected ? "전체해제" : "전체선택"
-            self?.collectionView.reloadData()
+            for indexPath in self!.collectionView.indexPathsForVisibleItems {
+                if let cell = self!.collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
+                    let asset = self!.viewModel.asset(at: indexPath)
+                    cell.updateSelectionState(self!.viewModel.isSelected(asset.localIdentifier))
+                }
+            }
         }
         
         viewModel.onPermissionDenied = { [weak self] in
@@ -184,12 +196,24 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
 
 extension PhotoPickerViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        if viewModel.isSelectionMode{
-            let asset = viewModel.asset(at: indexPath)
-            viewModel.toggleSelection(for: asset.localIdentifier)
-            UIView.performWithoutAnimation {
-                collectionView.reloadItems(at: [indexPath])
-            }
+        guard viewModel.isSelectionMode else { return }
+        let asset = viewModel.asset(at: indexPath)
+        viewModel.toggleSelection(for: asset.localIdentifier)
+        
+        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
+            let isSelected = viewModel.isSelected(asset.localIdentifier)
+            cell.updateSelectionState(isSelected)
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
+        guard viewModel.isSelectionMode else { return }
+        let asset = viewModel.asset(at: indexPath)
+        viewModel.toggleSelection(for: asset.localIdentifier)
+        
+        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
+            let isSelected = viewModel.isSelected(asset.localIdentifier)
+            cell.updateSelectionState(isSelected)
         }
     }
 }
