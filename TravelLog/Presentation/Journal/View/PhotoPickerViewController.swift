@@ -24,11 +24,6 @@ final class PhotoPickerViewController: UIViewController {
         collectionView.backgroundColor = .white
         
         collectionView.isPrefetchingEnabled = true
-        collectionView.layer.drawsAsynchronously = true
-        collectionView.layer.shouldRasterize = true
-        collectionView.layer.rasterizationScale = UIScreen.main.scale
-        collectionView.isOpaque = true
-        
         collectionView.register(PhotoThumbnailCell.self,
                                 forCellWithReuseIdentifier: PhotoThumbnailCell.identifier)
         collectionView.register(PhotoPickerHeaderView.self,
@@ -82,6 +77,11 @@ final class PhotoPickerViewController: UIViewController {
         navigationItem.rightBarButtonItem = selectButton
         collectionView.delegate = self
         collectionView.dataSource = self
+        
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePanSelection(_:)))
+        pan.minimumNumberOfTouches = 1
+        pan.cancelsTouchesInView = true
+        collectionView.addGestureRecognizer(pan)
     }
     
     private func configureBind() {
@@ -122,6 +122,16 @@ final class PhotoPickerViewController: UIViewController {
             alert.addAction(UIAlertAction(title: "취소", style: .cancel))
             self?.present(alert, animated: true)
         }
+        
+        viewModel.onSelectionUpdated = { [weak self] updates in
+            guard let self else { return }
+            for (id, isSelected) in updates {
+                if let index = self.viewModel.loadedAssets.firstIndex(where: { $0.localIdentifier == id }),
+                   let cell = self.collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? PhotoThumbnailCell {
+                    cell.updateSelectionState(isSelected)
+                }
+            }
+        }
     }
     
     @objc
@@ -140,6 +150,35 @@ final class PhotoPickerViewController: UIViewController {
             viewModel.toggleSelectAll()
         }else{
             dismiss(animated: true)
+        }
+    }
+    
+    @objc
+    private func handlePanSelection(_ gesture: UIPanGestureRecognizer) {
+        guard viewModel.isSelectionMode else { return }
+        let location = gesture.location(in: collectionView)
+        let indexPath = collectionView.indexPathForItem(at: location)
+        
+        switch gesture.state {
+        case .began:
+            if let index = indexPath?.item {
+                viewModel.beginRangeSelection(at: index)
+            }
+            
+        case .changed:
+            if let index = indexPath?.item {
+                viewModel.updateRangeSelection(to: index)
+            }
+            
+        case .ended, .cancelled, .failed:
+            // 드래그 끝날 때, 마지막 위치로 한 번 더 update 후 end 호출
+            if let index = indexPath?.item {
+                viewModel.updateRangeSelection(to: index)
+            }
+            viewModel.endRangeSelection()
+            
+        default:
+            break
         }
     }
 }

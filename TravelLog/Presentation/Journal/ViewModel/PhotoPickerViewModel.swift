@@ -14,7 +14,7 @@ final class PhotoPickerViewModel{
     
     private let observer = PhotoLibraryObserver() //PHPhotoLibrary 변경 감시자
     private var fetchResult: PHFetchResult<PHAsset>? //전체 PHAsset 목록
-    private var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
+    private(set) var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
     private var selectedAssets: Set<String> = [] //선택된 Asset Identifier 집합
     private var pageSize = 300 //한 번에 불러올 개수
     private var isFetching = false
@@ -42,6 +42,7 @@ final class PhotoPickerViewModel{
     var onPermissionDenied: (() -> Void)?
     var onSelectionModeChanged: ((Bool) -> Void)?
     var onSelectAllToggled: ((Bool) -> Void)?
+    var onSelectionUpdated: (([String: Bool]) -> Void)?
     var onLimitedAccessDetected: (() -> Void)?
     
     private let imageManager = {
@@ -53,9 +54,16 @@ final class PhotoPickerViewModel{
         let opt = PHImageRequestOptions()
         opt.deliveryMode = .highQualityFormat //고화질 조정
         opt.resizeMode = .exact
+        opt.isNetworkAccessAllowed = true
         opt.isSynchronous = false
         return opt
     }()
+    
+    private(set) var startIndex: Int?
+    private(set) var lastIndex: Int?
+    private(set) var selectedRange: ClosedRange<Int>?
+    private(set) var originalSelectionState: [String: Bool] = [:]
+    private(set) var isRemovingMode = false
     
     init() {
         //포토라이브러리 변경 감시 - 사진 추가/삭제 시 자동 갱신
@@ -113,26 +121,26 @@ final class PhotoPickerViewModel{
     }
     
     func prefetchImages(for indexes: [Int], targetSize: CGSize) {
-            guard let result = fetchResult else { return }
-            let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
-            imageManager.startCachingImages(
-                for: assets,
-                targetSize: targetSize,
-                contentMode: .aspectFill,
-                options: imageOptions
-            )
-        }
+        guard let result = fetchResult else { return }
+        let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
+        imageManager.startCachingImages(
+            for: assets,
+            targetSize: targetSize,
+            contentMode: .aspectFill,
+            options: imageOptions
+        )
+    }
     
     func cancelPrefetch(for indexes: [Int], targetSize: CGSize) {
-            guard let result = fetchResult else { return }
-            let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
-            imageManager.stopCachingImages(
-                for: assets,
-                targetSize: targetSize,
-                contentMode: .aspectFill,
-                options: imageOptions
-            )
-        }
+        guard let result = fetchResult else { return }
+        let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
+        imageManager.stopCachingImages(
+            for: assets,
+            targetSize: targetSize,
+            contentMode: .aspectFill,
+            options: imageOptions
+        )
+    }
     
     // MARK: - 썸네일 요청
     //AsyncStream으로 안전하게 이미지 스트리밍(저화질 -> 고화질)
@@ -176,6 +184,7 @@ final class PhotoPickerViewModel{
     
     func clearSelections(){
         selectedAssets.removeAll()
+        onSelectionUpdated?([:])
     }
     
     func toggleSelection(for identifier : String){
@@ -185,6 +194,7 @@ final class PhotoPickerViewModel{
             selectedAssets.insert(identifier)
         }
         isAllSelected = (selectedAssets.count == loadedAssets.count)
+        onSelectionUpdated?([identifier: selectedAssets.contains(identifier)])
     }
     
     func toggleSelectAll(){
@@ -195,6 +205,10 @@ final class PhotoPickerViewModel{
             selectedAssets = Set(loadedAssets.map{ $0.localIdentifier })
             isAllSelected = true
         }
+        let map = loadedAssets.reduce(into: [String: Bool]()){
+            $0[$1.localIdentifier] = self.isAllSelected
+        }
+        onSelectionUpdated?(map)
     }
     
     func isSelected(_ identifier: String) -> Bool{
@@ -207,5 +221,85 @@ final class PhotoPickerViewModel{
     
     func asset(at indexPath: IndexPath) -> PHAsset {
         return loadedAssets[indexPath.item]
+    }
+    
+    //MARK: - 드래그 선택 관리
+    func beginRangeSelection(at index: Int){
+        guard index < loadedAssets.count else { return }
+        startIndex = index
+        selectedRange = index...index
+        lastIndex = index
+        originalSelectionState.removeAll()
+        
+        let asset = loadedAssets[index]
+        let id = asset.localIdentifier
+        let wasSelected = isSelected(id)
+        isRemovingMode = wasSelected
+        
+        // 즉시 반전하지 않음 — 단순히 상태 기록만
+        originalSelectionState[id] = wasSelected
+    }
+    
+    func updateRangeSelection(to index: Int){
+        guard let start = startIndex else { return }
+        
+        let minItem = min(start, index)
+        let maxItem = max(start, index)
+        let newRange = minItem...maxItem
+        var changed: [String: Bool] = [:]
+        
+        // 새 구간 내 셀들 업데이트
+        for i in newRange {
+            let asset = loadedAssets[i]
+            let id = asset.localIdentifier
+            
+            if originalSelectionState[id] == nil {
+                originalSelectionState[id] = isSelected(id)
+            }
+            
+            if isRemovingMode {
+                if isSelected(id) {
+                    selectedAssets.remove(id)
+                    changed[id] = false
+                }
+            } else {
+                if !isSelected(id) {
+                    selectedAssets.insert(id)
+                    changed[id] = true
+                }
+            }
+        }
+        
+        // 이전 구간에 있었지만 새 구간에 없는 셀 복원
+        if let oldRange = selectedRange {
+            for i in oldRange where !newRange.contains(i) {
+                let asset = loadedAssets[i]
+                let id = asset.localIdentifier
+                if let original = originalSelectionState[id],
+                   isSelected(id) != original {
+                    if original {
+                        selectedAssets.insert(id)
+                    } else {
+                        selectedAssets.remove(id)
+                    }
+                    changed[id] = original
+                }
+            }
+        }
+        
+        selectedRange = newRange
+        
+        // 즉시 반영
+        if !changed.isEmpty {
+            onSelectionUpdated?(changed)
+        }
+    }
+    
+    func endRangeSelection() {
+        // 드래그 종료 시 추가 조정 없음 (상태 그대로 확정)
+        startIndex = nil
+        lastIndex = nil
+        selectedRange = nil
+        originalSelectionState.removeAll()
     }
 }
