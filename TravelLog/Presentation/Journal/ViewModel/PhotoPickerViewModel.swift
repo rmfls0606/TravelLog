@@ -52,7 +52,7 @@ final class PhotoPickerViewModel{
     }()
     private let imageOptions: PHImageRequestOptions = {
         let opt = PHImageRequestOptions()
-        opt.deliveryMode = .highQualityFormat //고화질 조정
+        opt.deliveryMode = .opportunistic //고화질 조정
         opt.resizeMode = .exact
         opt.isNetworkAccessAllowed = true
         opt.isSynchronous = false
@@ -155,12 +155,36 @@ final class PhotoPickerViewModel{
                 contentMode: .aspectFill,
                 options: imageOptions
             ) { image, info in
-                guard let image = image, !state.finished else { return }
                 
-                continuation.yield(image)
+                //1. 스트림이 이미 종료되었다면 아무것도 하지 않습니다.
+                guard !state.finished else { return }
                 
+                //2. 에러가 발생했는지 확인합니다.
+                if let _ = info?[PHImageErrorKey]{
+                    state.finished = true
+                    continuation.finish() //에러 발생 시 스트림을 즉시 종료합니다.
+                    return
+                }
+                
+                //3. 이미지가 iCloud에만 있는지 확인합니다.
+                let isInCloud = (
+                    info?[PHImageResultIsInCloudKey] as? Bool
+                ) ?? false
+                
+                //4. 이미지가 nil인데 iCloud에서 다운로드 중이라면
+                if image == nil && isInCloud{
+                    return
+                }
+                
+                //5. 유효한 이미지가 있다면(저화질이든, 고화질이든) 스트림에 전달합니다.
+                if let image = image{
+                    continuation.yield(image)
+                }
+                
+                //6. 최종 이미지(고화질)인지 확인합니다.
                 let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
                 if !isDegraded {
+                    //최종 콜백. 스트림 종료합니다.
                     state.finished = true
                     continuation.finish()
                 }
