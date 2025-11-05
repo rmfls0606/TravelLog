@@ -358,9 +358,12 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
-        let (immediate, stream) = viewModel.requestThumbnail(for: asset, targetSize: targetSize)
+        let stream = viewModel.requestThumbnailStream(
+            for: asset,
+            targetSize: targetSize
+        )
         
-        cell.applyThumbnailStream(immediateImage: immediate, stream: stream)
+        cell.configure(with: asset, targetSize: targetSize, viewModel: viewModel)
         
         return cell
     }
@@ -393,13 +396,26 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
 
 extension PhotoPickerViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard viewModel.isSelectionMode else { return }
-        let asset = viewModel.asset(at: indexPath)
-        viewModel.toggleSelection(for: asset.localIdentifier)
-        
-        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
-            let isSelected = viewModel.isSelected(asset.localIdentifier)
-            cell.updateSelectionState(isSelected)
+        if viewModel.isSelectionMode{
+            let asset = viewModel.asset(at: indexPath)
+            viewModel.toggleSelection(for: asset.localIdentifier)
+            
+            if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
+                let isSelected = viewModel.isSelected(asset.localIdentifier)
+                cell.updateSelectionState(isSelected)
+            }
+        }else{
+            let tappedIndex = indexPath.item
+            let allLoadedAssets = viewModel.loadedAssets
+            
+            let pageVC = PhotoPageViewController(
+                viewModel: self.viewModel,
+                allAssets: allLoadedAssets,
+                currentIndex: tappedIndex
+            )
+            
+            
+            navigationController?.pushViewController(pageVC, animated: true)
         }
     }
     
