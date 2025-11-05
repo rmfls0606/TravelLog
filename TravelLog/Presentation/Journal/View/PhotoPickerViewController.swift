@@ -11,7 +11,12 @@ import PhotosUI
 
 final class PhotoPickerViewController: UIViewController {
     
+    private enum PanMode{
+        case none, selecting, scrolling
+    }
+    
     private let viewModel = PhotoPickerViewModel()
+    private var panMode: PanMode = .none
     private var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         let spacing: CGFloat = 2
@@ -70,6 +75,13 @@ final class PhotoPickerViewController: UIViewController {
         }
     }
     
+    private lazy var pan: UIPanGestureRecognizer = {
+        let gesture = UIPanGestureRecognizer()
+        gesture.minimumNumberOfTouches = 1
+        gesture.cancelsTouchesInView = true
+        return gesture
+    }()
+    
     private func configureView(){
         title = "최근 항목"
         view.backgroundColor = .systemBackground
@@ -78,9 +90,8 @@ final class PhotoPickerViewController: UIViewController {
         collectionView.delegate = self
         collectionView.dataSource = self
         
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePanSelection(_:)))
-        pan.minimumNumberOfTouches = 1
-        pan.cancelsTouchesInView = true
+        pan.addTarget(self, action: #selector(handlePanSelection(_:)))
+        pan.delegate = self
         collectionView.addGestureRecognizer(pan)
     }
     
@@ -156,6 +167,9 @@ final class PhotoPickerViewController: UIViewController {
     @objc
     private func handlePanSelection(_ gesture: UIPanGestureRecognizer) {
         guard viewModel.isSelectionMode else { return }
+        
+        guard panMode == .selecting else { return }
+        
         let location = gesture.location(in: collectionView)
         let indexPath = collectionView.indexPathForItem(at: location)
         
@@ -176,6 +190,7 @@ final class PhotoPickerViewController: UIViewController {
                 viewModel.updateRangeSelection(to: index)
             }
             viewModel.endRangeSelection()
+            panMode = .none //다음 팬을 위해 초기화
             
         default:
             break
@@ -304,5 +319,34 @@ extension PhotoPickerViewController: UIScrollViewDelegate{
         if maxIndex >= viewModel.numberOfItems() - 30 {
             viewModel.loadMoreAssetsIfNeeded()
         }
+    }
+}
+
+extension PhotoPickerViewController: UIGestureRecognizerDelegate{
+    //스크롤 vs 드래그 선택 구분
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer == pan else { return true }
+        
+        let velocity = pan.velocity(in: collectionView)
+        let absX = abs(velocity.x)
+        let absY = abs(velocity.y)
+        
+        //방향 결정
+        if absX > absY{
+            panMode = .selecting //수평 -> 선택 전용
+            return true
+        }else{
+            panMode = .scrolling //수ㅜ직 -> 스크롤
+            return false
+        }
+    }
+    
+    //collectionView 스크롤 제스처와 동시 인식 허용
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if panMode == .selecting,
+           otherGestureRecognizer == collectionView.panGestureRecognizer{
+            return false
+        }
+        return true
     }
 }
