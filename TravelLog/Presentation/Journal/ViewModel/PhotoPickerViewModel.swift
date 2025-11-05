@@ -12,6 +12,9 @@ import UIKit
 //사진 접근 권한, 페이징 로딩, 선택 상대 관리, 이미지 캐싱 등을 담당.
 final class PhotoPickerViewModel{
     
+    //UIImage를 저장한 RAM 캐시
+    private let thumbnailCache = NSCache<NSString, UIImage>()
+    
     private let observer = PhotoLibraryObserver() //PHPhotoLibrary 변경 감시자
     private var fetchResult: PHFetchResult<PHAsset>? //전체 PHAsset 목록
     private(set) var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
@@ -122,7 +125,6 @@ final class PhotoPickerViewModel{
             DispatchQueue.main.async {
                 self.loadedAssets.append(contentsOf: newAssets)
                 self.onAssetsChanged?(newIndexPaths)
-//                self.isFetching = false
             }
         }
     }
@@ -155,8 +157,17 @@ final class PhotoPickerViewModel{
     
     // MARK: - 썸네일 요청
     //AsyncStream으로 안전하게 이미지 스트리밍(저화질 -> 고화질)
-    func requestThumbnail(for asset: PHAsset, targetSize: CGSize) -> AsyncStream<UIImage?> {
-        AsyncStream { continuation in
+    func requestThumbnail(for asset: PHAsset, targetSize: CGSize) -> (immediateImage: UIImage?, stream: AsyncStream<UIImage?>) {
+        
+        let cacheKey = asset.localIdentifier as NSString
+        
+        //1. RAM 캐시에 이미지가 있는지 '동기적'으로 확인합니다.
+        if let cacheImage = thumbnailCache.object(forKey: cacheKey){
+            //이미지가 있으면, 즉시 반환합니다. 스트림은 비어있고, 즉시 종료되는 스트림을 보냅니다.
+            return (immediateImage: cacheImage, stream: AsyncStream{ $0.finish() })
+        }
+        
+        let stream = AsyncStream<UIImage?> { continuation in
             final class State { var finished = false }
             let state = State()
             
@@ -198,6 +209,11 @@ final class PhotoPickerViewModel{
                     //최종 콜백. 스트림 종료합니다.
                     state.finished = true
                     continuation.finish()
+                    
+                    //최종 고화질 이미지를 받았으면, RAM 캐시에 저장합니다.
+                    if let image = image{
+                        self.thumbnailCache.setObject(image, forKey: cacheKey)
+                    }
                 }
             }
             
@@ -206,6 +222,8 @@ final class PhotoPickerViewModel{
                 state.finished = true
             }
         }
+        
+        return (immediateImage: nil, stream: stream)
     }
     
     //선택 모드 전환

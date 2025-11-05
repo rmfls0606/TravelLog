@@ -358,8 +358,9 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
-        let stream = viewModel.requestThumbnail(for: asset, targetSize: targetSize)
-        cell.applyThumbnailStream(stream)
+        let (immediate, stream) = viewModel.requestThumbnail(for: asset, targetSize: targetSize)
+        
+        cell.applyThumbnailStream(immediateImage: immediate, stream: stream)
         
         return cell
     }

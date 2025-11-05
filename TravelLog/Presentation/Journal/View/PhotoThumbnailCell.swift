@@ -102,25 +102,37 @@ final class PhotoThumbnailCell: UICollectionViewCell {
         overlayView.isHidden = !isSelected
     }
     
-    func applyThumbnailStream(_ stream: AsyncStream<UIImage?>) {
+    func applyThumbnailStream(immediateImage: UIImage?, stream: AsyncStream<UIImage?>) {
         
-        showShimmer()
+        //이전 로드 작업을 취소
+        loadTask?.cancel()
         
-        loadTask = Task {
-            var isFirst = true
-            for await image in stream {
-                guard !Task.isCancelled else { return }
-                if isFirst {
-                    imageView.image = image
-                    self.hideShimmer()
-                    isFirst = false
-                } else {
-                    self.imageView.image = image
-                }
-            }
+        //즉시 로드할 이미지가 있는지 확인합니다.
+        if let image = immediateImage{
+            //이미지가 있으면
+            imageView.image = image
+            hideShimmer()
+            loadTask = nil
+        }else{
+            //즉시 로드할 이미지가 없습니다.
+            showShimmer()
             
-            if isFirst{
-                self.hideShimmer()
+            loadTask = Task {
+                var isFirst = true
+                for await image in stream {
+                    guard !Task.isCancelled else { return }
+                    if isFirst {
+                        imageView.image = image
+                        self.hideShimmer()
+                        isFirst = false
+                    } else {
+                        self.imageView.image = image
+                    }
+                }
+                
+                if isFirst{
+                    self.hideShimmer()
+                }
             }
         }
     }
