@@ -38,7 +38,7 @@ final class PhotoPickerViewModel{
     private(set) var isLimitedAccess = false
     
     // 뷰컨에 보낼 콜백
-    var onAssetsChanged: (([PHAsset]) -> Void)?
+    var onAssetsChanged: (([IndexPath]?) -> Void)?
     var onPermissionDenied: (() -> Void)?
     var onSelectionModeChanged: ((Bool) -> Void)?
     var onSelectAllToggled: ((Bool) -> Void)?
@@ -71,6 +71,7 @@ final class PhotoPickerViewModel{
             self?.fetchResult = result
             self?.loadedAssets.removeAll()
             self?.loadMoreAssetsIfNeeded()
+            self?.onAssetsChanged?(nil)
         }
     }
     
@@ -109,15 +110,25 @@ final class PhotoPickerViewModel{
         isFetching = true
         queue.async { [weak self] in
             guard let self = self else { return }
-            let nextEnd = min(self.loadedAssets.count + self.pageSize, result.count)
-            let range = IndexSet(self.loadedAssets.count..<nextEnd)
+            
+            let startIndex = self.loadedAssets.count
+            let nextEnd = min(startIndex + self.pageSize, result.count)
+            let range = IndexSet(startIndex..<nextEnd)
+            
+            let newIndexPaths = (startIndex..<nextEnd).map{ IndexPath(item: $0, section: 0) }
+            
             let newAssets = result.objects(at: range)
+            
             DispatchQueue.main.async {
                 self.loadedAssets.append(contentsOf: newAssets)
-                self.onAssetsChanged?(self.loadedAssets)
-                self.isFetching = false
+                self.onAssetsChanged?(newIndexPaths)
+//                self.isFetching = false
             }
         }
+    }
+    
+    func didFinishUpdatingUI(){
+        self.isFetching = false
     }
     
     func prefetchImages(for indexes: [Int], targetSize: CGSize) {
@@ -156,7 +167,7 @@ final class PhotoPickerViewModel{
                 options: imageOptions
             ) { image, info in
                 
-                //1. 스트림이 이미 종료되었다면 아무것도 하지 않습니다.
+                //1.  스트림이 이미 종료되었다면 아무것도 하지 않습니다.
                 guard !state.finished else { return }
                 
                 //2. 에러가 발생했는지 확인합니다.

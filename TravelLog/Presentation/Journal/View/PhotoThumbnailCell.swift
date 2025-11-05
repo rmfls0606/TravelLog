@@ -115,9 +115,7 @@ final class PhotoThumbnailCell: UICollectionViewCell {
                     self.hideShimmer()
                     isFirst = false
                 } else {
-                    UIView.transition(with: imageView, duration: 0.15, options: .transitionCrossDissolve) {
-                        self.imageView.image = image
-                    }
+                    self.imageView.image = image
                 }
             }
             

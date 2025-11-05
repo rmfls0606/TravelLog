@@ -122,8 +122,27 @@ final class PhotoPickerViewController: UIViewController {
             }
         }
         
-        viewModel.onAssetsChanged = { [weak self] _ in
-            self?.collectionView.reloadData()
+        viewModel.onAssetsChanged = { [weak self] indexPaths in
+            guard let self = self else { return }
+            
+            if let newIndexPaths = indexPaths{
+                self.collectionView.performBatchUpdates({
+                    self.collectionView.insertItems(at: newIndexPaths)
+                }, completion: { _ in
+                    self.viewModel.didFinishUpdatingUI()
+                })
+            }else{
+                
+                CATransaction.begin()
+                CATransaction.setCompletionBlock {
+                    self.viewModel.loadMoreAssetsIfNeeded()
+                }
+                self.viewModel.didFinishUpdatingUI()
+                
+                self.collectionView.reloadData()
+                
+                CATransaction.commit()
+            }
         }
         
         viewModel.onSelectAllToggled = { [weak self] isAllSelected in
