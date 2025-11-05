@@ -12,8 +12,7 @@ import UIKit
 //사진 접근 권한, 페이징 로딩, 선택 상대 관리, 이미지 캐싱 등을 담당.
 final class PhotoPickerViewModel{
     
-    //UIImage를 저장한 RAM 캐시
-    private let thumbnailCache = NSCache<NSString, UIImage>()
+    private(set) var cacheManager = ThumbnailCacheManager.shared
     
     private let observer = PhotoLibraryObserver() //PHPhotoLibrary 변경 감시자
     private var fetchResult: PHFetchResult<PHAsset>? //전체 PHAsset 목록
@@ -157,15 +156,7 @@ final class PhotoPickerViewModel{
     
     // MARK: - 썸네일 요청
     //AsyncStream으로 안전하게 이미지 스트리밍(저화질 -> 고화질)
-    func requestThumbnail(for asset: PHAsset, targetSize: CGSize) -> (immediateImage: UIImage?, stream: AsyncStream<UIImage?>) {
-        
-        let cacheKey = asset.localIdentifier as NSString
-        
-        //1. RAM 캐시에 이미지가 있는지 '동기적'으로 확인합니다.
-        if let cacheImage = thumbnailCache.object(forKey: cacheKey){
-            //이미지가 있으면, 즉시 반환합니다. 스트림은 비어있고, 즉시 종료되는 스트림을 보냅니다.
-            return (immediateImage: cacheImage, stream: AsyncStream{ $0.finish() })
-        }
+    func requestThumbnailStream(for asset: PHAsset, targetSize: CGSize) -> AsyncStream<UIImage?> {
         
         let stream = AsyncStream<UIImage?> { continuation in
             final class State { var finished = false }
@@ -176,43 +167,32 @@ final class PhotoPickerViewModel{
                 targetSize: targetSize,
                 contentMode: .aspectFill,
                 options: imageOptions
-            ) { image, info in
+            ) { [weak self] image, info in
+                guard let self = self, !state.finished else { return }
                 
-                //1.  스트림이 이미 종료되었다면 아무것도 하지 않습니다.
-                guard !state.finished else { return }
-                
-                //2. 에러가 발생했는지 확인합니다.
-                if let _ = info?[PHImageErrorKey]{
+                if let _ = info?[PHImageErrorKey] {
                     state.finished = true
-                    continuation.finish() //에러 발생 시 스트림을 즉시 종료합니다.
+                    continuation.finish()
                     return
                 }
                 
-                //3. 이미지가 iCloud에만 있는지 확인합니다.
-                let isInCloud = (
-                    info?[PHImageResultIsInCloudKey] as? Bool
-                ) ?? false
-                
-                //4. 이미지가 nil인데 iCloud에서 다운로드 중이라면
-                if image == nil && isInCloud{
+                let isInCloud = (info?[PHImageResultIsInCloudKey] as? Bool) ?? false
+                if image == nil && isInCloud {
                     return
                 }
                 
-                //5. 유효한 이미지가 있다면(저화질이든, 고화질이든) 스트림에 전달합니다.
-                if let image = image{
+                if let image = image {
                     continuation.yield(image)
                 }
                 
-                //6. 최종 이미지(고화질)인지 확인합니다.
                 let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
                 if !isDegraded {
-                    //최종 콜백. 스트림 종료합니다.
                     state.finished = true
                     continuation.finish()
                     
-                    //최종 고화질 이미지를 받았으면, RAM 캐시에 저장합니다.
-                    if let image = image{
-                        self.thumbnailCache.setObject(image, forKey: cacheKey)
+                    // 최종 고화질 이미지는 여전히 캐시 매니저에 저장합니다.
+                    if let image = image {
+                        self.cacheManager.set(image, forKey: asset.localIdentifier)
                     }
                 }
             }
@@ -223,7 +203,52 @@ final class PhotoPickerViewModel{
             }
         }
         
-        return (immediateImage: nil, stream: stream)
+        return stream
+    }
+    
+    func requestPreviewStream(for asset: PHAsset, targetSize: CGSize) -> AsyncStream<UIImage?>{
+        let previewOptions: PHImageRequestOptions = {
+            let opt = PHImageRequestOptions()
+            opt.deliveryMode = .opportunistic
+            opt.resizeMode = .exact
+            opt.isNetworkAccessAllowed = true
+            return opt
+        }()
+        
+        let stream = AsyncStream<UIImage?> { continuation in
+            final class State { var finished = false }
+            let state = State()
+            
+            let requestID = imageManager.requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: .aspectFit,
+                options: previewOptions
+            ) { image, info in
+                
+                guard !state.finished else { return }
+                if let _ = info?[PHImageErrorKey] {
+                    state.finished = true; continuation.finish(); return
+                }
+                let isInCloud = (info?[PHImageResultIsInCloudKey] as? Bool) ?? false
+                if image == nil && isInCloud { return }
+                
+                if let image = image {
+                    continuation.yield(image)
+                }
+                
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if !isDegraded {
+                    state.finished = true
+                    continuation.finish()
+                }
+            }
+            continuation.onTermination = { [weak self] _ in
+                self?.imageManager.cancelImageRequest(requestID)
+                state.finished = true
+            }
+        }
+        return stream
     }
     
     //선택 모드 전환
