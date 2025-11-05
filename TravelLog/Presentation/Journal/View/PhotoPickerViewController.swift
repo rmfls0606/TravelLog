@@ -22,8 +22,9 @@ final class PhotoPickerViewController: UIViewController {
     private let viewModel = PhotoPickerViewModel()
     private var panMode: PanMode = .none
     
-    /// 자동 스크롤의 속도를 조절합니다. (포인트/프레임)
-    private let autoScrollSpeed: CGFloat = 10.0
+    private let maxAutoScrollSpeed: CGFloat = 15.0 // 가장자리에 닿았을 때 최대 속도
+    private let minAutoScrollSpeed: CGFloat = 2.0  // 핫존에 막 진입했을 때 최소 속도
+    private let hotZoneHeight: CGFloat = 80.0      // 핫존의 높이
     
     /// 자동 스크롤 타이머입니다. (Timer보다 부드러운 CADisplayLink 사용)
     private var autoScrollLink: CADisplayLink?
@@ -212,16 +213,10 @@ final class PhotoPickerViewController: UIViewController {
             break
         }
     }
-
     
-    // 손가락 위치를 확인하여 자동 스크롤을 시작/중지합니다.
-    // location은 collectionView 내부 좌표입니다.
+    
+    /// 손가락 위치를 확인하여 자동 스크롤을 시작/중지합니다. (collectionView 좌표계 기준)
     private func checkAutoScroll(at location: CGPoint) {
-        // '핫 존'의 높이를 정의합니다. (가장자리 80 포인트)
-        let hotZoneHeight: CGFloat = 80.0
-        
-        // 컬렉션뷰의 '현재 보이는' 영역(bounds)을 가져옵니다.
-        // bounds.minY는 contentOffset.y와 같습니다.
         let bounds = collectionView.bounds
         
         // 핫존의 Y 좌표를 계산합니다.
@@ -229,15 +224,13 @@ final class PhotoPickerViewController: UIViewController {
         let bottomHotZoneY = bounds.maxY - hotZoneHeight
         
         if location.y < topHotZoneY {
-            // 상단 핫 존에 닿음
             autoScrollDirection = .up
             startAutoScroll()
         } else if location.y > bottomHotZoneY {
-            // 하단 핫 존에 닿음
             autoScrollDirection = .down
             startAutoScroll()
         } else {
-            // 중간 영역에 있음
+            // 핫존에 없으면 타이머를 '중지'합니다.
             stopAutoScroll()
         }
     }
@@ -259,49 +252,71 @@ final class PhotoPickerViewController: UIViewController {
         autoScrollDirection = .none
     }
     
-    /// (매우 중요) CADisplayLink가 매 프레임마다 호출하는 함수입니다.
+    /// (매우 중요) CADisplayLink가 매 프레임마다 호출하는 함수입니다. (비례 속도 적용됨)
     @objc private func handleAutoScrollTick() {
-        // 1. 스크롤 루프가 도는 중에도 손가락이 핫존을 벗어났는지 '매 프레임' 다시 체크합니다.
-        let location = pan.location(in: collectionView)
-        checkAutoScroll(at: location)
-        
-        // 2. 스크롤 방향이 여전히 유효한지 확인합니다.
-        guard autoScrollDirection != .none else { return }
-        
-        // 3. 현재 contentOffset을 가져옵니다.
-        var newOffset = collectionView.contentOffset
-        
-        // 4. 방향에 따라 스크롤 속도를 더합니다.
-        if autoScrollDirection == .up {
-            newOffset.y -= autoScrollSpeed
-        } else {
-            newOffset.y += autoScrollSpeed
+        // 1. 방향이 없으면 멈춤 (stopAutoScroll()이 호출된 경우)
+        guard autoScrollDirection != .none else {
+            stopAutoScroll()
+            return
         }
         
-        // 5. 스크롤이 콘텐츠 범위를 벗어나지 않도록 제한합니다.
+        // 2. 현재 손가락 위치 다시 가져오기
+        let location = pan.location(in: collectionView)
+        let bounds = collectionView.bounds
+        
+        // 3. 핫존 범위 정의
+        let topHotZoneEndY = bounds.minY + hotZoneHeight
+        let bottomHotZoneStartY = bounds.maxY - hotZoneHeight
+        
+        var speed: CGFloat = 0.0
+        
+        // 4. '비례' 속도 계산
+        if autoScrollDirection == .up && location.y < topHotZoneEndY {
+            // --- 상단 핫존 ---
+            let distanceIntoZone = topHotZoneEndY - location.y
+            let intensity = min(1.0, max(0.0, distanceIntoZone / hotZoneHeight)) // 0.0 ~ 1.0
+            speed = (intensity * (maxAutoScrollSpeed - minAutoScrollSpeed)) + minAutoScrollSpeed
+            
+        } else if autoScrollDirection == .down && location.y > bottomHotZoneStartY {
+            // --- 하단 핫존 ---
+            let distanceIntoZone = location.y - bottomHotZoneStartY
+            let intensity = min(1.0, max(0.0, distanceIntoZone / hotZoneHeight)) // 0.0 ~ 1.0
+            speed = (intensity * (maxAutoScrollSpeed - minAutoScrollSpeed)) + minAutoScrollSpeed
+            
+        } else {
+            // 핫존을 벗어남
+            stopAutoScroll()
+            return
+        }
+        
+        // 5. 스크롤 적용
+        var newOffset = collectionView.contentOffset
+        if autoScrollDirection == .up {
+            newOffset.y -= speed
+        } else {
+            newOffset.y += speed
+        }
+        
+        // 6. 범위 제한
         let maxOffset = collectionView.contentSize.height - collectionView.bounds.height
         newOffset.y = max(0, min(newOffset.y, maxOffset))
         
-        // 6. 컬렉션뷰를 프로그래밍 방식으로 스크롤합니다.
-        collectionView.contentOffset = newOffset
-        
-        // 스크롤 후, 화면의 가장자리(위 또는 아래)에 있는 셀의 index를 찾아서
-        // ViewModel의 updateRangeSelection을 '강제로' 호출합니다.
-        let visibleBounds = collectionView.bounds
-        let pointAtEdge: CGPoint
-        
-        if autoScrollDirection == .up {
-            // 위로 스크롤 중이면, 화면 상단의 좌표로
-            pointAtEdge = CGPoint(x: visibleBounds.midX, y: visibleBounds.minY + 1)
-        } else {
-            // 아래로 스크롤 중이면, 화면 하단의 좌표로
-            pointAtEdge = CGPoint(x: visibleBounds.midX, y: visibleBounds.maxY - 1)
-        }
-        
-        // 해당 좌표의 IndexPath를 찾습니다.
-        if let indexPath = collectionView.indexPathForItem(at: pointAtEdge) {
-            // ViewModel의 로직을 재사용합니다!
-            viewModel.updateRangeSelection(to: indexPath.item)
+        // 7. 스크롤이 실제로 일어났을 때만 적용
+        if collectionView.contentOffset.y != newOffset.y {
+            collectionView.contentOffset = newOffset
+            
+            // 8. ViewModel 업데이트 (가장자리 셀 기준)
+            let visibleBounds = collectionView.bounds
+            let pointAtEdge: CGPoint
+            if autoScrollDirection == .up {
+                pointAtEdge = CGPoint(x: visibleBounds.midX, y: visibleBounds.minY + 1)
+            } else {
+                pointAtEdge = CGPoint(x: visibleBounds.midX, y: visibleBounds.maxY - 1)
+            }
+            
+            if let indexPath = collectionView.indexPathForItem(at: pointAtEdge) {
+                viewModel.updateRangeSelection(to: indexPath.item)
+            }
         }
     }
 }
@@ -438,6 +453,11 @@ extension PhotoPickerViewController: UIGestureRecognizerDelegate{
         let velocity = pan.velocity(in: collectionView)
         let absX = abs(velocity.x)
         let absY = abs(velocity.y)
+        
+        guard viewModel.isSelectionMode else {
+            panMode = .none
+            return false
+        }
         
         //방향 결정
         if absX > absY{
