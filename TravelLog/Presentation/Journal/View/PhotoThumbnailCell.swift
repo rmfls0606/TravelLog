@@ -11,11 +11,20 @@ import SnapKit
 final class PhotoThumbnailCell: UICollectionViewCell {
     static let identifier = "PhotoThumbnailCell"
     private var loadTask: Task<Void, Never>?
+    
+    private let shimmerView: ShimmerView = {
+        let view = ShimmerView()
+        view.layer.cornerRadius = 12
+        view.clipsToBounds = true
+        return view
+    }()
+    
     private let imageView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFill
         view.layer.cornerRadius = 12
         view.clipsToBounds = true
+        view.isHidden = true
         return view
     }()
     
@@ -52,12 +61,17 @@ final class PhotoThumbnailCell: UICollectionViewCell {
     }
     
     private func configureHierarchy(){
+        contentView.addSubview(shimmerView)
         contentView.addSubview(imageView)
         imageView.addSubview(overlayView)
         imageView.addSubview(checkMark)
     }
     
     private func configureLayout(){
+        shimmerView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        
         imageView.snp.makeConstraints{ make in
             make.edges.equalToSuperview()
         }
@@ -73,25 +87,43 @@ final class PhotoThumbnailCell: UICollectionViewCell {
         }
     }
     
+    private func showShimmer(){
+        shimmerView.startShimmering()
+        imageView.isHidden = true
+    }
+    
+    private func hideShimmer(){
+        shimmerView.stopShimmering()
+        imageView.isHidden = false
+    }
+    
     func updateSelectionState(_ isSelected: Bool) {
-            checkMark.isHidden = !isSelected
-            overlayView.isHidden = !isSelected
-        }
+        checkMark.isHidden = !isSelected
+        overlayView.isHidden = !isSelected
+    }
     
     func applyThumbnailStream(_ stream: AsyncStream<UIImage?>) {
-            loadTask = Task {
-                var isFirst = true
-                for await image in stream {
-                    guard !Task.isCancelled else { return }
-                    if isFirst {
-                        imageView.image = image
-                        isFirst = false
-                    } else {
-                        UIView.transition(with: imageView, duration: 0.15, options: .transitionCrossDissolve) {
-                            self.imageView.image = image
-                        }
+        
+        showShimmer()
+        
+        loadTask = Task {
+            var isFirst = true
+            for await image in stream {
+                guard !Task.isCancelled else { return }
+                if isFirst {
+                    imageView.image = image
+                    self.hideShimmer()
+                    isFirst = false
+                } else {
+                    UIView.transition(with: imageView, duration: 0.15, options: .transitionCrossDissolve) {
+                        self.imageView.image = image
                     }
                 }
             }
+            
+            if isFirst{
+                self.hideShimmer()
+            }
         }
+    }
 }
