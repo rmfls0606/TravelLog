@@ -71,10 +71,6 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
         setupViews()
         setupTapGesture()
         
-        if let cachedImage = cacheManager.get(forKey: asset.localIdentifier) {
-            self.imageView.image = cachedImage
-        }
-        
         loadFullImage()
     }
     
@@ -133,10 +129,7 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
                 guard !Task.isCancelled else { return }
                 
                 if isFirstImage {
-                    // (스와이프 시) 빈 이미지뷰에 저화질을 채움
-                    if self.imageView.image == nil {
-                        self.imageView.image = image
-                    }
+                    self.imageView.image = image
                     isFirstImage = false
                 } else {
                     self.imageView.image = image
@@ -183,5 +176,34 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
         zoomRect.origin.y = center.y - (zoomRect.size.height / 2.0)
         
         return zoomRect
+    }
+    
+    
+    
+    private func updateImageViewLayout(for image: UIImage) {
+        let scrollSize = scrollView.bounds.size
+        let imageRatio = image.size.width / image.size.height
+        let viewRatio = scrollSize.width / scrollSize.height
+
+        var width: CGFloat
+        var height: CGFloat
+
+        if imageRatio > viewRatio {
+            // 가로가 더 긴 이미지
+            width = scrollSize.width
+            height = width / imageRatio
+        } else {
+            // 세로가 더 긴 이미지
+            height = scrollSize.height
+            width = height * imageRatio
+        }
+
+        imageView.snp.remakeConstraints { make in
+            make.center.equalTo(scrollView.contentLayoutGuide)
+            make.width.equalTo(width)
+            make.height.equalTo(height)
+        }
+
+        scrollView.contentSize = CGSize(width: width, height: height)
     }
 }
