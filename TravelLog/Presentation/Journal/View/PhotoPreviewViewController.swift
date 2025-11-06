@@ -38,6 +38,18 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
         return imageView
     }()
     
+    private lazy var singleTapGesture: UITapGestureRecognizer = {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(didTapView))
+        tap.numberOfTapsRequired = 1
+        return tap
+    }()
+    
+    private lazy var doubleTapGesture: UITapGestureRecognizer = {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(didDoubleTapView(_:)))
+        tap.numberOfTapsRequired = 2
+        return tap
+    }()
+    
     // MARK: - Initializer
     
     init(viewModel: PhotoPickerViewModel, asset: PHAsset, index: Int) {
@@ -94,9 +106,10 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
     // MARK: - Logic
     
     private func setupTapGesture() {
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(didTapView))
-        tapGesture.numberOfTapsRequired = 1
-        view.addGestureRecognizer(tapGesture)
+        view.addGestureRecognizer(singleTapGesture)
+        view.addGestureRecognizer(doubleTapGesture)
+        
+        singleTapGesture.require(toFail: doubleTapGesture)
     }
     
     @objc private func didTapView() {
@@ -136,5 +149,39 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
     // 줌(Zoom) 기능을 위해 어떤 뷰를 확대/축소할지 알려줍니다.
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return imageView
+    }
+    
+    @objc private func didDoubleTapView(_ gesture: UITapGestureRecognizer) {
+        if scrollView.zoomScale > scrollView.minimumZoomScale {
+            scrollView.setZoomScale(scrollView.minimumZoomScale, animated: true)
+        } else {
+            // 2. 현재 줌 스케일이 1.0이면,
+            //    '줌 인' (사용자가 요청한 2배)을 실행합니다.
+            let targetScale: CGFloat = 2.0
+            
+            // 3. 탭한 위치를 가져옵니다.
+            let location = gesture.location(in: imageView)
+            
+            // 4. 탭한 위치를 중심으로 2배 확대될 '영역(Rect)'을 계산합니다.
+            let zoomRect = calculateZoomRect(for: targetScale, with: location)
+            
+            // 5. 해당 영역으로 줌인!
+            scrollView.zoom(to: zoomRect, animated: true)
+        }
+    }
+    
+    // 줌인할 영역(CGRect)을 계산하는 헬퍼 함수
+    private func calculateZoomRect(for scale: CGFloat, with center: CGPoint) -> CGRect {
+        var zoomRect = CGRect.zero
+        
+        // 1. 줌인될 영역의 너비와 높이를 계산
+        zoomRect.size.width = (imageView.frame.size.width / scale)
+        zoomRect.size.height = (imageView.frame.size.height / scale)
+        
+        // 2. 줌인될 영역의 원점(origin)을 탭한 위치(center) 기준으로 계산
+        zoomRect.origin.x = center.x - (zoomRect.size.width / 2.0)
+        zoomRect.origin.y = center.y - (zoomRect.size.height / 2.0)
+        
+        return zoomRect
     }
 }
