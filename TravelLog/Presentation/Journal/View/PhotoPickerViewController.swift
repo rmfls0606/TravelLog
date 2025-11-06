@@ -112,13 +112,20 @@ final class PhotoPickerViewController: UIViewController {
     
     private func configureBind() {
         viewModel.onSelectionModeChanged = { [weak self] isSelecting in
-            self?.selectButton.title = isSelecting ? "취소" : "선택"
-            self?.collectionView.allowsMultipleSelection = isSelecting
+            guard let self = self else { return }
+            self.selectButton.title = isSelecting ? "취소" : "선택"
+            self.collectionView.allowsMultipleSelection = isSelecting
             
             if isSelecting{
-                self?.navigationItem.leftBarButtonItem = self?.allSelectButton
+                self.navigationItem.leftBarButtonItem = self.allSelectButton
             }else{
-                self?.navigationItem.leftBarButtonItem = self?.dismissButton
+                self.navigationItem.leftBarButtonItem = self.dismissButton
+                
+                for visibleCell in self.collectionView.visibleCells {
+                    if let cell = visibleCell as? PhotoThumbnailCell {
+                        cell.updateSelectionState(false)
+                    }
+                }
             }
         }
         
