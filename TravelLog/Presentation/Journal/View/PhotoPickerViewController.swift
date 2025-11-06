@@ -146,12 +146,11 @@ final class PhotoPickerViewController: UIViewController {
         }
         
         viewModel.onSelectAllToggled = { [weak self] isAllSelected in
-            self?.allSelectButton.title = isAllSelected ? "전체해제" : "전체선택"
-            for indexPath in self!.collectionView.indexPathsForVisibleItems {
-                if let cell = self!.collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
-                    let asset = self!.viewModel.asset(at: indexPath)
-                    cell.updateSelectionState(self!.viewModel.isSelected(asset.localIdentifier))
-                }
+            guard let self else { return }
+            for indexPath in collectionView.indexPathsForVisibleItems {
+                guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell else { continue }
+                let asset = viewModel.asset(at: indexPath)
+                cell.updateSelectionState(viewModel.isSelected(asset.localIdentifier))
             }
         }
         
@@ -323,6 +322,7 @@ final class PhotoPickerViewController: UIViewController {
         // 7. 스크롤이 실제로 일어났을 때만 적용
         if collectionView.contentOffset.y != newOffset.y {
             collectionView.contentOffset = newOffset
+            collectionView.layoutIfNeeded()
             
             // 8. ViewModel 업데이트 (가장자리 셀 기준)
             let visibleBounds = collectionView.bounds

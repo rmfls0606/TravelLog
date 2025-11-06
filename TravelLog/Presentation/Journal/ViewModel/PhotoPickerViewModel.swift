@@ -75,7 +75,7 @@ final class PhotoPickerViewModel{
         observer.changeHandler = { [weak self] result in
             self?.fetchResult = result
             self?.loadedAssets.removeAll()
-            self?.loadMoreAssetsIfNeeded()
+//            self?.loadMoreAssetsIfNeeded()
             self?.onAssetsChanged?(nil)
         }
     }
