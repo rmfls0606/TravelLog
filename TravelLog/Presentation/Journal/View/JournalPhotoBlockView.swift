@@ -51,7 +51,7 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
     let removeTapped = PublishRelay<Void>()
     
     private var lastSentText: String = ""  // 중복 방지용 캐시
-
+    
     override func layoutSubviews() {
         super.layoutSubviews()
         let layer = CAShapeLayer()
@@ -63,6 +63,8 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
         layer.path = UIBezierPath(roundedRect: dashBox.bounds, cornerRadius: 12).cgPath
         dashBox.layer.addSublayer(layer)
     }
+    
+    let cameraTapped = PublishRelay<Void>()
     
     // MARK: - Init
     override init(frame: CGRect) {
@@ -187,19 +189,24 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
             }
             .disposed(by: disposeBag)
         
+        cameraSelectButton.rx.tap
+            .bind(to: cameraTapped)
+            .disposed(by: disposeBag)
+        
+        
         removeButton.rx.tap
             .bind(to: removeTapped)
             .disposed(by: disposeBag)
     }
     
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-           // Return 키 누를 시 키보드 내리기
-           if text == "\n" {
-               textView.resignFirstResponder()
-               return false
-           }
-           return true
-       }
+        // Return 키 누를 시 키보드 내리기
+        if text == "\n" {
+            textView.resignFirstResponder()
+            return false
+        }
+        return true
+    }
     
     // MARK: - Public Accessors
     var textContent: String {

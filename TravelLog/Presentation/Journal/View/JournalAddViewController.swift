@@ -69,23 +69,23 @@ final class JournalAddViewController: BaseViewController {
             $0.top.leading.trailing.equalTo(view.safeAreaLayoutGuide)
             $0.bottom.equalTo(addBar.snp.top)
         }
-
+        
         contentStack.snp.makeConstraints {
             $0.edges.equalTo(scrollView.contentLayoutGuide).inset(16)
             $0.width.equalTo(scrollView.frameLayoutGuide).offset(-32)
         }
-
+        
         emptyContainerView.snp.makeConstraints {
             $0.top.equalTo(view.safeAreaLayoutGuide.snp.top)
             $0.bottom.equalTo(addBar.snp.top)
             $0.horizontalEdges.equalToSuperview().inset(16)
         }
-
+        
         emptyView.snp.makeConstraints {
             $0.center.equalToSuperview()
             $0.width.lessThanOrEqualToSuperview().inset(16)
         }
-
+        
         addBlockContainer.snp.makeConstraints { make in
             make.leading.trailing.equalToSuperview().inset(16)
             make.bottom.equalTo(saveButton.snp.top).offset(-12)
@@ -100,7 +100,7 @@ final class JournalAddViewController: BaseViewController {
         blockTitle.snp.makeConstraints { make in
             make.top.horizontalEdges.equalToSuperview().inset(16)
         }
-
+        
         saveButton.snp.makeConstraints {
             $0.leading.trailing.bottom.equalTo(view.safeAreaLayoutGuide).inset(16)
             $0.height.equalTo(52)
@@ -289,7 +289,7 @@ final class JournalAddViewController: BaseViewController {
             saveButton.configuration = config
         }
     }
-
+    
     // MARK: - 블록 추가
     private func addTextBlock() {
         emptyContainerView.isHidden = true
@@ -346,6 +346,15 @@ final class JournalAddViewController: BaseViewController {
         
         let card = JournalPhotoBlockView()
         contentStack.addArrangedSubview(card)
+        
+        card.cameraTapped
+            .bind(with: self) { owner, _ in
+                let pickerVC = PhotoPickerViewController()
+                let nav = UINavigationController(rootViewController: pickerVC)
+                nav.modalPresentationStyle = .fullScreen
+                owner.present(nav, animated: true)
+            }
+            .disposed(by: card.disposeBag)
         
         card.removeTapped
             .bind(with: self) { owner, _ in
