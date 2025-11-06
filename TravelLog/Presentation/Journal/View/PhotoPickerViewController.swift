@@ -152,14 +152,14 @@ final class PhotoPickerViewController: UIViewController {
             }
         }
         
-        viewModel.onSelectAllToggled = { [weak self] isAllSelected in
-            guard let self else { return }
-            for indexPath in collectionView.indexPathsForVisibleItems {
-                guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell else { continue }
-                let asset = viewModel.asset(at: indexPath)
-                cell.updateSelectionState(viewModel.isSelected(asset.localIdentifier))
-            }
-        }
+//        viewModel.onSelectAllToggled = { [weak self] isAllSelected in
+//            guard let self else { return }
+//            for indexPath in collectionView.indexPathsForVisibleItems {
+//                guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell else { continue }
+//                let asset = viewModel.asset(at: indexPath)
+//                cell.updateSelectionState(viewModel.isSelected(asset.localIdentifier))
+//            }
+//        }
         
         viewModel.onPermissionDenied = { [weak self] in
             let alert = UIAlertController(title: "권한 필요",
@@ -201,11 +201,11 @@ final class PhotoPickerViewController: UIViewController {
     
     @objc
     private func didTapLeftBarButton(){
-        if viewModel.isSelectionMode{
-            viewModel.toggleSelectAll()
-        }else{
+//        if viewModel.isSelectionMode{
+//            viewModel.toggleSelectAll()
+//        }else{
             dismiss(animated: true)
-        }
+//        }
     }
     
     @objc

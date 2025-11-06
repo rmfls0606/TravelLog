@@ -35,11 +35,11 @@ final class PhotoPickerViewModel{
     }
     
     //전체 선택 상태
-    private(set) var isAllSelected: Bool = false{
-        didSet{
-            onSelectAllToggled?(isAllSelected)
-        }
-    }
+//    private(set) var isAllSelected: Bool = false{
+//        didSet{
+//            onSelectAllToggled?(isAllSelected)
+//        }
+//    }
     
     //제한 접근 여부
     private(set) var isLimitedAccess = false
@@ -262,7 +262,7 @@ final class PhotoPickerViewModel{
         isSelectionMode.toggle()
         if !isSelectionMode{
             clearSelections()
-            isAllSelected = false
+//            isAllSelected = false
         }
     }
     
@@ -281,23 +281,23 @@ final class PhotoPickerViewModel{
             }
             selectedAssets.insert(identifier)
         }
-        isAllSelected = (selectedAssets.count == loadedAssets.count)
+//        isAllSelected = (selectedAssets.count == loadedAssets.count)
         onSelectionUpdated?([identifier: selectedAssets.contains(identifier)])
     }
     
-    func toggleSelectAll(){
-        if isAllSelected{
-            selectedAssets.removeAll()
-            isAllSelected = false
-        }else{
-            selectedAssets = Set(loadedAssets.map{ $0.localIdentifier })
-            isAllSelected = true
-        }
-        let map = loadedAssets.reduce(into: [String: Bool]()){
-            $0[$1.localIdentifier] = self.isAllSelected
-        }
-        onSelectionUpdated?(map)
-    }
+//    func toggleSelectAll(){
+//        if isAllSelected{
+//            selectedAssets.removeAll()
+//            isAllSelected = false
+//        }else{
+//            selectedAssets = Set(loadedAssets.map{ $0.localIdentifier })
+//            isAllSelected = true
+//        }
+//        let map = loadedAssets.reduce(into: [String: Bool]()){
+//            $0[$1.localIdentifier] = self.isAllSelected
+//        }
+//        onSelectionUpdated?(map)
+//    }
     
     func isSelected(_ identifier: String) -> Bool{
         selectedAssets.contains(identifier)
