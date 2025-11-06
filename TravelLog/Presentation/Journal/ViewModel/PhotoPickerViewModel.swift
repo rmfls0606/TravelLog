@@ -304,6 +304,11 @@ final class PhotoPickerViewModel{
         return loadedAssets[indexPath.item]
     }
     
+    func safeAsset(at index: Int) -> PHAsset?{
+        guard index >= 0 && index < loadedAssets.count else { return nil }
+        return loadedAssets[index]
+    }
+    
     //MARK: - 드래그 선택 관리
     func beginRangeSelection(at index: Int){
         guard index < loadedAssets.count else { return }

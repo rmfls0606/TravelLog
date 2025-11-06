@@ -19,7 +19,6 @@ final class PhotoPageViewController: UIPageViewController {
     private let totalAssetCount: Int
     
     private let customNavigationBar: UIView = {
-//        let effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
         let view = UIView()
         view.backgroundColor = .black.withAlphaComponent(0.3)
         return view
@@ -119,11 +118,13 @@ final class PhotoPageViewController: UIPageViewController {
     }
     
     private func createPreviewController(at index: Int) -> PhotoPreviewViewController? {
-        guard index >= 0 && index < allAssets.count else {
-            return nil
+        if index >= viewModel.numberOfItems() - 5 {
+            viewModel.loadMoreAssetsIfNeeded()
         }
         
-        let asset = allAssets[index]
+        guard let asset = viewModel.safeAsset(at: index) else {
+               return nil
+           }
         
         let previewVC = PhotoPreviewViewController(
             viewModel: self.viewModel,
@@ -176,5 +177,11 @@ extension PhotoPageViewController: UIPageViewControllerDelegate {
         self.currentIndex = currentVC.view.tag
         
         updateNavigationTitle()
+        
+        //페이징 트리거
+        //남은 이미지가 적으면 ViewModel에 다음 페이지 요청
+        if currentIndex >= viewModel.numberOfItems() - 5{
+            viewModel.loadMoreAssetsIfNeeded()
+        }
     }
 }
