@@ -345,6 +345,13 @@ final class PhotoPickerViewController: UIViewController {
             }
         }
     }
+    
+    private func scrollToItem(at index: Int){
+        guard index < viewModel.numberOfItems() else { return }
+        
+        let indexPath = IndexPath(item: index, section: 0)
+        collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
+    }
 }
 
 extension PhotoPickerViewController: UICollectionViewDataSource {
@@ -419,6 +426,11 @@ extension PhotoPickerViewController: UICollectionViewDelegate {
                 currentIndex: tappedIndex,
                 totalCount: totalCount
             )
+            
+            pageVC.onDismissToIndex = { [weak self] index in
+                guard let self else { return }
+                self.scrollToItem(at: index)
+            }
             
             pageVC.modalPresentationStyle = .fullScreen
             self.present(pageVC, animated: true)

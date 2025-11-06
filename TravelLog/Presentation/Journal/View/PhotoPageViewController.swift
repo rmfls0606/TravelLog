@@ -11,6 +11,8 @@ import SnapKit
 
 final class PhotoPageViewController: UIPageViewController {
     
+    var onDismissToIndex: ((Int) -> Void)? //현재 인덱스를 되돌려줄 클로저
+    
     private let viewModel: PhotoPickerViewModel
     
     private var allAssets: [PHAsset]
@@ -101,6 +103,7 @@ final class PhotoPageViewController: UIPageViewController {
     }
     
     @objc private func didTapCloseButton() {
+        onDismissToIndex?(currentIndex)
         self.dismiss(animated: true)
     }
     
