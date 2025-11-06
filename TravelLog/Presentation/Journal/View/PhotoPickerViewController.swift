@@ -57,10 +57,10 @@ final class PhotoPickerViewController: UIViewController {
         return button
     }()
     
-    private lazy var allSelectButton: UIBarButtonItem = {
-        let button = UIBarButtonItem(title: "전체선택", style: .plain, target: self, action: #selector(didTapLeftBarButton))
-        return button
-    }()
+    //    private lazy var allSelectButton: UIBarButtonItem = {
+    //        let button = UIBarButtonItem(title: "전체선택", style: .plain, target: self, action: #selector(didTapLeftBarButton))
+    //        return button
+    //    }()
     
     private lazy var selectButton: UIBarButtonItem = {
         let button = UIBarButtonItem(title: "선택", style: .plain, target: self, action: #selector(didTapSelect))
@@ -116,17 +116,17 @@ final class PhotoPickerViewController: UIViewController {
             self.selectButton.title = isSelecting ? "취소" : "선택"
             self.collectionView.allowsMultipleSelection = isSelecting
             
-            if isSelecting{
-                self.navigationItem.leftBarButtonItem = self.allSelectButton
-            }else{
-                self.navigationItem.leftBarButtonItem = self.dismissButton
-                
-                for visibleCell in self.collectionView.visibleCells {
-                    if let cell = visibleCell as? PhotoThumbnailCell {
-                        cell.updateSelectionState(false)
-                    }
+            //            if isSelecting{
+            //                self.navigationItem.leftBarButtonItem = self.allSelectButton
+            //            }else{
+            self.navigationItem.leftBarButtonItem = self.dismissButton
+            
+            for visibleCell in self.collectionView.visibleCells {
+                if let cell = visibleCell as? PhotoThumbnailCell {
+                    cell.updateSelectionState(false)
                 }
             }
+            //            }
         }
         
         viewModel.onAssetsChanged = { [weak self] indexPaths in
@@ -182,6 +182,10 @@ final class PhotoPickerViewController: UIViewController {
                     cell.updateSelectionState(isSelected)
                 }
             }
+        }
+        
+        viewModel.onSelectionLimitReached = { [weak self] in
+            self?.showSelectionLimitAlert()
         }
     }
     
@@ -351,6 +355,14 @@ final class PhotoPickerViewController: UIViewController {
         
         let indexPath = IndexPath(item: index, section: 0)
         collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
+    }
+    
+    private func showSelectionLimitAlert(){
+        let alert = UIAlertController(title: "선택 제한",
+                                      message: "최대 \(viewModel.maxSelectableCount)개까지만 선택할 수 있습니다.",
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        present(alert, animated: true)
     }
 }
 

@@ -12,6 +12,8 @@ import UIKit
 //사진 접근 권한, 페이징 로딩, 선택 상대 관리, 이미지 캐싱 등을 담당.
 final class PhotoPickerViewModel{
     
+    var maxSelectableCount: Int = 5 //최대ㅐ 선택 개수 프로퍼티 추가
+    
     private(set) var cacheManager = ThumbnailCacheManager.shared
     
     private let observer = PhotoLibraryObserver() //PHPhotoLibrary 변경 감시자
@@ -49,6 +51,7 @@ final class PhotoPickerViewModel{
     var onSelectAllToggled: ((Bool) -> Void)?
     var onSelectionUpdated: (([String: Bool]) -> Void)?
     var onLimitedAccessDetected: (() -> Void)?
+    var onSelectionLimitReached: (() -> Void)? //한도 초과 시 알림용 콜백
     
     private let imageManager = {
         let manager = PHCachingImageManager()
@@ -272,6 +275,10 @@ final class PhotoPickerViewModel{
         if selectedAssets.contains(identifier){
             selectedAssets.remove(identifier)
         }else{
+            guard selectedAssets.count < maxSelectableCount else{
+                onSelectionLimitReached?() //초과 시 콜백 호출
+                return
+            }
             selectedAssets.insert(identifier)
         }
         isAllSelected = (selectedAssets.count == loadedAssets.count)
@@ -350,8 +357,14 @@ final class PhotoPickerViewModel{
                 }
             } else {
                 if !isSelected(id) {
-                    selectedAssets.insert(id)
-                    changed[id] = true
+                    if selectedAssets.count < maxSelectableCount{
+                        selectedAssets.insert(id)
+                        changed[id] = true
+                    }else{
+                        //초과 시 즉시 콜백 & 복원 처리
+                        onSelectionLimitReached?()
+                        changed[id] = false
+                    }
                 }
             }
         }
