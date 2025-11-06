@@ -21,6 +21,9 @@ final class PhotoPickerViewModel{
     private var pageSize = 300 //한 번에 불러올 개수
     private var isFetching = false
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
+    var totalAssetCount: Int {
+        return fetchResult?.count ?? 0
+    }
     
     //선택 모드 상태
     private(set) var isSelectionMode: Bool = false{
