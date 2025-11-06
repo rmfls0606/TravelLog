@@ -46,7 +46,15 @@ final class PhotoPageViewController: UIPageViewController {
         self.currentIndex = currentIndex
         self.totalAssetCount = totalCount
         
-        super.init(transitionStyle: .scroll, navigationOrientation: .horizontal)
+        let options: [UIPageViewController.OptionsKey: Any] = [
+            .interPageSpacing: 32.0
+        ]
+        
+        super.init(
+            transitionStyle: .scroll,
+            navigationOrientation: .horizontal,
+            options: options
+        )
     }
     
     required init?(coder: NSCoder) {
