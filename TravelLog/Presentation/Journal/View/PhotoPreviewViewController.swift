@@ -11,7 +11,7 @@ import SnapKit
 
 /// 단일 PHAsset을 고화질로 로드하고 줌(Zoom)할 수 있는 뷰 컨트롤러
 final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
-    
+    var onSingleTap: (() -> Void)?
     // MARK: - Properties
     private let viewModel: PhotoPickerViewModel
     
@@ -57,7 +57,7 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupViews()
-        loadFullImage()
+        setupTapGesture()
         
         if let cachedImage = cacheManager.get(forKey: asset.localIdentifier) {
             self.imageView.image = cachedImage
@@ -69,8 +69,7 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
     // MARK: - Setup
     
     private func setupViews() {
-        view.backgroundColor = .white
-        navigationItem.largeTitleDisplayMode = .never // 타이틀 작게
+        view.backgroundColor = .black
         
         // 줌을 위한 Delegate 설정
         scrollView.delegate = self
@@ -80,7 +79,7 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
         
         // AutoLayout (SnapKit)
         scrollView.snp.makeConstraints { make in
-            make.edges.equalTo(view.safeAreaLayoutGuide).inset(8)
+            make.edges.equalToSuperview()
         }
         
         // 줌을 사용하려면 imageView가 scrollView의 contentLayoutGuide를 꽉 채워야 함
@@ -93,6 +92,16 @@ final class PhotoPreviewViewController: UIViewController, UIScrollViewDelegate {
     }
     
     // MARK: - Logic
+    
+    private func setupTapGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(didTapView))
+        tapGesture.numberOfTapsRequired = 1
+        view.addGestureRecognizer(tapGesture)
+    }
+    
+    @objc private func didTapView() {
+        onSingleTap?()
+    }
     
     private func loadFullImage() {
         let targetSize = CGSize(

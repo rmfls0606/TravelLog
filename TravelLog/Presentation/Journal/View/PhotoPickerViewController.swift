@@ -358,10 +358,6 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
-        let stream = viewModel.requestThumbnailStream(
-            for: asset,
-            targetSize: targetSize
-        )
         
         cell.configure(with: asset, targetSize: targetSize, viewModel: viewModel)
         
@@ -408,14 +404,17 @@ extension PhotoPickerViewController: UICollectionViewDelegate {
             let tappedIndex = indexPath.item
             let allLoadedAssets = viewModel.loadedAssets
             
+            let totalCount = viewModel.totalAssetCount
+            
             let pageVC = PhotoPageViewController(
                 viewModel: self.viewModel,
                 allAssets: allLoadedAssets,
-                currentIndex: tappedIndex
+                currentIndex: tappedIndex,
+                totalCount: totalCount
             )
             
-            
-            navigationController?.pushViewController(pageVC, animated: true)
+            pageVC.modalPresentationStyle = .fullScreen
+            self.present(pageVC, animated: true)
         }
     }
     

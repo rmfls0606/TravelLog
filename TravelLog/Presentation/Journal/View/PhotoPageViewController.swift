@@ -7,6 +7,7 @@
 
 import UIKit
 import PhotosUI
+import SnapKit
 
 final class PhotoPageViewController: UIPageViewController {
     
@@ -15,10 +16,35 @@ final class PhotoPageViewController: UIPageViewController {
     private var allAssets: [PHAsset]
     private var currentIndex: Int
     
-    init(viewModel: PhotoPickerViewModel, allAssets: [PHAsset], currentIndex: Int) {
+    private let totalAssetCount: Int
+    
+    private let customNavigationBar: UIView = {
+//        let effect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        let view = UIView()
+        view.backgroundColor = .black.withAlphaComponent(0.3)
+        return view
+    }()
+    
+    private let closeButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "xmark"), for: .normal)
+        button.tintColor = .white
+        return button
+    }()
+    
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 17, weight: .semibold)
+        label.textAlignment = .center
+        return label
+    }()
+    
+    init(viewModel: PhotoPickerViewModel, allAssets: [PHAsset], currentIndex: Int, totalCount: Int) {
         self.viewModel = viewModel
         self.allAssets = allAssets
         self.currentIndex = currentIndex
+        self.totalAssetCount = totalCount
         
         super.init(transitionStyle: .scroll, navigationOrientation: .horizontal)
     }
@@ -33,9 +59,42 @@ final class PhotoPageViewController: UIPageViewController {
         delegate = self
         dataSource = self
         
+        view.backgroundColor = .black
+        
+        setupCustomBar()
         setupInitialPage()
         updateNavigationTitle()
-        view.backgroundColor = .white
+        
+    }
+    
+    private func setupCustomBar() {
+        // PageVC의 view '위에' 바를 추가합니다.
+        view.addSubview(customNavigationBar)
+        customNavigationBar.addSubview(closeButton)
+        customNavigationBar.addSubview(titleLabel)
+        
+        // 커스텀 바는 화면 상단에 Safe Area까지 차지
+        customNavigationBar.snp.makeConstraints { make in
+            make.top.horizontalEdges.equalToSuperview()
+            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.top).offset(44) // 표준 네비게이션 바 높이
+        }
+        
+        closeButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().offset(16)
+            make.bottom.equalTo(customNavigationBar.snp.bottom).offset(-8)
+            make.width.height.equalTo(30)
+        }
+        
+        closeButton.addTarget(self, action: #selector(didTapCloseButton), for: .touchUpInside)
+        
+        titleLabel.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.centerY.equalTo(closeButton.snp.centerY)
+        }
+    }
+    
+    @objc private func didTapCloseButton() {
+        self.dismiss(animated: true)
     }
     
     private func setupInitialPage() {
@@ -48,7 +107,7 @@ final class PhotoPageViewController: UIPageViewController {
     }
     
     private func updateNavigationTitle() {
-        self.title = "\(currentIndex + 1) / \(allAssets.count)"
+        self.titleLabel.text = "\(currentIndex + 1) / \(totalAssetCount)"
     }
     
     private func createPreviewController(at index: Int) -> PhotoPreviewViewController? {
@@ -64,9 +123,18 @@ final class PhotoPageViewController: UIPageViewController {
             index: index
         )
         
-//        previewVC.view.tag = index
+        previewVC.onSingleTap = { [weak self] in
+            self?.toggleCustomBar()
+        }
         
         return previewVC
+    }
+    
+    func toggleCustomBar() {
+        let isHidden = customNavigationBar.alpha == 0
+        UIView.animate(withDuration: 0.25) {
+            self.customNavigationBar.alpha = isHidden ? 1 : 0
+        }
     }
 }
 
