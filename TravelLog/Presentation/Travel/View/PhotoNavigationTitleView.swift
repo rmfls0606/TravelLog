@@ -88,12 +88,15 @@ final class PhotoNavigationTitleView: UIView {
         }
     }
     
-    func updateSelectedPhotoCount(_ count: Int, isSelecting: Bool){
-        if isSelecting{
-            selectedPhotoBox.isHidden = false
-            selectedPhotoLabel.text = "\(count)개 선택 중"
-        }else{
-            selectedPhotoBox.isHidden = true
+    func updateSelectedPhotoCount(_ count: Int, isSelecting: Bool) {
+        let shouldShow = isSelecting && count > 0
+
+        // 애니메이션으로 전환
+        UIView.transition(with: selectedPhotoBox, duration: 0.25, options: .transitionCrossDissolve) {
+            self.selectedPhotoBox.isHidden = !shouldShow
+            if shouldShow {
+                self.selectedPhotoLabel.text = "\(count)개 선택 중"
+            }
         }
     }
 }
