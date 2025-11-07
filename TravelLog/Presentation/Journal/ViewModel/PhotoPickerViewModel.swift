@@ -19,7 +19,7 @@ final class PhotoPickerViewModel{
     private let observer = PhotoLibraryObserver() //PHPhotoLibrary 변경 감시자
     private var fetchResult: PHFetchResult<PHAsset>? //전체 PHAsset 목록
     private(set) var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
-    private var selectedAssets: Set<String> = [] //선택된 Asset Identifier 집합
+    private(set) var selectedAssets: Set<String> = [] //선택된 Asset Identifier 집합
     private var pageSize = 300 //한 번에 불러올 개수
     private var isFetching = false
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)

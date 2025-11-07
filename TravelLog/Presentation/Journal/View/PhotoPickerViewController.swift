@@ -67,6 +67,8 @@ final class PhotoPickerViewController: UIViewController {
         return button
     }()
     
+    private let photoTitleView = PhotoNavigationTitleView()
+    
     private var dataSource: UICollectionViewDiffableDataSource<Int, PHAsset>!
     
     override func viewDidLoad() {
@@ -75,6 +77,7 @@ final class PhotoPickerViewController: UIViewController {
         configureLayout()
         configureView()
         configureBind()
+        
         Task{
             await viewModel.checkPermission()
         }
@@ -98,7 +101,7 @@ final class PhotoPickerViewController: UIViewController {
     }()
     
     private func configureView(){
-        title = "최근 항목"
+        navigationItem.titleView = photoTitleView
         view.backgroundColor = .systemBackground
         navigationItem.leftBarButtonItem = dismissButton
         navigationItem.rightBarButtonItem = selectButton
@@ -120,6 +123,10 @@ final class PhotoPickerViewController: UIViewController {
             //                self.navigationItem.leftBarButtonItem = self.allSelectButton
             //            }else{
             self.navigationItem.leftBarButtonItem = self.dismissButton
+
+            self.photoTitleView.updateSelectedPhotoCount(
+                self.viewModel.selectedAssets.count,
+                isSelecting: isSelecting)
             
             for visibleCell in self.collectionView.visibleCells {
                 if let cell = visibleCell as? PhotoThumbnailCell {
@@ -182,6 +189,11 @@ final class PhotoPickerViewController: UIViewController {
                     cell.updateSelectionState(isSelected)
                 }
             }
+            
+            self.photoTitleView.updateSelectedPhotoCount(
+                self.viewModel.selectedAssets.count,
+                isSelecting: self.viewModel.isSelectionMode
+            )
         }
         
         viewModel.onSelectionLimitReached = { [weak self] in
