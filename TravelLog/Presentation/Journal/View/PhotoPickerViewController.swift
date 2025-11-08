@@ -9,7 +9,14 @@ import UIKit
 import SnapKit
 import PhotosUI
 
+protocol PhotoPickerViewControllerDelegate: AnyObject{
+    func photoPicker(_ picker: PhotoPickerViewController, didFinishPicking images: [UIImage])
+    func photoPickerDidCancel(_ picker: PhotoPickerViewController)
+}
+
 final class PhotoPickerViewController: UIViewController {
+    
+    weak var delegate: PhotoPickerViewControllerDelegate?
     
     private enum PanMode{
         case none, selecting, scrolling
@@ -110,7 +117,7 @@ final class PhotoPickerViewController: UIViewController {
         navigationItem.titleView = photoTitleView
         view.backgroundColor = .systemBackground
         navigationItem.leftBarButtonItem = dismissButton
-//        navigationItem.rightBarButtonItem = selectButton
+        //        navigationItem.rightBarButtonItem = selectButton
         navigationItem
             .setRightBarButtonItems([checkButton, selectButton], animated: true)
         collectionView.delegate = self
@@ -133,7 +140,7 @@ final class PhotoPickerViewController: UIViewController {
             self.navigationItem.leftBarButtonItem = self.dismissButton
             self.checkButton.isHidden = !isSelecting
             
-
+            
             self.photoTitleView.updateSelectedPhotoCount(
                 self.viewModel.selectedAssets.count,
                 isSelecting: isSelecting)
@@ -169,14 +176,14 @@ final class PhotoPickerViewController: UIViewController {
             }
         }
         
-//        viewModel.onSelectAllToggled = { [weak self] isAllSelected in
-//            guard let self else { return }
-//            for indexPath in collectionView.indexPathsForVisibleItems {
-//                guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell else { continue }
-//                let asset = viewModel.asset(at: indexPath)
-//                cell.updateSelectionState(viewModel.isSelected(asset.localIdentifier))
-//            }
-//        }
+        //        viewModel.onSelectAllToggled = { [weak self] isAllSelected in
+        //            guard let self else { return }
+        //            for indexPath in collectionView.indexPathsForVisibleItems {
+        //                guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell else { continue }
+        //                let asset = viewModel.asset(at: indexPath)
+        //                cell.updateSelectionState(viewModel.isSelected(asset.localIdentifier))
+        //            }
+        //        }
         
         viewModel.onPermissionDenied = { [weak self] in
             let alert = UIAlertController(title: "권한 필요",
@@ -217,8 +224,69 @@ final class PhotoPickerViewController: UIViewController {
     }
     
     @objc
-    private func didTapCheck(){
-        dismiss(animated: true)
+    private func didTapCheck() {
+        let identifiers = Array(viewModel.selectionOrder) // 순서 보존용 배열
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
+        var assets: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in
+            assets.append(asset)
+        }
+
+        // identifiers 순서대로 정렬
+        let sortedAssets = identifiers.compactMap { id in
+            assets.first(where: { $0.localIdentifier == id })
+        }
+
+        Task {
+            let manager = PHCachingImageManager.default()
+            let options = PHImageRequestOptions()
+            options.isSynchronous = false
+            options.deliveryMode = .highQualityFormat
+            options.resizeMode = .exact
+            options.isNetworkAccessAllowed = true // iCloud 이미지 자동 다운로드 허용
+
+            let targetSize = CGSize(width: 1200, height: 1200)
+
+            // PHAsset → UIImage 비동기 변환
+            let images: [UIImage] = await withTaskGroup(of: UIImage?.self) { group in
+                for asset in sortedAssets {
+                    group.addTask {
+                        await self.requestImageAsync(manager: manager, asset: asset, targetSize: targetSize, options: options)
+                    }
+                }
+
+                var results: [UIImage] = []
+                for await image in group {
+                    if let image = image {
+                        results.append(image)
+                    }
+                }
+                return results
+            }
+
+            await MainActor.run {
+                delegate?.photoPicker(self, didFinishPicking: images)
+                dismiss(animated: true)
+            }
+        }
+    }
+    
+    private func requestImageAsync(
+        manager: PHImageManager,
+        asset: PHAsset,
+        targetSize: CGSize,
+        options: PHImageRequestOptions
+    ) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            manager.requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: .aspectFit,
+                options: options
+            ) { image, _ in
+                continuation.resume(returning: image)
+            }
+        }
     }
     
     @objc
@@ -228,11 +296,11 @@ final class PhotoPickerViewController: UIViewController {
     
     @objc
     private func didTapLeftBarButton(){
-//        if viewModel.isSelectionMode{
-//            viewModel.toggleSelectAll()
-//        }else{
-            dismiss(animated: true)
-//        }
+        //        if viewModel.isSelectionMode{
+        //            viewModel.toggleSelectAll()
+        //        }else{
+        dismiss(animated: true)
+        //        }
     }
     
     @objc

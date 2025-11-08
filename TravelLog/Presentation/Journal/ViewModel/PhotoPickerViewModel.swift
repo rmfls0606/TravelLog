@@ -20,6 +20,7 @@ final class PhotoPickerViewModel{
     private var fetchResult: PHFetchResult<PHAsset>? //전체 PHAsset 목록
     private(set) var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
     private(set) var selectedAssets: Set<String> = [] //선택된 Asset Identifier 집합
+    private(set) var selectionOrder: [String] = []
     private var pageSize = 300 //한 번에 불러올 개수
     private var isFetching = false
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
@@ -274,12 +275,14 @@ final class PhotoPickerViewModel{
     func toggleSelection(for identifier : String){
         if selectedAssets.contains(identifier){
             selectedAssets.remove(identifier)
+            selectionOrder.removeAll{ $0 == identifier}
         }else{
             guard selectedAssets.count < maxSelectableCount else{
                 onSelectionLimitReached?() //초과 시 콜백 호출
                 return
             }
             selectedAssets.insert(identifier)
+            selectionOrder.append(identifier)
         }
 //        isAllSelected = (selectedAssets.count == loadedAssets.count)
         onSelectionUpdated?([identifier: selectedAssets.contains(identifier)])
@@ -353,12 +356,14 @@ final class PhotoPickerViewModel{
             if isRemovingMode {
                 if isSelected(id) {
                     selectedAssets.remove(id)
+                    selectionOrder.removeAll { $0 == id }
                     changed[id] = false
                 }
             } else {
                 if !isSelected(id) {
                     if selectedAssets.count < maxSelectableCount{
                         selectedAssets.insert(id)
+                        selectionOrder.append(id)
                         changed[id] = true
                     }else{
                         //초과 시 즉시 콜백 & 복원 처리
