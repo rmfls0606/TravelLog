@@ -67,6 +67,12 @@ final class PhotoPickerViewController: UIViewController {
         return button
     }()
     
+    private lazy var checkButton: UIBarButtonItem = {
+        let button = UIBarButtonItem(title: "확인", style: .plain, target: self, action: #selector(didTapCheck))
+        button.isHidden = true
+        return button
+    }()
+    
     private let photoTitleView = PhotoNavigationTitleView()
     
     private var dataSource: UICollectionViewDiffableDataSource<Int, PHAsset>!
@@ -104,7 +110,9 @@ final class PhotoPickerViewController: UIViewController {
         navigationItem.titleView = photoTitleView
         view.backgroundColor = .systemBackground
         navigationItem.leftBarButtonItem = dismissButton
-        navigationItem.rightBarButtonItem = selectButton
+//        navigationItem.rightBarButtonItem = selectButton
+        navigationItem
+            .setRightBarButtonItems([checkButton, selectButton], animated: true)
         collectionView.delegate = self
         collectionView.dataSource = self
         
@@ -123,6 +131,8 @@ final class PhotoPickerViewController: UIViewController {
             //                self.navigationItem.leftBarButtonItem = self.allSelectButton
             //            }else{
             self.navigationItem.leftBarButtonItem = self.dismissButton
+            self.checkButton.isHidden = !isSelecting
+            
 
             self.photoTitleView.updateSelectedPhotoCount(
                 self.viewModel.selectedAssets.count,
@@ -204,6 +214,11 @@ final class PhotoPickerViewController: UIViewController {
     @objc
     private func didTapSelect(){
         viewModel.toggleSelectionMode()
+    }
+    
+    @objc
+    private func didTapCheck(){
+        dismiss(animated: true)
     }
     
     @objc
