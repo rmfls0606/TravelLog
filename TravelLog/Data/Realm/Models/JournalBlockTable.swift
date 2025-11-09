@@ -52,6 +52,7 @@ final class JournalBlockTable: Object {
     // Content
     @Persisted var text: String?
     @Persisted var imageURLs: List<String>
+    @Persisted var photoDescription: String?
     @Persisted var latitude: Double?
     @Persisted var longitude: Double?
     @Persisted var placeName: String?
@@ -75,6 +76,7 @@ final class JournalBlockTable: Object {
         order: Int,
         text: String? = nil,
         imageURLs: [String] = [],
+        photoDescription: String? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil,
         placeName: String? = nil,
@@ -93,6 +95,7 @@ final class JournalBlockTable: Object {
         self.order = order
         self.text = text
         self.imageURLs.append(objectsIn: imageURLs)
+        self.photoDescription = photoDescription
         self.latitude = latitude
         self.longitude = longitude
         self.placeName = placeName
