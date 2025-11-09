@@ -42,9 +42,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     private func migration(){
         
-        let config = Realm.Configuration(schemaVersion: 1) { migration, oldSchemaVersion in
+        let config = Realm.Configuration(schemaVersion: 2) { migration, oldSchemaVersion in
             //JournalBlockTable에 링크 미리보기를 위한 linkTitle, linkDescription, linkImagePath 컬럼 추가
             if oldSchemaVersion < 1 {}
+            if oldSchemaVersion > 2 {}
         }
         
         Realm.Configuration.defaultConfiguration = config
