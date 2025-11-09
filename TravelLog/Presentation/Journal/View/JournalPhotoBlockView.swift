@@ -18,6 +18,9 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
     private let typeLabel = UILabel()
     private let timeLabel = UILabel()
     private let removeButton = UIButton(type: .system)
+    
+    private let photoContainer = UIStackView()
+    
     private let dashBox: UIView = {
         let view = UIView()
         view.layer.cornerRadius = 12
@@ -41,6 +44,22 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
         btn.configuration = config
         return btn
     }()
+    
+    private let photoScrollView: UIScrollView = {
+        let view = UIScrollView()
+        view.showsHorizontalScrollIndicator = false
+        view.isHidden = true
+        return view
+    }()
+    
+    private let photoStackView: UIStackView = {
+        let view = UIStackView()
+        view.axis = .horizontal
+        view.alignment = .center
+        view.spacing = 8
+        return view
+    }()
+    
     private let textContainer = UIView()
     let textView = UITextView()
     private let placeholderLabel = UILabel()
@@ -49,12 +68,20 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
     let disposeBag = DisposeBag()
     let textChanged = PublishRelay<String>()
     let removeTapped = PublishRelay<Void>()
+    let cameraTapped = PublishRelay<Void>()
+    
+    private var selectedImages: [UIImage] = [] //현재 보여줄 이미지들
     
     private var lastSentText: String = ""  // 중복 방지용 캐시
     
     override func layoutSubviews() {
         super.layoutSubviews()
+        
+        dashBox.layoutIfNeeded()
+        dashBox.layer.sublayers?.removeAll(where: { $0.name == "dashedBorder" })
+        
         let layer = CAShapeLayer()
+        layer.name = "dashedBorder"
         let strokeColor = UIColor(red: 120/255, green: 130/255, blue: 255/255, alpha: 0.7)
         layer.strokeColor = strokeColor.cgColor
         layer.fillColor = nil
@@ -63,8 +90,6 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
         layer.path = UIBezierPath(roundedRect: dashBox.bounds, cornerRadius: 12).cgPath
         dashBox.layer.addSublayer(layer)
     }
-    
-    let cameraTapped = PublishRelay<Void>()
     
     // MARK: - Init
     override init(frame: CGRect) {
@@ -81,10 +106,16 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
     // MARK: - Setup
     private func setupView() {
         addSubview(headerStack)
-        addSubview(dashBox)
+        addSubview(photoContainer)
         addSubview(textContainer)
         
+        photoContainer.axis = .vertical
+        photoContainer.spacing = 12
+        photoContainer.addArrangedSubview(dashBox)
+        photoContainer.addArrangedSubview(photoScrollView)
+        
         dashBox.addSubview(cameraSelectButton)
+        photoScrollView.addSubview(photoStackView)
         
         textContainer.addSubview(textView)
         textContainer.addSubview(placeholderLabel)
@@ -99,6 +130,10 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
         headerStack.alignment = .center
         headerStack.spacing = 6
         
+        photoScrollView.showsHorizontalScrollIndicator = false
+        photoStackView.axis = .horizontal
+        photoStackView.spacing = 8
+        
         textView.delegate = self
     }
     
@@ -108,26 +143,26 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
             $0.leading.trailing.equalToSuperview().inset(16)
         }
         
-        dashBox.snp.makeConstraints { make in
-            make.top.equalTo(headerStack.snp.bottom).offset(16)
-            make.leading.trailing.equalToSuperview().inset(16)
-            make.height.equalTo(120)
+        photoContainer.snp.makeConstraints {
+            $0.top.equalTo(headerStack.snp.bottom).offset(16)
+            $0.leading.trailing.equalToSuperview().inset(16)
         }
         
-        cameraSelectButton.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+        dashBox.snp.makeConstraints { $0.height.equalTo(120) }
+        cameraSelectButton.snp.makeConstraints { $0.edges.equalToSuperview() }
+        
+        photoScrollView.snp.makeConstraints { $0.height.equalTo(120) }
+        photoStackView.snp.makeConstraints {
+            $0.edges.equalToSuperview()
+            $0.height.equalToSuperview()
         }
         
         textContainer.snp.makeConstraints {
-            $0.top.equalTo(dashBox.snp.bottom).offset(10)
+            $0.top.equalTo(photoContainer.snp.bottom).offset(10)
             $0.leading.trailing.bottom.equalToSuperview().inset(16)
             $0.height.greaterThanOrEqualTo(80)
         }
-        
-        textView.snp.makeConstraints {
-            $0.edges.equalToSuperview().inset(12)
-        }
-        
+        textView.snp.makeConstraints { $0.edges.equalToSuperview().inset(12) }
         placeholderLabel.snp.makeConstraints {
             $0.top.equalTo(textView).offset(6)
             $0.leading.equalTo(textView).offset(8)
@@ -197,6 +232,71 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
         removeButton.rx.tap
             .bind(to: removeTapped)
             .disposed(by: disposeBag)
+    }
+    
+    func updateSelectedPhotos(_ images: [UIImage]) {
+        self.selectedImages = images
+        if images.isEmpty{
+            showPlaceholder(true)
+        }else{
+            showPlaceholder(false)
+            reloadPhotoStack()
+        }
+    }
+    
+    private func showPlaceholder(_ show: Bool){
+        dashBox.isHidden = !show
+        photoScrollView.isHidden = show
+    }
+    
+    private func reloadPhotoStack(){
+        // 기존 썸네일 제거
+        photoStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        // 1) 항상 첫 번째는 +버튼
+        let addButton = makeAddThumbButton()
+        photoStackView.addArrangedSubview(addButton)
+        addButton.snp.makeConstraints { make in
+            make.width.height.equalTo(120)
+        }
+        
+        // 2) 그 다음부터는 썸네일
+        for image in selectedImages {
+            let imageView = UIImageView(image: image)
+            imageView.contentMode = .scaleAspectFill
+            imageView.clipsToBounds = true
+            imageView.layer.cornerRadius = 10
+            imageView.snp.makeConstraints { make in
+                make.width.height.equalTo(120)
+            }
+            photoStackView.addArrangedSubview(imageView)
+        }
+    }
+    
+    private func makeAddThumbButton() -> UIButton {
+        var config = UIButton.Configuration.filled()
+        config.baseBackgroundColor = UIColor.systemGray6
+        config.baseForegroundColor = .label
+        let imageConfig = UIImage.SymbolConfiguration(scale: .small)
+        config.preferredSymbolConfigurationForImage = imageConfig
+        config.image = UIImage(systemName: "camera")
+        config.imagePlacement = .top
+        config.imagePadding = 4
+        config.titlePadding = 4
+        config.attributedTitle = AttributedString("사진으로 담기", attributes: AttributeContainer([
+            .font: UIFont.systemFont(ofSize: 12),
+            .foregroundColor: UIColor.label
+        ]))
+        
+        let btn = UIButton(type: .system)
+        btn.layer.cornerRadius = 10
+        btn.layer.borderWidth = 1
+        btn.layer.borderColor = UIColor.systemGray4.cgColor
+        btn.addAction(UIAction(handler: { [weak self] _ in
+            self?.cameraTapped.accept(())
+        }), for: .touchUpInside)
+        btn.configuration = config
+        return btn
     }
     
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {

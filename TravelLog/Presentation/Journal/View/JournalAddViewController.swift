@@ -12,6 +12,8 @@ import SnapKit
 
 final class JournalAddViewController: BaseViewController {
     
+    private weak var activePhotoBlock: JournalPhotoBlockView?
+    
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
     
@@ -349,7 +351,9 @@ final class JournalAddViewController: BaseViewController {
         
         card.cameraTapped
             .bind(with: self) { owner, _ in
+                owner.activePhotoBlock = card
                 let pickerVC = PhotoPickerViewController()
+                pickerVC.delegate = owner
                 let nav = UINavigationController(rootViewController: pickerVC)
                 nav.modalPresentationStyle = .fullScreen
                 owner.present(nav, animated: true)
@@ -371,5 +375,19 @@ final class JournalAddViewController: BaseViewController {
                 }
             }
             .disposed(by: card.disposeBag)
+    }
+}
+
+extension JournalAddViewController: PhotoPickerViewControllerDelegate{
+    func photoPicker(
+        _ picker: PhotoPickerViewController,
+        didFinishPicking images: [UIImage]
+    ) {
+        activePhotoBlock?.updateSelectedPhotos(images)
+        activePhotoBlock = nil
+    }
+    
+    func photoPickerDidCancel(_ picker: PhotoPickerViewController) {
+        activePhotoBlock = nil
     }
 }
