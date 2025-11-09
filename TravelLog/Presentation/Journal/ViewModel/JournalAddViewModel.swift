@@ -33,6 +33,10 @@ final class JournalAddViewModel: BaseViewModel {
         var linkTitle: String? = nil
         var linkDescription: String? = nil
         var linkImage: UIImage? = nil
+        
+        //사진 확장 필드
+        var photoDescription: String? = nil
+        var photoImages: [UIImage]? = nil
     }
     
     // MARK: - Properties
@@ -54,7 +58,17 @@ final class JournalAddViewModel: BaseViewModel {
                 guard let self else { return .empty() }
                 
                 let validBlocks = blocks.filter {
-                    !($0.text?.isEmpty ?? true) || !($0.linkURL?.isEmpty ?? true)
+                    switch $0.type {
+                    case .text:
+                        return !($0.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                    case .link:
+                        return !($0.linkURL?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                    case .photo:
+                        return !($0.photoImages?.isEmpty ?? true) ||
+                               !($0.photoDescription?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                    default:
+                        return false
+                    }
                 }
                 guard !validBlocks.isEmpty else { return .empty() }
                 
@@ -86,6 +100,8 @@ final class JournalAddViewModel: BaseViewModel {
                                 linkTitle: $0.linkTitle,
                                 linkDescription: $0.linkDescription,
                                 linkImage: $0.linkImage,
+                                photoDescription: $0.photoDescription,
+                                photoImages: $0.photoImages,
                                 date: self.selectedDate
                             )
                         }

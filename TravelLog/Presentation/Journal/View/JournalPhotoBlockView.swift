@@ -70,7 +70,7 @@ final class JournalPhotoBlockView: BaseView, UITextViewDelegate {
     let removeTapped = PublishRelay<Void>()
     let cameraTapped = PublishRelay<Void>()
     
-    private var selectedImages: [UIImage] = [] //현재 보여줄 이미지들
+    private(set) var selectedImages: [UIImage] = [] //현재 보여줄 이미지들
     
     private var lastSentText: String = ""  // 중복 방지용 캐시
     

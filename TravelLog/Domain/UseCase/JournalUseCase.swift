@@ -20,6 +20,8 @@ protocol JournalUseCaseType {
         linkTitle: String?,
         linkDescription: String?,
         linkImage: UIImage?,
+        photoDescription: String?,
+        photoImages: [UIImage]?,
         date: Date
     ) -> Completable
     func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable
@@ -45,6 +47,8 @@ final class JournalUseCase: JournalUseCaseType {
         linkTitle: String?,
         linkDescription: String?,
         linkImage: UIImage?,
+        photoDescription: String?,
+        photoImages: [UIImage]?,
         date: Date
     ) -> Completable {
         return Completable.create { [weak self] completable in
@@ -74,7 +78,9 @@ final class JournalUseCase: JournalUseCaseType {
                         linkURL: linkURL,
                         linkTitle: linkTitle,
                         linkDescription: linkDescription,
-                        linkImage: linkImage
+                        linkImage: linkImage,
+                        photoDescription: photoDescription,
+                        photoImages: photoImages
                     )
                     .subscribe(completable)
                     .disposed(by: DisposeBag())
@@ -89,7 +95,9 @@ final class JournalUseCase: JournalUseCaseType {
                                 linkURL: linkURL,
                                 linkTitle: linkTitle,
                                 linkDescription: linkDescription,
-                                linkImage: linkImage
+                                linkImage: linkImage,
+                                photoDescription: photoDescription,
+                                photoImages: photoImages
                             )
                         }
                         .subscribe(completable)

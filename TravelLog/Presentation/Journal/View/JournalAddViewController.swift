@@ -264,6 +264,17 @@ final class JournalAddViewController: BaseViewController {
                         return JournalAddViewModel.JournalBlockData(type: .text, text: content, linkURL: nil)
                     } else if let linkBlock = $0 as? JournalLinkBlockView, let content = linkBlock.textContent, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         return JournalAddViewModel.JournalBlockData(type: .link, text: nil, linkURL: content)
+                    }else if let photoBlock = $0 as? JournalPhotoBlockView,
+                             !photoBlock.selectedImages.isEmpty ||
+                                !photoBlock.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        // 사진 블록
+                        return JournalAddViewModel.JournalBlockData(
+                            type: .photo,
+                            text: nil,
+                            linkURL: nil,
+                            photoDescription: photoBlock.textContent,
+                            photoImages: photoBlock.selectedImages
+                        )
                     }
                     return nil
                 }
