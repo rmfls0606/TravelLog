@@ -13,21 +13,21 @@ import RealmSwift
 import SafariServices
 
 final class JournalTimelineViewController: BaseViewController {
-
+    
     // MARK: - UI
     private let scrollView = UIScrollView()
     private let contentView = UIView()
-
+    
     private let headerContainer = UIView()
     private let tripImageView = UIImageView()
     private let cityLabel = UILabel()
     private let countryLabel = UILabel()
-
+    
     private let addMemoryContainerView = UIView()
     private let addMemoryView = CustomEmptyView()
-
+    
     private let tableView = UITableView(frame: .zero, style: .grouped)
-
+    
     // MARK: - Properties
     private let viewModel: JournalTimelineViewModel
     private let disposeBag = DisposeBag()
@@ -35,7 +35,7 @@ final class JournalTimelineViewController: BaseViewController {
     private var groupedData: [(date: Date, blocks: [JournalBlockTable])] = []
     private var trip: TravelTable?
     private let deleteTappedSubject = PublishSubject<(ObjectId, ObjectId)>()
-
+    
     // MARK: - Init
     init(tripId: ObjectId) {
         self.viewModel = JournalTimelineViewModel(tripId: tripId)
@@ -43,7 +43,7 @@ final class JournalTimelineViewController: BaseViewController {
         fetchTrip(tripId)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
+    
     // MARK: - Lifecycle
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -55,7 +55,7 @@ final class JournalTimelineViewController: BaseViewController {
         )
         updateTableViewHeight()
     }
-
+    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if let tripId = trip?.id {
@@ -65,12 +65,12 @@ final class JournalTimelineViewController: BaseViewController {
             AppLifecycleManager.shared.refreshExpiredLinkMetadataIfNeeded(for: tripId)
         }
     }
-
+    
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         NetworkMonitor.shared.stopMonitoring()
     }
-
+    
     
     // MARK: - Setup
     private func fetchTrip(_ tripId: ObjectId) {
@@ -81,55 +81,55 @@ final class JournalTimelineViewController: BaseViewController {
             title = "여행 기록"
         }
     }
-
+    
     override func configureHierarchy() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-
+        
         contentView.addSubviews(headerContainer, addMemoryContainerView, tableView)
         headerContainer.addSubviews(tripImageView, cityLabel, countryLabel)
         addMemoryContainerView.addSubview(addMemoryView)
     }
-
+    
     override func configureLayout() {
         scrollView.snp.makeConstraints { make in
             make.edges.equalTo(view.safeAreaLayoutGuide)
         }
-
+        
         contentView.snp.makeConstraints { make in
             make.edges.equalTo(scrollView.contentLayoutGuide)
             make.width.equalTo(scrollView.frameLayoutGuide)
         }
-
+        
         headerContainer.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(16)
             make.horizontalEdges.equalToSuperview().inset(16)
             make.height.equalTo(headerContainer.snp.width).multipliedBy(0.4)
         }
-
+        
         tripImageView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-
+        
         cityLabel.snp.makeConstraints { make in
             make.leading.trailing.equalToSuperview().inset(16)
             make.bottom.equalTo(countryLabel.snp.top).offset(-4)
         }
-
+        
         countryLabel.snp.makeConstraints { make in
             make.leading.trailing.equalToSuperview().inset(16)
             make.bottom.equalToSuperview().inset(16)
         }
-
+        
         addMemoryContainerView.snp.makeConstraints { make in
             make.top.equalTo(headerContainer.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview().inset(16)
         }
-
+        
         addMemoryView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-
+        
         // ✅ 수정된 핵심: tableView 높이 고정 제거, contentView bottom에 연결
         tableView.snp.makeConstraints { make in
             make.top.equalTo(addMemoryContainerView.snp.bottom).offset(16)
@@ -137,30 +137,30 @@ final class JournalTimelineViewController: BaseViewController {
             make.bottom.equalToSuperview() // scrollView contentView bottom에 연결
         }
     }
-
+    
     override func configureView() {
         view.backgroundColor = .systemGroupedBackground
-
+        
         headerContainer.clipsToBounds = true
         headerContainer.layer.cornerRadius = 12
         headerContainer.backgroundColor = UIColor.black.withAlphaComponent(0.08)
-
+        
         tripImageView.contentMode = .scaleAspectFill
         tripImageView.clipsToBounds = true
         tripImageView.image = .seoul
-
+        
         cityLabel.font = .boldSystemFont(ofSize: 20)
         cityLabel.textColor = .white
         countryLabel.font = .systemFont(ofSize: 14, weight: .medium)
         countryLabel.textColor = .white.withAlphaComponent(0.9)
-
+        
         if let trip = trip {
             cityLabel.text = trip.destination?.name ?? "-"
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy.MM.dd"
             countryLabel.text = "\(formatter.string(from: trip.startDate)) - \(formatter.string(from: trip.endDate))"
         }
-
+        
         addMemoryView.configure(
             icon: UIImage(systemName: "plus"),
             iconTint: .white,
@@ -171,7 +171,7 @@ final class JournalTimelineViewController: BaseViewController {
             buttonImage: UIImage(systemName: "rectangle.and.pencil.and.ellipsis"),
             buttonGradient: .bluePurple
         )
-
+        
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
         tableView.isScrollEnabled = false
@@ -186,31 +186,31 @@ final class JournalTimelineViewController: BaseViewController {
         tableView.register(JournalAddFooterView.self, forHeaderFooterViewReuseIdentifier: JournalAddFooterView.identifier)
         tableView.dataSource = self
         tableView.delegate = self
-
+        
         navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .add)
     }
-
+    
     override func configureBind() {
         let input = JournalTimelineViewModel.Input(
             viewWillAppear: rx.methodInvoked(#selector(UIViewController.viewWillAppear(_:))).map { _ in () },
             addTapped: addMemoryView.actionButton.rx.tap.asObservable(),
             deleteTapped: deleteTappedSubject.asObservable()
         )
-
+        
         let output = viewModel.transform(input: input)
-
+        
         output.journals
             .drive(with: self) { owner, journals in
                 owner.updateGroupedData(from: journals)
-
+                
                 DispatchQueue.main.async {
                     let hasData = !journals.isEmpty
-
+                    
                     owner.addMemoryContainerView.isHidden = hasData
                     owner.tableView.isHidden = !hasData
                     owner.tableView.reloadData()
                     owner.tableView.layoutIfNeeded()
-
+                    
                     // 데이터 있을 때는 tableView를 headerContainer 바로 아래로 붙이기
                     owner.tableView.snp.remakeConstraints { make in
                         if hasData {
@@ -222,7 +222,7 @@ final class JournalTimelineViewController: BaseViewController {
                         make.bottom.equalToSuperview()
                         make.height.equalTo(owner.tableView.contentSize.height)
                     }
-
+                    
                     owner.addMemoryContainerView.alpha = hasData ? 0 : 1
                     owner.tableView.alpha = hasData ? 1 : 0
                     owner.view.layoutIfNeeded()
@@ -230,7 +230,7 @@ final class JournalTimelineViewController: BaseViewController {
                 }
             }
             .disposed(by: disposeBag)
-
+        
         output.navigateToAdd
             .bind(with: self) { owner, tripId in
                 let addVM = JournalAddViewModel(tripId: tripId, date: Date())
@@ -239,7 +239,7 @@ final class JournalTimelineViewController: BaseViewController {
                 owner.navigationController?.pushViewController(addVC, animated: true)
             }
             .disposed(by: disposeBag)
-
+        
         navigationItem.rightBarButtonItem?.rx.tap
             .bind(with: self) { owner, _ in
                 guard let trip = owner.trip else { return }
@@ -249,7 +249,7 @@ final class JournalTimelineViewController: BaseViewController {
                 owner.navigationController?.pushViewController(addVC, animated: true)
             }
             .disposed(by: disposeBag)
-
+        
         output.deleteCompleted
             .observe(on: MainScheduler.instance)
             .subscribe(with: self) { owner, _ in
@@ -257,7 +257,7 @@ final class JournalTimelineViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
     }
-
+    
     // MARK: - Update Height
     private func updateTableViewHeight() {
         DispatchQueue.main.async { [weak self] in
@@ -270,7 +270,7 @@ final class JournalTimelineViewController: BaseViewController {
             self.contentView.layoutIfNeeded()
         }
     }
-
+    
     // MARK: - Grouping
     private func updateGroupedData(from journals: [JournalTable]) {
         let blocks = journals.flatMap { $0.blocks }
@@ -283,13 +283,13 @@ final class JournalTimelineViewController: BaseViewController {
 
 // MARK: - UITableViewDataSource & Delegate
 extension JournalTimelineViewController: UITableViewDataSource, UITableViewDelegate {
-
+    
     func numberOfSections(in tableView: UITableView) -> Int { groupedData.count }
-
+    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         groupedData[section].blocks.count
     }
-
+    
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         let header = tableView.dequeueReusableHeaderFooterView(
             withIdentifier: JournalDateHeaderView.identifier
@@ -297,33 +297,33 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
         header?.configure(date: groupedData[section].date)
         return header
     }
-
+    
     func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
         guard let footer = tableView.dequeueReusableHeaderFooterView(
             withIdentifier: JournalAddFooterView.identifier
         ) as? JournalAddFooterView else { return nil }
-
+        
         footer.tapGesture.rx.event
             .throttle(.milliseconds(400), scheduler: MainScheduler.instance)
             .bind(with: self) { owner, _ in
                 guard let trip = owner.trip else { return }
                 let date = owner.groupedData[section].date
-
+                
                 let addVM = JournalAddViewModel(tripId: trip.id, date: date)
                 let addVC = JournalAddViewController(viewModel: addVM)
                 addVC.hidesBottomBarWhenPushed = true
                 owner.navigationController?.pushViewController(addVC, animated: true)
             }
             .disposed(by: footer.disposeBag)
-
+        
         return footer
     }
-
+    
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat { 84 }
-
+    
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let block = groupedData[indexPath.section].blocks[indexPath.row]
-
+        
         switch block.type {
         case .text:
             guard let cell = tableView.dequeueReusableCell(
@@ -334,12 +334,34 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             }
             cell.configure(with: block)
             return cell
-
+            
         case .link:
             let cell = tableView.dequeueReusableCell(withIdentifier: JournalLinkCell.identifier, for: indexPath) as! JournalLinkCell
             cell.configure(with: block)
+            
+            // 링크 탭 → 항상 SafariVC 시도 (형식 불량이어도 최대한 열기)
+            cell.linkTapped
+                .bind(with: self) { owner, urlString in
+                    var openURL: URL?
+                    
+                    if let normalized = URLNormalizer.normalized(urlString) {
+                        openURL = normalized.url
+                    } else if let fallback = URL(string: "https://\(urlString)") {
+                        openURL = fallback
+                    } else {
+                        openURL = URL(string: urlString)
+                    }
+                    
+                    guard let finalURL = openURL else { return }
+                    
+                    let vc = SFSafariViewController(url: finalURL)
+                    vc.preferredControlTintColor = .systemGreen
+                    owner.present(vc, animated: true)
+                }
+                .disposed(by: cell.reuseBag)
+            
             return cell
-
+            
         case .photo:
             let cell = tableView.dequeueReusableCell(withIdentifier: JournalPhotoCell.identifier, for: indexPath) as! JournalPhotoCell
             cell.configure(with: block)
@@ -352,12 +374,12 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
                 self.updateTableViewHeight()
             }
             return cell
-
+            
         default:
             return UITableViewCell()
         }
     }
-
+    
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
         let isFirst = (indexPath.section == 0 && indexPath.row == 0)
         if let textCell = cell as? JournalTextCell {
@@ -374,17 +396,17 @@ extension JournalTimelineViewController {
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath)
     -> UISwipeActionsConfiguration? {
-
+        
         let deleteAction = UIContextualAction(style: .destructive, title: "삭제") { [weak self] _, _, completion in
             guard let self else { return }
             let block = self.groupedData[indexPath.section].blocks[indexPath.row]
             guard let journal = block.journal.first else { return }
-
+            
             // ViewModel에 삭제 요청 전달
             self.deleteTappedSubject.onNext((journal.id, block.id))
             completion(true)
         }
-
+        
         deleteAction.backgroundColor = .systemRed
         return UISwipeActionsConfiguration(actions: [deleteAction])
     }
