@@ -373,6 +373,14 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
                 }
                 self.updateTableViewHeight()
             }
+            
+            cell.onPhotoTap = { [weak self] images, startIndex in
+                    guard let self else { return }
+                    let pager = PhotoPageLocalViewController(images: images, currentIndex: startIndex)
+                    pager.modalPresentationStyle = .fullScreen
+                    self.present(pager, animated: true)
+                }
+            
             return cell
             
         default:
