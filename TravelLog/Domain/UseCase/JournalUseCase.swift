@@ -114,9 +114,20 @@ final class JournalUseCase: JournalUseCaseType {
         return Completable.create { completable in
             do {
                 let realm = try Realm()
+                let fileManager = FileManager.default
+                let docURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
                 guard let journal = realm.object(ofType: JournalTable.self, forPrimaryKey: journalId),
                       let block = realm.object(ofType: JournalBlockTable.self, forPrimaryKey: blockId) else {
                     throw NSError(domain: "NotFound", code: 404)
+                }
+
+                
+                //여러 장 사진 삭제 (imageURLs)
+                for filename in block.imageURLs {
+                    let fileURL = docURL.appendingPathComponent("\(filename).jpg")
+                    if fileManager.fileExists(atPath: fileURL.path) {
+                        try? fileManager.removeItem(at: fileURL)
+                    }
                 }
                 
                 if let filename = block.linkImagePath {

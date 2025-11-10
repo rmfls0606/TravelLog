@@ -113,6 +113,15 @@ final class TripRealmDataSource{
                         
                         //블록 이미지 파일 삭제
                         for block in blocks {
+                            
+                            //여러 장 사진 삭제
+                            for filename in block.imageURLs{
+                                let fileURL = docURL.appendingPathComponent("\(filename).jpg")
+                                if fileManager.fileExists(atPath: fileURL.path){
+                                    try? fileManager.removeItem(at: fileURL)
+                                }
+                            }
+                            
                             if let filename = block.linkImagePath {
                                 let fileURL = docURL.appendingPathComponent("\(filename).jpg")
                                 if fileManager.fileExists(atPath: fileURL.path) {
