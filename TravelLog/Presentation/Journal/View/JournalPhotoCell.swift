@@ -24,7 +24,6 @@ final class JournalPhotoCell: UITableViewCell {
     private let collectionView: UICollectionView
     private var collectionHeightConstraint: Constraint?
 
-    // footerStack (버튼 + 설명)
     private let footerStack = UIStackView()
     private let moreButton = UIButton(type: .system)
     private let descriptionLabel = UILabel()
@@ -32,7 +31,9 @@ final class JournalPhotoCell: UITableViewCell {
     private var images: [UIImage] = []
     private var isExpanded = false
     private let maxPreviewCount = 3
+
     var onHeightChange: (() -> Void)?
+    var onPhotoTap: (([UIImage], Int) -> Void)?
 
     // MARK: - Init
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -48,6 +49,7 @@ final class JournalPhotoCell: UITableViewCell {
         setupViews()
         setupLayout()
         setupAppearance()
+        setupTapGesture() // 제스처 추가
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -59,6 +61,7 @@ final class JournalPhotoCell: UITableViewCell {
         descriptionLabel.text = nil
         descriptionLabel.isHidden = false
         moreButton.isHidden = true
+        onPhotoTap = nil
     }
 
     // MARK: - Public
@@ -66,7 +69,6 @@ final class JournalPhotoCell: UITableViewCell {
         timeLabel.text = formatKoreanTime(block.createdAt)
         locationLabel.text = block.placeName ?? "위치 없음"
 
-        // 설명 존재 여부
         if let desc = block.photoDescription,
            !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             descriptionLabel.isHidden = false
@@ -76,13 +78,11 @@ final class JournalPhotoCell: UITableViewCell {
             descriptionLabel.text = nil
         }
 
-        // 이미지 로드
         let filenames = Array(block.imageURLs)
         images = filenames.compactMap { LinkMetadataRepositoryImpl.loadImageFromDocuments(filename: $0) }
 
         moreButton.isHidden = images.count <= maxPreviewCount
         updateMoreButtonTitle()
-
         contentView.layoutIfNeeded()
         updateCollectionHeight()
         collectionView.reloadData()
@@ -96,6 +96,7 @@ final class JournalPhotoCell: UITableViewCell {
 
 // MARK: - Setup
 private extension JournalPhotoCell {
+
     func setupViews() {
         timelineLine.backgroundColor = .systemGray5
         dotView.backgroundColor = .systemPink
@@ -111,7 +112,7 @@ private extension JournalPhotoCell {
 
         footerStack.axis = .vertical
         footerStack.spacing = 8
-        footerStack.alignment = .leading    // 왼쪽 정렬
+        footerStack.alignment = .leading
         footerStack.addArrangedSubview(moreButton)
         footerStack.addArrangedSubview(descriptionLabel)
         cardView.addSubview(footerStack)
@@ -120,6 +121,7 @@ private extension JournalPhotoCell {
 
         collectionView.backgroundColor = .clear
         collectionView.isScrollEnabled = false
+        collectionView.allowsSelection = true
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.register(PhotoItemCell.self,
@@ -146,7 +148,6 @@ private extension JournalPhotoCell {
             $0.leading.equalTo(timelineLine.snp.trailing).offset(16)
             $0.trailing.equalToSuperview().inset(16)
             $0.top.equalToSuperview().inset(16)
-            // bottom 제약은 낮은 priority로 설정
             $0.bottom.equalToSuperview().inset(8).priority(.low)
         }
 
@@ -174,6 +175,11 @@ private extension JournalPhotoCell {
             $0.leading.trailing.equalToSuperview().inset(16)
             $0.bottom.equalToSuperview().inset(16)
         }
+
+        // 사진 영역과 footerStack 연결 보정 (터치 막힘 방지)
+        photosContainer.snp.makeConstraints {
+            $0.bottom.equalTo(footerStack.snp.top).offset(-8)
+        }
     }
 
     func setupAppearance() {
@@ -197,23 +203,37 @@ private extension JournalPhotoCell {
         moreButton.setTitleColor(.systemGray, for: .normal)
         moreButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
     }
+
+    // 제스처 기반 탭 인식 추가
+    func setupTapGesture() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handlePhotoTap(_:)))
+        tap.cancelsTouchesInView = false
+        collectionView.addGestureRecognizer(tap)
+    }
 }
 
 // MARK: - Actions
 private extension JournalPhotoCell {
+
     @objc func didTapMore() {
         isExpanded.toggle()
         updateMoreButtonTitle()
         updateCollectionHeight()
-
         UIView.performWithoutAnimation {
             collectionView.reloadData()
             collectionView.layoutIfNeeded()
         }
-
         DispatchQueue.main.async { [weak self] in
             self?.onHeightChange?()
         }
+    }
+
+    @objc func handlePhotoTap(_ gr: UITapGestureRecognizer) {
+        let point = gr.location(in: collectionView)
+        guard let indexPath = collectionView.indexPathForItem(at: point) else { return }
+        let start = indexPath.item
+        guard !images.isEmpty, start < images.count else { return }
+        onPhotoTap?(images, start)
     }
 
     func updateMoreButtonTitle() {
@@ -222,16 +242,15 @@ private extension JournalPhotoCell {
     }
 
     func updateCollectionHeight() {
+        contentView.layoutIfNeeded()
+        let width = max(collectionView.bounds.width, 1)
+        let spacing: CGFloat = 8
+        let itemWidth = (width - (2 * spacing)) / 3
         let visibleCount = isExpanded ? images.count : min(images.count, maxPreviewCount)
         guard visibleCount > 0 else {
             collectionHeightConstraint?.update(offset: 0)
             return
         }
-
-        layoutIfNeeded()
-        let width = collectionView.bounds.width
-        let spacing: CGFloat = 8
-        let itemWidth = (width - (2 * spacing)) / 3
         let rows = ceil(CGFloat(visibleCount) / 3.0)
         let height = rows * itemWidth + max(0, rows - 1) * spacing
         collectionHeightConstraint?.update(offset: height)
