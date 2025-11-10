@@ -53,6 +53,7 @@ final class JournalTimelineViewController: BaseViewController {
             end: CGPoint(x: 1, y: 0.5),
             cornerRadius: 16
         )
+        updateTableViewHeight()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -70,6 +71,7 @@ final class JournalTimelineViewController: BaseViewController {
         NetworkMonitor.shared.stopMonitoring()
     }
 
+    
     // MARK: - Setup
     private func fetchTrip(_ tripId: ObjectId) {
         if let trip = realm.object(ofType: TravelTable.self, forPrimaryKey: tripId) {
@@ -145,12 +147,10 @@ final class JournalTimelineViewController: BaseViewController {
 
         tripImageView.contentMode = .scaleAspectFill
         tripImageView.clipsToBounds = true
-        tripImageView.backgroundColor = UIColor.black.withAlphaComponent(0.1)
         tripImageView.image = .seoul
 
         cityLabel.font = .boldSystemFont(ofSize: 20)
         cityLabel.textColor = .white
-
         countryLabel.font = .systemFont(ofSize: 14, weight: .medium)
         countryLabel.textColor = .white.withAlphaComponent(0.9)
 
@@ -181,6 +181,7 @@ final class JournalTimelineViewController: BaseViewController {
         tableView.showsVerticalScrollIndicator = false
         tableView.register(JournalTextCell.self, forCellReuseIdentifier: JournalTextCell.identifier)
         tableView.register(JournalLinkCell.self, forCellReuseIdentifier: JournalLinkCell.identifier)
+        tableView.register(JournalPhotoCell.self, forCellReuseIdentifier: JournalPhotoCell.identifier)
         tableView.register(JournalDateHeaderView.self, forHeaderFooterViewReuseIdentifier: JournalDateHeaderView.identifier)
         tableView.register(JournalAddFooterView.self, forHeaderFooterViewReuseIdentifier: JournalAddFooterView.identifier)
         tableView.dataSource = self
@@ -225,6 +226,7 @@ final class JournalTimelineViewController: BaseViewController {
                     owner.addMemoryContainerView.alpha = hasData ? 0 : 1
                     owner.tableView.alpha = hasData ? 1 : 0
                     owner.view.layoutIfNeeded()
+                    owner.updateTableViewHeight()
                 }
             }
             .disposed(by: disposeBag)
@@ -256,29 +258,16 @@ final class JournalTimelineViewController: BaseViewController {
             .disposed(by: disposeBag)
     }
 
-    // MARK: - Delete
-    private func deleteJournalBlock(at indexPath: IndexPath) {
-        let block = groupedData[indexPath.section].blocks[indexPath.row]
-
-        do {
-            try realm.write {
-                let journal = block.journal.first
-                realm.delete(block)
-                if let journal, !journal.isInvalidated, journal.blocks.isEmpty {
-                    realm.delete(journal)
-                }
+    // MARK: - Update Height
+    private func updateTableViewHeight() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let contentHeight = self.tableView.contentSize.height
+            guard contentHeight > 0 else { return } // 0일 땐 무시
+            self.tableView.snp.updateConstraints { make in
+                make.height.equalTo(contentHeight)
             }
-
-            groupedData[indexPath.section].blocks.remove(at: indexPath.row)
-
-            if groupedData[indexPath.section].blocks.isEmpty {
-                groupedData.remove(at: indexPath.section)
-                tableView.deleteSections(IndexSet(integer: indexPath.section), with: .automatic)
-            } else {
-                tableView.deleteRows(at: [indexPath], with: .automatic)
-            }
-        } catch {
-            print("삭제 실패: \(error)")
+            self.contentView.layoutIfNeeded()
         }
     }
 
@@ -347,35 +336,21 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             return cell
 
         case .link:
-            guard let cell = tableView.dequeueReusableCell(
-                withIdentifier: JournalLinkCell.identifier,
-                for: indexPath
-            ) as? JournalLinkCell else {
-                return UITableViewCell()
-            }
+            let cell = tableView.dequeueReusableCell(withIdentifier: JournalLinkCell.identifier, for: indexPath) as! JournalLinkCell
             cell.configure(with: block)
+            return cell
 
-            // 링크 탭 → 항상 SafariVC 시도 (형식 불량이어도 최대한 열기)
-            cell.linkTapped
-                .bind(with: self) { owner, urlString in
-                    var openURL: URL?
-
-                    if let normalized = URLNormalizer.normalized(urlString) {
-                        openURL = normalized.url
-                    } else if let fallback = URL(string: "https://\(urlString)") {
-                        openURL = fallback
-                    } else {
-                        openURL = URL(string: urlString)
-                    }
-
-                    guard let finalURL = openURL else { return }
-
-                    let vc = SFSafariViewController(url: finalURL)
-                    vc.preferredControlTintColor = .systemGreen
-                    owner.present(vc, animated: true)
+        case .photo:
+            let cell = tableView.dequeueReusableCell(withIdentifier: JournalPhotoCell.identifier, for: indexPath) as! JournalPhotoCell
+            cell.configure(with: block)
+            cell.onHeightChange = { [weak self] in
+                guard let self else { return }
+                UIView.performWithoutAnimation {
+                    self.tableView.beginUpdates()
+                    self.tableView.endUpdates()
                 }
-                .disposed(by: cell.reuseBag)
-
+                self.updateTableViewHeight()
+            }
             return cell
 
         default:
@@ -389,6 +364,8 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             textCell.setIsFirstInTimeline(isFirst)
         } else if let linkCell = cell as? JournalLinkCell {
             linkCell.setIsFirstInTimeline(isFirst)
+        }else if let photoCell = cell as? JournalPhotoCell{
+            photoCell.setIsFirstInTimeline(isFirst)
         }
     }
 }
