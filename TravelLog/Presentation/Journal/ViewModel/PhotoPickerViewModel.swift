@@ -53,6 +53,7 @@ final class PhotoPickerViewModel{
     var onSelectionUpdated: (([String: Bool]) -> Void)?
     var onLimitedAccessDetected: (() -> Void)?
     var onSelectionLimitReached: (() -> Void)? //한도 초과 시 알림용 콜백
+    var onAssetsReloaded: (() -> Void)? //사진 촬영 후 자동 선택을 위한 콜백
     
     private let imageManager = {
         let manager = PHCachingImageManager()
@@ -81,6 +82,9 @@ final class PhotoPickerViewModel{
             self?.loadedAssets.removeAll()
 //            self?.loadMoreAssetsIfNeeded()
             self?.onAssetsChanged?(nil)
+            DispatchQueue.main.async {
+                self?.onAssetsReloaded?() //데이터 리로드 완료 후 콜백 호출
+            }
         }
     }
     
@@ -130,6 +134,9 @@ final class PhotoPickerViewModel{
             
             DispatchQueue.main.async {
                 self.loadedAssets.append(contentsOf: newAssets)
+                let newPathsWithOffset = newIndexPaths.map{
+                    IndexPath(item: $0.item + 1, section: $0.section)
+                } //카마레 셀로 인해 인덱스가 1씩 밀리므로 +1 해서 전달
                 self.onAssetsChanged?(newIndexPaths)
             }
         }
@@ -268,7 +275,14 @@ final class PhotoPickerViewModel{
     }
     
     func clearSelections(){
+        let oldSelected = selectedAssets
         selectedAssets.removeAll()
+        selectionOrder.removeAll()
+        
+        //모든 셀을 업데이트 하기 위해 빈 맵 대신 [:] 전송
+        let updates = oldSelected.reduce(into: [String: Bool]()) {
+            $0[$1] = false
+        }
         onSelectionUpdated?([:])
     }
     
@@ -334,6 +348,8 @@ final class PhotoPickerViewModel{
         
         // 즉시 반전하지 않음 — 단순히 상태 기록만
         originalSelectionState[id] = wasSelected
+        
+        toggleSelection(for: id) //음..
     }
     
     func updateRangeSelection(to index: Int){
@@ -363,7 +379,7 @@ final class PhotoPickerViewModel{
                 if !isSelected(id) {
                     if selectedAssets.count < maxSelectableCount{
                         selectedAssets.insert(id)
-                        selectionOrder.append(id)
+                        selectionOrder.append(id) //음...
                         changed[id] = true
                     }else{
                         //초과 시 즉시 콜백 & 복원 처리
@@ -383,6 +399,7 @@ final class PhotoPickerViewModel{
                    isSelected(id) != original {
                     if original {
                         selectedAssets.insert(id)
+                        selectionOrder.append(id) //음
                     } else {
                         selectedAssets.remove(id)
                     }

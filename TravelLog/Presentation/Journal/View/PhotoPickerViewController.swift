@@ -39,6 +39,9 @@ final class PhotoPickerViewController: UIViewController {
     /// 현재 자동 스크롤 방향을 저장합니다.
     private var autoScrollDirection: AutoScrollDirection = .none
     
+    //사진 촬영 후 자동 선택을 위해 새로 저장된 에셋의 ID를 임시 저장합니다.
+    private var newlySaveAssetIdentifier: String?
+    
     private var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         let spacing: CGFloat = 2
@@ -51,6 +54,11 @@ final class PhotoPickerViewController: UIViewController {
         collectionView.backgroundColor = .white
         
         collectionView.isPrefetchingEnabled = true
+        collectionView
+            .register(
+                CameraThumbnailCell.self,
+                forCellWithReuseIdentifier: CameraThumbnailCell
+                    .identifier)
         collectionView.register(PhotoThumbnailCell.self,
                                 forCellWithReuseIdentifier: PhotoThumbnailCell.identifier)
         collectionView.register(PhotoPickerHeaderView.self,
@@ -122,6 +130,7 @@ final class PhotoPickerViewController: UIViewController {
             .setRightBarButtonItems([checkButton, selectButton], animated: true)
         collectionView.delegate = self
         collectionView.dataSource = self
+        collectionView.prefetchDataSource = self
         
         pan.addTarget(self, action: #selector(handlePanSelection(_:)))
         pan.delegate = self
@@ -157,8 +166,11 @@ final class PhotoPickerViewController: UIViewController {
             guard let self = self else { return }
             
             if let newIndexPaths = indexPaths{
+                
+                let offsetPaths = newIndexPaths.map { IndexPath(item: $0.item + 1, section: $0.section) }
+                
                 self.collectionView.performBatchUpdates({
-                    self.collectionView.insertItems(at: newIndexPaths)
+                    self.collectionView.insertItems(at: offsetPaths)
                 }, completion: { _ in
                     self.viewModel.didFinishUpdatingUI()
                 })
@@ -202,7 +214,7 @@ final class PhotoPickerViewController: UIViewController {
             guard let self else { return }
             for (id, isSelected) in updates {
                 if let index = self.viewModel.loadedAssets.firstIndex(where: { $0.localIdentifier == id }),
-                   let cell = self.collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? PhotoThumbnailCell {
+                   let cell = self.collectionView.cellForItem(at: IndexPath(item: index + 1, section: 0)) as? PhotoThumbnailCell {
                     cell.updateSelectionState(isSelected)
                 }
             }
@@ -215,6 +227,26 @@ final class PhotoPickerViewController: UIViewController {
         
         viewModel.onSelectionLimitReached = { [weak self] in
             self?.showSelectionLimitAlert()
+        }
+        
+        //사진 저장 및 리로드 완료 후 자동 선택 처리
+        viewModel.onAssetsReloaded = { [weak self] in
+            guard let self = self, let idToSelect = self.newlySaveAssetIdentifier else { return }
+            
+            //1. 선택 모드가 아니면 선택 모드로 전환
+            if !self.viewModel.isSelectionMode{
+                self.viewModel.toggleSelectionMode()
+            }
+            
+            //2. 0.1초 지연 후 선택(Cell이 완전히 그려진 후)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1){
+                //3. 방금 저장한 사진을 선택(선택 제한 검사 포함)
+                if !self.viewModel.isSelected(idToSelect){
+                    self.viewModel.toggleSelection(for: idToSelect)
+                }
+                
+                self.newlySaveAssetIdentifier = nil
+            }
         }
     }
     
@@ -231,12 +263,12 @@ final class PhotoPickerViewController: UIViewController {
         fetchResult.enumerateObjects { asset, _, _ in
             assets.append(asset)
         }
-
+        
         // identifiers 순서대로 정렬
         let sortedAssets = identifiers.compactMap { id in
             assets.first(where: { $0.localIdentifier == id })
         }
-
+        
         Task {
             let manager = PHCachingImageManager.default()
             let options = PHImageRequestOptions()
@@ -244,9 +276,9 @@ final class PhotoPickerViewController: UIViewController {
             options.deliveryMode = .highQualityFormat
             options.resizeMode = .exact
             options.isNetworkAccessAllowed = true // iCloud 이미지 자동 다운로드 허용
-
+            
             let targetSize = CGSize(width: 1200, height: 1200)
-
+            
             // PHAsset → UIImage 비동기 변환
             let images: [UIImage] = await withTaskGroup(of: UIImage?.self) { group in
                 for asset in sortedAssets {
@@ -254,7 +286,7 @@ final class PhotoPickerViewController: UIViewController {
                         await self.requestImageAsync(manager: manager, asset: asset, targetSize: targetSize, options: options)
                     }
                 }
-
+                
                 var results: [UIImage] = []
                 for await image in group {
                     if let image = image {
@@ -263,7 +295,7 @@ final class PhotoPickerViewController: UIViewController {
                 }
                 return results
             }
-
+            
             await MainActor.run {
                 delegate?.photoPicker(self, didFinishPicking: images)
                 dismiss(animated: true)
@@ -299,6 +331,7 @@ final class PhotoPickerViewController: UIViewController {
         //        if viewModel.isSelectionMode{
         //            viewModel.toggleSelectAll()
         //        }else{
+        delegate?.photoPickerDidCancel(self) //델리게이트 취소 호출
         dismiss(animated: true)
         //        }
     }
@@ -307,28 +340,45 @@ final class PhotoPickerViewController: UIViewController {
     private func handlePanSelection(_ gesture: UIPanGestureRecognizer) {
         guard viewModel.isSelectionMode else { return }
         
-        guard panMode == .selecting else { return }
-        
         let location = gesture.location(in: collectionView)
-        let indexPath = collectionView.indexPathForItem(at: location)
+        
+        // (NEW) 카메라 셀(item 0)에서는 드래그 선택 무시
+        guard let indexPath = collectionView.indexPathForItem(at: location),
+              indexPath.item > 0 else {
+            
+            // 드래그가 카메라 셀에서 시작된 경우
+            if gesture.state == .began {
+                panMode = .none
+            }
+            
+            // 드래그가 진행 중이지만 카메라 셀 위로 이동한 경우, 자동 스크롤만 체크
+            if gesture.state == .changed {
+                checkAutoScroll(at: location)
+            } else if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed {
+                // 카메라 셀 위에서 드래그가 끝난 경우
+                viewModel.endRangeSelection()
+                panMode = .none
+                stopAutoScroll()
+            }
+            return
+        }
+        
+        // (NEW) 실제 애셋 인덱스로 변환 (오프셋 -1)
+        let assetIndex = indexPath.item - 1
+        
+        guard panMode == .selecting else { return }
         
         switch gesture.state {
         case .began:
-            if let index = indexPath?.item {
-                viewModel.beginRangeSelection(at: index)
-            }
+            viewModel.beginRangeSelection(at: assetIndex)
             
         case .changed:
-            if let index = indexPath?.item {
-                viewModel.updateRangeSelection(to: index)
-            }
+            viewModel.updateRangeSelection(to: assetIndex)
             checkAutoScroll(at: location)
             
         case .ended, .cancelled, .failed:
             // 드래그 끝날 때, 마지막 위치로 한 번 더 update 후 end 호출
-            if let index = indexPath?.item {
-                viewModel.updateRangeSelection(to: index)
-            }
+            viewModel.updateRangeSelection(to: assetIndex)
             viewModel.endRangeSelection()
             panMode = .none //다음 팬을 위해 초기화
             stopAutoScroll()
@@ -448,7 +498,11 @@ final class PhotoPickerViewController: UIViewController {
     private func scrollToItem(at index: Int){
         guard index < viewModel.numberOfItems() else { return }
         
-        let indexPath = IndexPath(item: index, section: 0)
+        let indexPath = IndexPath(item: index + 1, section: 0)
+        
+        guard indexPath.item < collectionView
+            .numberOfItems(inSection: 0) else { return }
+        
         collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
     }
     
@@ -459,19 +513,47 @@ final class PhotoPickerViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
     }
+    
+    private func showCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            // 시뮬레이터 등 카메라 사용 불가 알림
+            let alert = UIAlertController(title: "카메라 사용 불가", message: "이 기기에서는 카메라를 사용할 수 없습니다.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.allowsEditing = true // 필요시 true로 변경
+        picker.delegate = self
+        present(picker, animated: true)
+    }
 }
 
 extension PhotoPickerViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        viewModel.numberOfItems()
+        //카메라 셀 1 개 + 에셋 개수
+        viewModel.numberOfItems() + 1
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        if indexPath.item == 0{
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: CameraThumbnailCell.identifier,
+                for: indexPath
+            ) as? CameraThumbnailCell else { return UICollectionViewCell() }
+            
+            return cell
+        }
+        
+        let assetIndexPath = IndexPath(item: indexPath.item - 1, section: 0)
+        
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoThumbnailCell.identifier, for: indexPath) as? PhotoThumbnailCell else {
             return UICollectionViewCell()
         }
         
-        let asset = viewModel.asset(at: indexPath)
+        let asset = viewModel.asset(at: assetIndexPath)
         let isSelected = viewModel.isSelected(asset.localIdentifier)
         cell.updateSelectionState(isSelected)
         
@@ -513,8 +595,15 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
 
 extension PhotoPickerViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        if indexPath.item == 0{
+            showCamera()
+            return
+        }
+        
+        let assetIndexPath = IndexPath(item: indexPath.item - 1, section: 0)
+        
         if viewModel.isSelectionMode{
-            let asset = viewModel.asset(at: indexPath)
+            let asset = viewModel.asset(at: assetIndexPath)
             viewModel.toggleSelection(for: asset.localIdentifier)
             
             if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
@@ -522,7 +611,7 @@ extension PhotoPickerViewController: UICollectionViewDelegate {
                 cell.updateSelectionState(isSelected)
             }
         }else{
-            let tappedIndex = indexPath.item
+            let tappedIndex = assetIndexPath.item
             let allLoadedAssets = viewModel.loadedAssets
             
             let totalCount = viewModel.totalAssetCount
@@ -545,6 +634,7 @@ extension PhotoPickerViewController: UICollectionViewDelegate {
     }
     
     func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
+        guard indexPath.item > 0 else { return } //카메라 셀 무시
         guard viewModel.isSelectionMode else { return }
         let asset = viewModel.asset(at: indexPath)
         viewModel.toggleSelection(for: asset.localIdentifier)
@@ -576,7 +666,9 @@ extension PhotoPickerViewController: UICollectionViewDelegateFlowLayout{
 
 extension PhotoPickerViewController: UICollectionViewDataSourcePrefetching{
     func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
-        let indexs = indexPaths.map(\.item)
+        let indexs = indexPaths.compactMap { $0.item > 0 ? $0.item - 1 : nil }
+        guard !indexs.isEmpty else { return }
+        
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
@@ -589,7 +681,9 @@ extension PhotoPickerViewController: UICollectionViewDataSourcePrefetching{
     }
     
     func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
-        let indexs = indexPaths.map(\.item)
+        let indexs = indexPaths.compactMap { $0.item > 0 ? $0.item - 1 : nil }
+        guard !indexs.isEmpty else { return }
+        
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
@@ -599,7 +693,11 @@ extension PhotoPickerViewController: UICollectionViewDataSourcePrefetching{
 
 extension PhotoPickerViewController: UIScrollViewDelegate{
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard let maxIndex = collectionView.indexPathsForVisibleItems.map(\.item).max() else { return }
+        guard let maxVisibleUIItem = collectionView.indexPathsForVisibleItems.map(\.item).max() else { return }
+        guard maxVisibleUIItem > 0 else { return }
+        
+        let maxIndex = maxVisibleUIItem - 1
+        
         if maxIndex >= viewModel.numberOfItems() - 30 {
             viewModel.loadMoreAssetsIfNeeded()
         }
@@ -610,6 +708,12 @@ extension PhotoPickerViewController: UIGestureRecognizerDelegate{
     //스크롤 vs 드래그 선택 구분
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer == pan else { return true }
+        
+        let location = pan.location(in: collectionView)
+        if let indexPath = collectionView.indexPathForItem(at: location), indexPath.item == 0 {
+            panMode = .scrolling
+            return false
+        }
         
         let velocity = pan.velocity(in: collectionView)
         let absX = abs(velocity.x)
@@ -637,5 +741,45 @@ extension PhotoPickerViewController: UIGestureRecognizerDelegate{
             return false
         }
         return true
+    }
+}
+
+extension PhotoPickerViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        
+        guard let image = info[.originalImage] as? UIImage else {
+            // 이미지를 가져오지 못한 경우
+            picker.dismiss(animated: true)
+            return
+        }
+        
+        var placeholder: PHObjectPlaceholder?
+        
+        // 1. 사진을 포토 라이브러리에 저장
+        PHPhotoLibrary.shared().performChanges({
+            let request = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            placeholder = request.placeholderForCreatedAsset
+        }, completionHandler: { [weak self] success, error in
+            DispatchQueue.main.async {
+                // 2. 카메라 창 닫기
+                picker.dismiss(animated: true)
+                
+                if success, let identifier = placeholder?.localIdentifier {
+                    // 3. 저장이 성공하면, 새로 생긴 애셋의 ID를 저장
+                    // (ViewModel의 Observer가 이 변경을 감지하고 onAssetsReloaded를 호출할 것임)
+                    print("사진 저장 성공: \(identifier)")
+                    self?.newlySaveAssetIdentifier = identifier
+                } else if let error = error {
+                    print("사진 저장 실패: \(error.localizedDescription)")
+                    // (Optional) 사용자에게 저장 실패 알림
+                }
+            }
+        })
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        // 카메라 촬영 중 취소
+        picker.dismiss(animated: true)
     }
 }
