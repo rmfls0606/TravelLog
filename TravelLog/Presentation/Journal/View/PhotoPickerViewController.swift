@@ -8,6 +8,7 @@
 import UIKit
 import SnapKit
 import PhotosUI
+import AVFoundation // 카메라 권한 확인을 위해 임포트
 
 protocol PhotoPickerViewControllerDelegate: AnyObject{
     func photoPicker(_ picker: PhotoPickerViewController, didFinishPicking images: [UIImage])
@@ -29,9 +30,11 @@ final class PhotoPickerViewController: UIViewController {
     private let viewModel = PhotoPickerViewModel()
     private var panMode: PanMode = .none
     
+    // isPanSelecting 프로퍼티 제거
+    
     private let maxAutoScrollSpeed: CGFloat = 15.0 // 가장자리에 닿았을 때 최대 속도
     private let minAutoScrollSpeed: CGFloat = 2.0  // 핫존에 막 진입했을 때 최소 속도
-    private let hotZoneHeight: CGFloat = 80.0      // 핫존의 높이
+    private let hotZoneHeight: CGFloat = 80.0     // 핫존의 높이
     
     /// 자동 스크롤 타이머입니다. (Timer보다 부드러운 CADisplayLink 사용)
     private var autoScrollLink: CADisplayLink?
@@ -54,6 +57,7 @@ final class PhotoPickerViewController: UIViewController {
         collectionView.backgroundColor = .white
         
         collectionView.isPrefetchingEnabled = true
+        // (NEW) 카메라 셀 등록
         collectionView
             .register(
                 CameraThumbnailCell.self,
@@ -71,11 +75,6 @@ final class PhotoPickerViewController: UIViewController {
         let button = UIBarButtonItem(image: UIImage(systemName: "chevron.left"), style: .plain, target: self, action: #selector(didTapLeftBarButton))
         return button
     }()
-    
-    //    private lazy var allSelectButton: UIBarButtonItem = {
-    //        let button = UIBarButtonItem(title: "전체선택", style: .plain, target: self, action: #selector(didTapLeftBarButton))
-    //        return button
-    //    }()
     
     private lazy var selectButton: UIBarButtonItem = {
         let button = UIBarButtonItem(title: "선택", style: .plain, target: self, action: #selector(didTapSelect))
@@ -125,7 +124,6 @@ final class PhotoPickerViewController: UIViewController {
         navigationItem.titleView = photoTitleView
         view.backgroundColor = .systemBackground
         navigationItem.leftBarButtonItem = dismissButton
-        //        navigationItem.rightBarButtonItem = selectButton
         navigationItem
             .setRightBarButtonItems([checkButton, selectButton], animated: true)
         collectionView.delegate = self
@@ -143,9 +141,6 @@ final class PhotoPickerViewController: UIViewController {
             self.selectButton.title = isSelecting ? "취소" : "선택"
             self.collectionView.allowsMultipleSelection = isSelecting
             
-            //            if isSelecting{
-            //                self.navigationItem.leftBarButtonItem = self.allSelectButton
-            //            }else{
             self.navigationItem.leftBarButtonItem = self.dismissButton
             self.checkButton.isHidden = !isSelecting
             
@@ -154,12 +149,20 @@ final class PhotoPickerViewController: UIViewController {
                 self.viewModel.selectedAssets.count,
                 isSelecting: isSelecting)
             
+            // (FIX) 선택 모드 해제 시, 뷰모델의 현재 상태를 기반으로 모든 셀을 '해제' 상태로 올바르게 업데이트
             for visibleCell in self.collectionView.visibleCells {
                 if let cell = visibleCell as? PhotoThumbnailCell {
-                    cell.updateSelectionState(false)
+                    if let indexPath = self.collectionView.indexPath(for: cell), indexPath.item > 0 {
+                        let assetIndexPath = IndexPath(item: indexPath.item - 1, section: 0)
+                        if assetIndexPath.item < self.viewModel.numberOfItems() { // 유효한 인덱스인지 확인
+                            let asset = self.viewModel.asset(at: assetIndexPath)
+                            cell.updateSelectionState(self.viewModel.isSelected(asset.localIdentifier))
+                        }
+                    } else if !isSelecting {
+                         cell.updateSelectionState(false) // (선택 모드 해제 시)
+                    }
                 }
             }
-            //            }
         }
         
         viewModel.onAssetsChanged = { [weak self] indexPaths in
@@ -167,6 +170,7 @@ final class PhotoPickerViewController: UIViewController {
             
             if let newIndexPaths = indexPaths{
                 
+                // (NEW) 카메라 셀 오프셋 적용
                 let offsetPaths = newIndexPaths.map { IndexPath(item: $0.item + 1, section: $0.section) }
                 
                 self.collectionView.performBatchUpdates({
@@ -188,15 +192,6 @@ final class PhotoPickerViewController: UIViewController {
             }
         }
         
-        //        viewModel.onSelectAllToggled = { [weak self] isAllSelected in
-        //            guard let self else { return }
-        //            for indexPath in collectionView.indexPathsForVisibleItems {
-        //                guard let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell else { continue }
-        //                let asset = viewModel.asset(at: indexPath)
-        //                cell.updateSelectionState(viewModel.isSelected(asset.localIdentifier))
-        //            }
-        //        }
-        
         viewModel.onPermissionDenied = { [weak self] in
             let alert = UIAlertController(title: "권한 필요",
                                           message: "사진 접근 권한이 필요합니다. 설정에서 허용해주세요.",
@@ -213,9 +208,13 @@ final class PhotoPickerViewController: UIViewController {
         viewModel.onSelectionUpdated = { [weak self] updates in
             guard let self else { return }
             for (id, isSelected) in updates {
+                // (NEW) 카메라 셀 오프셋 적용
                 if let index = self.viewModel.loadedAssets.firstIndex(where: { $0.localIdentifier == id }),
-                   let cell = self.collectionView.cellForItem(at: IndexPath(item: index + 1, section: 0)) as? PhotoThumbnailCell {
-                    cell.updateSelectionState(isSelected)
+                   index < self.viewModel.numberOfItems() { // 유효성 검사
+                   let uiIndexPath = IndexPath(item: index + 1, section: 0)
+                   if let cell = self.collectionView.cellForItem(at: uiIndexPath) as? PhotoThumbnailCell {
+                       cell.updateSelectionState(isSelected)
+                   }
                 }
             }
             
@@ -229,20 +228,21 @@ final class PhotoPickerViewController: UIViewController {
             self?.showSelectionLimitAlert()
         }
         
-        //사진 저장 및 리로드 완료 후 자동 선택 처리
+        // (NEW) 사진 저장 및 리로드 완료 후 자동 선택 처리
         viewModel.onAssetsReloaded = { [weak self] in
             guard let self = self, let idToSelect = self.newlySaveAssetIdentifier else { return }
             
-            //1. 선택 모드가 아니면 선택 모드로 전환
             if !self.viewModel.isSelectionMode{
                 self.viewModel.toggleSelectionMode()
             }
             
-            //2. 0.1초 지연 후 선택(Cell이 완전히 그려진 후)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1){
-                //3. 방금 저장한 사진을 선택(선택 제한 검사 포함)
                 if !self.viewModel.isSelected(idToSelect){
                     self.viewModel.toggleSelection(for: idToSelect)
+                }
+                
+                if let index = self.viewModel.loadedAssets.firstIndex(where: { $0.localIdentifier == idToSelect }) {
+                    self.scrollToItem(at: index)
                 }
                 
                 self.newlySaveAssetIdentifier = nil
@@ -257,14 +257,13 @@ final class PhotoPickerViewController: UIViewController {
     
     @objc
     private func didTapCheck() {
-        let identifiers = Array(viewModel.selectionOrder) // 순서 보존용 배열
+        let identifiers = Array(viewModel.selectionOrder)
         let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
         var assets: [PHAsset] = []
         fetchResult.enumerateObjects { asset, _, _ in
             assets.append(asset)
         }
         
-        // identifiers 순서대로 정렬
         let sortedAssets = identifiers.compactMap { id in
             assets.first(where: { $0.localIdentifier == id })
         }
@@ -275,11 +274,10 @@ final class PhotoPickerViewController: UIViewController {
             options.isSynchronous = false
             options.deliveryMode = .highQualityFormat
             options.resizeMode = .exact
-            options.isNetworkAccessAllowed = true // iCloud 이미지 자동 다운로드 허용
+            options.isNetworkAccessAllowed = true
             
             let targetSize = CGSize(width: 1200, height: 1200)
             
-            // PHAsset → UIImage 비동기 변환
             let images: [UIImage] = await withTaskGroup(of: UIImage?.self) { group in
                 for asset in sortedAssets {
                     group.addTask {
@@ -297,8 +295,8 @@ final class PhotoPickerViewController: UIViewController {
             }
             
             await MainActor.run {
-                delegate?.photoPicker(self, didFinishPicking: images)
-                dismiss(animated: true)
+                self.delegate?.photoPicker(self, didFinishPicking: images)
+                self.dismiss(animated: true)
             }
         }
     }
@@ -328,59 +326,66 @@ final class PhotoPickerViewController: UIViewController {
     
     @objc
     private func didTapLeftBarButton(){
-        //        if viewModel.isSelectionMode{
-        //            viewModel.toggleSelectAll()
-        //        }else{
-        delegate?.photoPickerDidCancel(self) //델리게이트 취소 호출
+        delegate?.photoPickerDidCancel(self) // (NEW) 델리게이트 취소 호출
         dismiss(animated: true)
-        //        }
     }
     
     @objc
     private func handlePanSelection(_ gesture: UIPanGestureRecognizer) {
         guard viewModel.isSelectionMode else { return }
         
-        let location = gesture.location(in: collectionView)
-        
-        // (NEW) 카메라 셀(item 0)에서는 드래그 선택 무시
-        guard let indexPath = collectionView.indexPathForItem(at: location),
-              indexPath.item > 0 else {
-            
-            // 드래그가 카메라 셀에서 시작된 경우
-            if gesture.state == .began {
-                panMode = .none
-            }
-            
-            // 드래그가 진행 중이지만 카메라 셀 위로 이동한 경우, 자동 스크롤만 체크
-            if gesture.state == .changed {
-                checkAutoScroll(at: location)
-            } else if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed {
-                // 카메라 셀 위에서 드래그가 끝난 경우
-                viewModel.endRangeSelection()
-                panMode = .none
-                stopAutoScroll()
-            }
+        // (FIX) panMode가 .selecting일 때만 이 핸들러가 작동하도록 함
+        guard panMode == .selecting else {
             return
         }
         
-        // (NEW) 실제 애셋 인덱스로 변환 (오프셋 -1)
-        let assetIndex = indexPath.item - 1
-        
-        guard panMode == .selecting else { return }
+        let location = gesture.location(in: collectionView)
         
         switch gesture.state {
         case .began:
-            viewModel.beginRangeSelection(at: assetIndex)
+            // (NEW) .began 상태는 gestureRecognizerShouldBegin에서 처리됨
+            // panMode가 .selecting으로 설정되었으므로, 첫 번째 셀을 토글합니다.
+            if let indexPath = collectionView.indexPathForItem(at: location), indexPath.item > 0 {
+                let assetIndex = indexPath.item - 1
+                viewModel.beginRangeSelection(at: assetIndex)
+            }
             
         case .changed:
+            // (NEW) 카메라 셀(0) 또는 셀 밖으로 드래그 시
+            guard let indexPath = collectionView.indexPathForItem(at: location), indexPath.item > 0 else {
+                checkAutoScroll(at: location)
+                // (NEW) 셀 밖에서도 가장자리 셀을 선택하기 위한 로직
+                let visibleBounds = collectionView.bounds
+                let pointAtEdge: CGPoint
+                if location.y < visibleBounds.minY + hotZoneHeight { // 상단
+                    pointAtEdge = CGPoint(x: location.x, y: visibleBounds.minY + 1)
+                } else if location.y > visibleBounds.maxY - hotZoneHeight { // 하단
+                    pointAtEdge = CGPoint(x: location.x, y: visibleBounds.maxY - 1)
+                } else {
+                    pointAtEdge = .zero // 핫존 아님
+                }
+                
+                // (NEW) 가장자리 셀이 유효하면(카메라셀 아님) 업데이트
+                if pointAtEdge != .zero, let edgeIndexPath = collectionView.indexPathForItem(at: pointAtEdge), edgeIndexPath.item > 0 {
+                    viewModel.updateRangeSelection(to: edgeIndexPath.item - 1)
+                }
+                return
+            }
+            
+            // (NEW) 셀 안에서의 정상적인 드래그
+            let assetIndex = indexPath.item - 1
             viewModel.updateRangeSelection(to: assetIndex)
             checkAutoScroll(at: location)
             
         case .ended, .cancelled, .failed:
-            // 드래그 끝날 때, 마지막 위치로 한 번 더 update 후 end 호출
-            viewModel.updateRangeSelection(to: assetIndex)
+            // (NEW) 드래그가 끝났을 때, 마지막 위치로 한 번 더 업데이트
+            if let indexPath = collectionView.indexPathForItem(at: location), indexPath.item > 0 {
+                let assetIndex = indexPath.item - 1
+                viewModel.updateRangeSelection(to: assetIndex)
+            }
+            
             viewModel.endRangeSelection()
-            panMode = .none //다음 팬을 위해 초기화
+            panMode = .none // (FIX) 드래그가 끝났으므로 .none으로 초기화
             stopAutoScroll()
             
         default:
@@ -411,7 +416,7 @@ final class PhotoPickerViewController: UIViewController {
     
     /// 자동 스크롤 타이머(CADisplayLink)를 시작합니다.
     private func startAutoScroll() {
-        guard autoScrollLink == nil else { return } // 이미 실행 중이면 중복 실행 방지
+        guard autoScrollLink == nil else { return }
         
         let link = CADisplayLink(target: self, selector: #selector(handleAutoScrollTick))
         link.add(to: .main, forMode: .default)
@@ -428,42 +433,34 @@ final class PhotoPickerViewController: UIViewController {
     
     /// (매우 중요) CADisplayLink가 매 프레임마다 호출하는 함수입니다. (비례 속도 적용됨)
     @objc private func handleAutoScrollTick() {
-        // 1. 방향이 없으면 멈춤 (stopAutoScroll()이 호출된 경우)
         guard autoScrollDirection != .none else {
             stopAutoScroll()
             return
         }
         
-        // 2. 현재 손가락 위치 다시 가져오기
         let location = pan.location(in: collectionView)
         let bounds = collectionView.bounds
         
-        // 3. 핫존 범위 정의
         let topHotZoneEndY = bounds.minY + hotZoneHeight
         let bottomHotZoneStartY = bounds.maxY - hotZoneHeight
         
         var speed: CGFloat = 0.0
         
-        // 4. '비례' 속도 계산
         if autoScrollDirection == .up && location.y < topHotZoneEndY {
-            // --- 상단 핫존 ---
             let distanceIntoZone = topHotZoneEndY - location.y
-            let intensity = min(1.0, max(0.0, distanceIntoZone / hotZoneHeight)) // 0.0 ~ 1.0
+            let intensity = min(1.0, max(0.0, distanceIntoZone / hotZoneHeight))
             speed = (intensity * (maxAutoScrollSpeed - minAutoScrollSpeed)) + minAutoScrollSpeed
             
         } else if autoScrollDirection == .down && location.y > bottomHotZoneStartY {
-            // --- 하단 핫존 ---
             let distanceIntoZone = location.y - bottomHotZoneStartY
-            let intensity = min(1.0, max(0.0, distanceIntoZone / hotZoneHeight)) // 0.0 ~ 1.0
+            let intensity = min(1.0, max(0.0, distanceIntoZone / hotZoneHeight))
             speed = (intensity * (maxAutoScrollSpeed - minAutoScrollSpeed)) + minAutoScrollSpeed
             
         } else {
-            // 핫존을 벗어남
             stopAutoScroll()
             return
         }
         
-        // 5. 스크롤 적용
         var newOffset = collectionView.contentOffset
         if autoScrollDirection == .up {
             newOffset.y -= speed
@@ -471,39 +468,43 @@ final class PhotoPickerViewController: UIViewController {
             newOffset.y += speed
         }
         
-        // 6. 범위 제한
         let maxOffset = collectionView.contentSize.height - collectionView.bounds.height
         newOffset.y = max(0, min(newOffset.y, maxOffset))
         
-        // 7. 스크롤이 실제로 일어났을 때만 적용
         if collectionView.contentOffset.y != newOffset.y {
             collectionView.contentOffset = newOffset
             collectionView.layoutIfNeeded()
             
-            // 8. ViewModel 업데이트 (가장자리 셀 기준)
             let visibleBounds = collectionView.bounds
             let pointAtEdge: CGPoint
             if autoScrollDirection == .up {
-                pointAtEdge = CGPoint(x: visibleBounds.midX, y: visibleBounds.minY + 1)
+                // (FIX) location.x를 사용하여 현재 x좌표 기준으로 셀을 찾음
+                pointAtEdge = CGPoint(x: location.x, y: visibleBounds.minY + 1)
             } else {
-                pointAtEdge = CGPoint(x: visibleBounds.midX, y: visibleBounds.maxY - 1)
+                // (FIX) location.x를 사용하여 현재 x좌표 기준으로 셀을 찾음
+                pointAtEdge = CGPoint(x: location.x, y: visibleBounds.maxY - 1)
             }
             
-            if let indexPath = collectionView.indexPathForItem(at: pointAtEdge) {
-                viewModel.updateRangeSelection(to: indexPath.item)
+            // (NEW) 카메라 셀(0) 무시 및 오프셋 적용
+            if let indexPath = collectionView.indexPathForItem(at: pointAtEdge),
+               indexPath.item > 0 {
+                let assetIndex = indexPath.item - 1
+                viewModel.updateRangeSelection(to: assetIndex)
             }
         }
     }
     
-    private func scrollToItem(at index: Int){
-        guard index < viewModel.numberOfItems() else { return }
+    // (NEW) 애셋 인덱스(VM 기준)를 받아 UI 인덱스(카메라셀+1)로 변환 후 스크롤
+    private func scrollToItem(at assetIndex: Int){
+        guard assetIndex < viewModel.numberOfItems() else { return }
         
-        let indexPath = IndexPath(item: index + 1, section: 0)
+        let uiIndexPath = IndexPath(item: assetIndex + 1, section: 0)
         
-        guard indexPath.item < collectionView
-            .numberOfItems(inSection: 0) else { return }
+        // (NEW) UI 인덱스가 유효한지 한 번 더 확인
+        guard uiIndexPath.item < collectionView.numberOfItems(inSection: 0) else { return }
         
-        collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
+        // (NEW) 스크롤 위치를 .top으로 변경 (최신 사진이 잘 보이도록)
+        collectionView.scrollToItem(at: uiIndexPath, at: .top, animated: true)
     }
     
     private func showSelectionLimitAlert(){
@@ -523,26 +524,22 @@ final class PhotoPickerViewController: UIViewController {
         present(picker, animated: true)
     }
     
+    // (NEW) 카메라 권한 확인 로직 추가
     private func showCamera() {
-        // 1. 하드웨어 사용 가능 여부 확인
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
-            // 시뮬레이터 등 카메라 사용 불가 알림
             let alert = UIAlertController(title: "카메라 사용 불가", message: "이 기기에서는 카메라를 사용할 수 없습니다.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default))
             present(alert, animated: true)
             return
         }
         
-        // 2. 카메라 권한 상태 확인
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         
         switch status {
         case .authorized:
-            // 2-1. 권한이 승인된 경우: 카메라 열기
             openCameraPicker()
             
         case .notDetermined:
-            // 2-2. 권한이 아직 결정되지 않은 경우: 권한 요청
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     if granted {
@@ -552,11 +549,9 @@ final class PhotoPickerViewController: UIViewController {
             }
             
         case .denied, .restricted:
-            // 2-3. 권한이 거부되거나 제한된 경우: 설정 이동 얼럿 띄우기
             showCameraPermissionAlert()
             
         @unknown default:
-            // 알 수 없는 상태
             print("Unknown camera authorization status")
         }
     }
@@ -578,14 +573,17 @@ final class PhotoPickerViewController: UIViewController {
     }
 }
 
+// (NEW) 카메라 셀 로직 추가
 extension PhotoPickerViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        //카메라 셀 1 개 + 에셋 개수
-        viewModel.numberOfItems() + 1
+        // (NEW) 카메라 셀 1개 + 애셋 개수
+        return viewModel.numberOfItems() + 1
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        if indexPath.item == 0{
+        
+        // (NEW) 첫 번째 셀은 항상 카메라 셀
+        if indexPath.item == 0 {
             guard let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: CameraThumbnailCell.identifier,
                 for: indexPath
@@ -594,17 +592,22 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
             return cell
         }
         
+        // (NEW) 나머지 셀 (오프셋 -1 적용)
         let assetIndexPath = IndexPath(item: indexPath.item - 1, section: 0)
         
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PhotoThumbnailCell.identifier, for: indexPath) as? PhotoThumbnailCell else {
             return UICollectionViewCell()
         }
         
-        let asset = viewModel.asset(at: assetIndexPath)
+        // (FIX) 데이터 리로드 중 인덱스 충돌 방지
+        guard assetIndexPath.item < viewModel.numberOfItems() else {
+            return cell // 빈 셀 반환
+        }
+        
+        let asset = viewModel.asset(at: assetIndexPath) // 오프셋 인덱스 사용
         let isSelected = viewModel.isSelected(asset.localIdentifier)
         cell.updateSelectionState(isSelected)
         
-        // AsyncStream 기반 안전한 이미지 로딩
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
@@ -641,24 +644,30 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
 }
 
 extension PhotoPickerViewController: UICollectionViewDelegate {
+    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        
+        // (FIX) '선택 드래그'가 시작되었다면 (panMode == .selecting), 탭 이벤트를 무시합니다.
+        guard panMode != .selecting else { return }
+        
+        // (NEW) 카메라 셀(0) 탭 처리
         if indexPath.item == 0{
             showCamera()
             return
         }
         
+        // (NEW) 오프셋 인덱스 계산
         let assetIndexPath = IndexPath(item: indexPath.item - 1, section: 0)
         
+        // (FIX) 데이터 리로드 중 인덱스 충돌 방지
+        guard assetIndexPath.item < viewModel.numberOfItems() else { return }
+        
         if viewModel.isSelectionMode{
-            let asset = viewModel.asset(at: assetIndexPath)
+            let asset = viewModel.asset(at: assetIndexPath) // 오프셋 인덱스 사용
             viewModel.toggleSelection(for: asset.localIdentifier)
-            
-            if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
-                let isSelected = viewModel.isSelected(asset.localIdentifier)
-                cell.updateSelectionState(isSelected)
-            }
+            // (MODIFIED) 뷰모델의 onSelectionUpdated 콜백이 셀 업데이트를 처리
         }else{
-            let tappedIndex = assetIndexPath.item
+            let tappedIndex = assetIndexPath.item // 오프셋 인덱스 사용
             let allLoadedAssets = viewModel.loadedAssets
             
             let totalCount = viewModel.totalAssetCount
@@ -681,15 +690,23 @@ extension PhotoPickerViewController: UICollectionViewDelegate {
     }
     
     func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
+        
+        // (FIX) '선택 드래그'가 시작되었다면 (panMode == .selecting), 탭 이벤트를 무시합니다.
+        guard panMode != .selecting else { return }
+        
         guard indexPath.item > 0 else { return } //카메라 셀 무시
         guard viewModel.isSelectionMode else { return }
-        let asset = viewModel.asset(at: indexPath)
-        viewModel.toggleSelection(for: asset.localIdentifier)
         
-        if let cell = collectionView.cellForItem(at: indexPath) as? PhotoThumbnailCell {
-            let isSelected = viewModel.isSelected(asset.localIdentifier)
-            cell.updateSelectionState(isSelected)
-        }
+        // (FIXED) asset(at: indexPath) 버그 수정 -> assetIndexPath 사용
+        let assetIndexPath = IndexPath(item: indexPath.item - 1, section: 0)
+        
+        // (FIX) 뷰모델의 애셋 수보다 인덱스가 크면(데이터 리로드 중) 무시
+        guard assetIndexPath.item < viewModel.numberOfItems() else { return }
+        
+        let asset = viewModel.asset(at: assetIndexPath)
+        
+        viewModel.toggleSelection(for: asset.localIdentifier)
+        // (MODIFIED) 뷰모델의 onSelectionUpdated 콜백이 셀 업데이트를 처리
     }
 }
 
@@ -697,13 +714,11 @@ extension PhotoPickerViewController: UICollectionViewDelegateFlowLayout{
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
         guard viewModel.isLimitedAccess else { return .zero }
         
-        // 안전하게 헤더뷰 인스턴스 생성 후 높이 계산
         let fittingWidth = collectionView.bounds.width
         let headerView = PhotoPickerHeaderView(frame: CGRect(x: 0, y: 0, width: fittingWidth, height: 0))
         headerView.setNeedsLayout()
         headerView.layoutIfNeeded()
         
-        // 콘텐츠 사이즈 계산
         let targetSize = CGSize(width: fittingWidth, height: UIView.layoutFittingCompressedSize.height)
         let height = headerView.systemLayoutSizeFitting(targetSize).height
         
@@ -711,6 +726,7 @@ extension PhotoPickerViewController: UICollectionViewDelegateFlowLayout{
     }
 }
 
+// (NEW) 카메라 셀 오프셋 적용
 extension PhotoPickerViewController: UICollectionViewDataSourcePrefetching{
     func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
         let indexs = indexPaths.compactMap { $0.item > 0 ? $0.item - 1 : nil }
@@ -738,6 +754,7 @@ extension PhotoPickerViewController: UICollectionViewDataSourcePrefetching{
     }
 }
 
+// (NEW) 카메라 셀 오프셋 적용
 extension PhotoPickerViewController: UIScrollViewDelegate{
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard let maxVisibleUIItem = collectionView.indexPathsForVisibleItems.map(\.item).max() else { return }
@@ -756,6 +773,10 @@ extension PhotoPickerViewController: UIGestureRecognizerDelegate{
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer == pan else { return true }
         
+        // (FIX) 매번 제스처 시작 시 .none으로 초기화
+        panMode = .none
+        
+        // (NEW) 카메라 셀(0)에서는 스크롤만 허용
         let location = pan.location(in: collectionView)
         if let indexPath = collectionView.indexPathForItem(at: location), indexPath.item == 0 {
             panMode = .scrolling
@@ -783,50 +804,53 @@ extension PhotoPickerViewController: UIGestureRecognizerDelegate{
     
     //collectionView 스크롤 제스처와 동시 인식 허용
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // (FIX)
+        // 1. 팬 선택 모드(.selecting)일 때는, 컬렉션뷰의 스크롤(pan) 제스처와 동시 인식을 *허용하지 않습니다.* (false)
         if panMode == .selecting,
            otherGestureRecognizer == collectionView.panGestureRecognizer{
             return false
         }
-        return true
+        
+        // 2. 스크롤 모드(.scrolling)일 때는 컬렉션뷰 스크롤과 동시 인식을 *허용합니다.* (true)
+        if panMode == .scrolling, otherGestureRecognizer == collectionView.panGestureRecognizer {
+            return true
+        }
+        
+        // 3. 그 외의 경우는(panMode == .none 등) 충돌을 방지하기 위해 false를 반환합니다.
+        return false
     }
 }
 
+// (NEW) 카메라 결과 처리를 위한 Delegate
 extension PhotoPickerViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         
         guard let image = info[.originalImage] as? UIImage else {
-            // 이미지를 가져오지 못한 경우
             picker.dismiss(animated: true)
             return
         }
         
         var placeholder: PHObjectPlaceholder?
         
-        // 1. 사진을 포토 라이브러리에 저장
         PHPhotoLibrary.shared().performChanges({
             let request = PHAssetChangeRequest.creationRequestForAsset(from: image)
             placeholder = request.placeholderForCreatedAsset
         }, completionHandler: { [weak self] success, error in
             DispatchQueue.main.async {
-                // 2. 카메라 창 닫기
                 picker.dismiss(animated: true)
                 
                 if success, let identifier = placeholder?.localIdentifier {
-                    // 3. 저장이 성공하면, 새로 생긴 애셋의 ID를 저장
-                    // (ViewModel의 Observer가 이 변경을 감지하고 onAssetsReloaded를 호출할 것임)
                     print("사진 저장 성공: \(identifier)")
                     self?.newlySaveAssetIdentifier = identifier
                 } else if let error = error {
                     print("사진 저장 실패: \(error.localizedDescription)")
-                    // (Optional) 사용자에게 저장 실패 알림
                 }
             }
         })
     }
     
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        // 카메라 촬영 중 취소
         picker.dismiss(animated: true)
     }
 }

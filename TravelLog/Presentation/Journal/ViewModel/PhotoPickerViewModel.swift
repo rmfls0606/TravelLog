@@ -283,7 +283,7 @@ final class PhotoPickerViewModel{
         let updates = oldSelected.reduce(into: [String: Bool]()) {
             $0[$1] = false
         }
-        onSelectionUpdated?([:])
+        onSelectionUpdated?(updates)
     }
     
     func toggleSelection(for identifier : String){
