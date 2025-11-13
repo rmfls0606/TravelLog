@@ -514,7 +514,17 @@ final class PhotoPickerViewController: UIViewController {
         present(alert, animated: true)
     }
     
+    // (NEW) 실제 카메라 피커를 띄우는 헬퍼 함수
+    private func openCameraPicker() {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.allowsEditing = false
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+    
     private func showCamera() {
+        // 1. 하드웨어 사용 가능 여부 확인
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
             // 시뮬레이터 등 카메라 사용 불가 알림
             let alert = UIAlertController(title: "카메라 사용 불가", message: "이 기기에서는 카메라를 사용할 수 없습니다.", preferredStyle: .alert)
@@ -523,11 +533,48 @@ final class PhotoPickerViewController: UIViewController {
             return
         }
         
-        let picker = UIImagePickerController()
-        picker.sourceType = .camera
-        picker.allowsEditing = true // 필요시 true로 변경
-        picker.delegate = self
-        present(picker, animated: true)
+        // 2. 카메라 권한 상태 확인
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch status {
+        case .authorized:
+            // 2-1. 권한이 승인된 경우: 카메라 열기
+            openCameraPicker()
+            
+        case .notDetermined:
+            // 2-2. 권한이 아직 결정되지 않은 경우: 권한 요청
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.openCameraPicker()
+                    }
+                }
+            }
+            
+        case .denied, .restricted:
+            // 2-3. 권한이 거부되거나 제한된 경우: 설정 이동 얼럿 띄우기
+            showCameraPermissionAlert()
+            
+        @unknown default:
+            // 알 수 없는 상태
+            print("Unknown camera authorization status")
+        }
+    }
+    
+    // (NEW) 카메라 권한 거부 시 설정 이동 얼럿
+    private func showCameraPermissionAlert() {
+        let alert = UIAlertController(
+            title: "카메라 권한 필요",
+            message: "사진을 촬영하려면 카메라 접근 권한이 필요합니다. '설정'으로 이동하여 권한을 허용해주세요.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "설정으로 이동", style: .default) { _ in
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+        })
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        present(alert, animated: true)
     }
 }
 
