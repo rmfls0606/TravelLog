@@ -38,6 +38,7 @@ final class JournalAddViewController: BaseViewController {
     private let textButton = UIButton(configuration: .filled())
     private let linkButton = UIButton(configuration: .filled())
     private let photoButton = UIButton(configuration: .filled())
+    private let audioButton = UIButton(configuration: .filled())
     
     private let saveButton = UIButton(configuration: .filled())
     
@@ -58,6 +59,7 @@ final class JournalAddViewController: BaseViewController {
         addBar.addArrangedSubview(textButton)
         addBar.addArrangedSubview(linkButton)
         addBar.addArrangedSubview(photoButton)
+        addBar.addArrangedSubview(audioButton)
         addBlockContainer.addSubview(blockTitle)
         addBlockContainer.addSubview(addBar)
         // empty container
@@ -146,6 +148,7 @@ final class JournalAddViewController: BaseViewController {
             systemName: "pencil.line",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         )
+        textConfig.imagePlacement = .top
         textConfig.imagePadding = 8
         textConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
         textConfig.attributedTitle = AttributedString(
@@ -169,6 +172,7 @@ final class JournalAddViewController: BaseViewController {
             systemName: "link",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         )
+        linkConfig.imagePlacement = .top
         linkConfig.imagePadding = 8
         linkConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
         linkConfig.attributedTitle = AttributedString(
@@ -192,6 +196,7 @@ final class JournalAddViewController: BaseViewController {
             systemName: "camera",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
         )
+        photoConfig.imagePlacement = .top
         photoConfig.imagePadding = 8
         photoConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
         photoConfig.attributedTitle = AttributedString(
@@ -207,6 +212,30 @@ final class JournalAddViewController: BaseViewController {
         
         photoButton.configuration = photoConfig
         photoButton.clipsToBounds = true
+        
+        //음성 버튼
+        var audioConfig = UIButton.Configuration.filled()
+        audioConfig.baseForegroundColor = .white
+        audioConfig.image = UIImage(
+            systemName: "microphone",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        )
+        audioConfig.imagePlacement = .top
+        audioConfig.imagePadding = 8
+        audioConfig.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        audioConfig.attributedTitle = AttributedString(
+            "음성",
+            attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 15, weight: .semibold)])
+        )
+        
+        // UIBackgroundConfiguration.clear() 사용
+        var audioBg = UIBackgroundConfiguration.clear()
+        audioBg.cornerRadius = 12
+        audioBg.backgroundColor = UIColor.systemOrange
+        audioConfig.background = audioBg
+        
+        audioButton.configuration = audioConfig
+        audioButton.clipsToBounds = true
         
         // 저장 버튼
         var saveConfig = UIButton.Configuration.filled()
