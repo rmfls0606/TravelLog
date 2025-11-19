@@ -311,6 +311,10 @@ final class JournalAddViewController: BaseViewController {
             .bind(to: saveTrigger)
             .disposed(by: disposeBag)
         
+        audioButton.rx.tap
+            .bind(with: self) { owner, _ in owner.addAudioBlock() }
+            .disposed(by: disposeBag)
+        
         let input = JournalAddViewModel.Input(saveTapped: saveTrigger.asObservable())
         let output = viewModel.transform(input: input)
         
@@ -399,6 +403,30 @@ final class JournalAddViewController: BaseViewController {
                 owner.present(nav, animated: true)
             }
             .disposed(by: card.disposeBag)
+        
+        card.removeTapped
+            .bind(with: self) { owner, _ in
+                UIView.animate(withDuration: 0.25) {
+                    card.alpha = 0
+                } completion: { _ in
+                    owner.contentStack.removeArrangedSubview(card)
+                    card.removeFromSuperview()
+                    
+                    if owner.contentStack.arrangedSubviews.isEmpty {
+                        owner.emptyContainerView.isHidden = false
+                        owner.updateSaveButton(enabled: false)
+                    }
+                }
+            }
+            .disposed(by: card.disposeBag)
+    }
+    
+    private func addAudioBlock(){
+        emptyContainerView.isHidden = true
+        updateSaveButton(enabled: true)
+
+        let card = JournalAudioBlockView()
+        contentStack.addArrangedSubview(card)
         
         card.removeTapped
             .bind(with: self) { owner, _ in
