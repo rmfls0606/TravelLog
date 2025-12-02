@@ -157,6 +157,10 @@ final class JournalAudioBlockView: BaseView {
         forward15Button.tintColor = .systemGray
         [back15Button, playPauseButton, forward15Button].forEach { controlStack.addArrangedSubview($0) }
 
+        back15Button.setPreferredSymbolConfiguration(.init(pointSize: 26, weight: .medium), forImageIn: .normal)
+        playPauseButton.setPreferredSymbolConfiguration(.init(pointSize: 32, weight: .semibold), forImageIn: .normal)
+        forward15Button.setPreferredSymbolConfiguration(.init(pointSize: 26, weight: .medium), forImageIn: .normal)
+        
         // 상태 버튼 탭: 녹음/정지/재생 토글
         stateButton.rx.tap
             .bind(with: self) { owner, _ in
@@ -185,20 +189,20 @@ final class JournalAudioBlockView: BaseView {
     
     private func setupLayout() {
         headerStack.snp.makeConstraints {
-            $0.top.equalToSuperview().inset(12)
+            $0.top.equalToSuperview().inset(16)
             $0.horizontalEdges.equalToSuperview().inset(16)
         }
 
         dashBox.snp.makeConstraints {
-            $0.top.equalTo(headerStack.snp.bottom).offset(12)
+            $0.top.equalTo(headerStack.snp.bottom).offset(16)
             $0.leading.trailing.bottom.equalToSuperview().inset(16)
-            $0.height.equalTo(160)
+//            $0.height.equalTo(160)
         }
 
         waveformView.snp.makeConstraints {
-            $0.top.equalToSuperview().inset(24)
-            $0.horizontalEdges.equalToSuperview().inset(24)
-            $0.height.equalTo(30)
+            $0.top.equalToSuperview().inset(16)
+            $0.horizontalEdges.equalToSuperview().inset(16)
+            $0.height.equalTo(36)
         }
 
         playbackTimeLabel.snp.makeConstraints {
@@ -222,6 +226,7 @@ final class JournalAudioBlockView: BaseView {
         controlStack.snp.makeConstraints {
             $0.top.equalTo(playbackTimeLabel.snp.bottom).offset(16)
             $0.centerX.equalToSuperview()
+            $0.bottom.equalToSuperview().inset(16)
         }
     }
 
