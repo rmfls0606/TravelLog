@@ -65,6 +65,7 @@ final class JournalAudioBlockViewModel {
         let playbackProgress: Driver<Double>
         let waveformLevel: Driver<Float>
         let alertMessage: Signal<String>
+        let resetToIdle: Signal<Void>
     }
 
     // MARK: - Private
@@ -85,6 +86,7 @@ final class JournalAudioBlockViewModel {
     private let durationRelay = BehaviorRelay(value: "00:00")
     private let waveformRelay = BehaviorRelay<Float>(value: 0.0)
     private let alertRelay = PublishRelay<String>()
+    private let resetRelay = PublishRelay<Void>()
 
     // MARK: - Transform
     func transform(_ input: Input) -> Output {
@@ -120,7 +122,8 @@ final class JournalAudioBlockViewModel {
             totalDuration: durationRelay.asDriver(),
             playbackProgress: progressRelay.asDriver(),
             waveformLevel: waveformRelay.asDriver(),
-            alertMessage: alertRelay.asSignal()
+            alertMessage: alertRelay.asSignal(),
+            resetToIdle: resetRelay.asSignal()
         )
     }
 
@@ -153,7 +156,7 @@ final class JournalAudioBlockViewModel {
             startRecording()
 
         case .denied:
-            alertRelay.accept("마이크 접근이 거부되었습니다.\n설정에서 허용해주세요.")
+            presentSettingsAlert()
 
         case .undetermined:
             audioSession.requestRecordPermission { [weak self] granted in
@@ -216,6 +219,18 @@ final class JournalAudioBlockViewModel {
             currentTimeRelay.accept("00:00")
             recorder?.stop()
             isRecordingRelay.accept(false)
+            // 1초 미만이면 무시
+            if recordedDuration < 1 {
+                if let url = recordedFileURL {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                recordedFileURL = nil
+                alertRelay.accept("음성 기록이 너무 짧습니다.")
+                progressRelay.accept(0)
+                waveformRelay.accept(0)
+                durationRelay.accept("00:00")
+                resetRelay.accept(())
+            }
         }
         if isPlayingRelay.value {
             if external {
@@ -354,6 +369,44 @@ final class JournalAudioBlockViewModel {
         let clamped = min(0, power)
         let linear = (clamped - minDb) / (-minDb) // 0...1
         return pow(linear, 2.2) // emphasize loud parts, shrink quiet parts
+    }
+
+    // --------------------------------------------------------------------
+    // MARK: - Settings Alert
+    // --------------------------------------------------------------------
+    private func presentSettingsAlert() {
+        DispatchQueue.main.async {
+            guard let topVC = self.topViewController() else { return }
+            let alert = UIAlertController(
+                title: nil,
+                message: "음성녹음 기능을 사용하려면 ‘마이크’ 접근 권한을 허용해야 합니다.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel, handler: nil))
+            alert.addAction(UIAlertAction(title: "설정", style: .default, handler: { _ in
+                if let url = URL(string: UIApplication.openSettingsURLString),
+                   UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url)
+                }
+            }))
+            topVC.present(alert, animated: true)
+        }
+    }
+
+    private func topViewController(base: UIViewController? = UIApplication.shared.connectedScenes
+        .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+        .first?.rootViewController) -> UIViewController? {
+
+        if let nav = base as? UINavigationController {
+            return topViewController(base: nav.visibleViewController)
+        }
+        if let tab = base as? UITabBarController {
+            return topViewController(base: tab.selectedViewController)
+        }
+        if let presented = base?.presentedViewController {
+            return topViewController(base: presented)
+        }
+        return base
     }
 
     // MARK: - Notifications (Interruptions / Route Changes)

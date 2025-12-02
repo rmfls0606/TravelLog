@@ -9,6 +9,7 @@ import UIKit
 import SnapKit
 import RxSwift
 import RxCocoa
+import Toast
 
 final class JournalAudioBlockView: BaseView {
 
@@ -293,6 +294,14 @@ final class JournalAudioBlockView: BaseView {
             }
             .disposed(by: disposeBag)
 
+        output.resetToIdle
+            .emit(with: self) { owner, _ in
+                owner.audioState = .idle
+                owner.waveformView.beginRecording()
+                owner.playbackTimeLabel.text = "00:00"
+            }
+            .disposed(by: disposeBag)
+
         output.playbackProgress
             .drive(with: self) { owner, progress in
                 owner.waveformView.updatePlayhead(progress: CGFloat(progress))
@@ -301,8 +310,10 @@ final class JournalAudioBlockView: BaseView {
 
         output.alertMessage
             .emit(with: self) { owner, msg in
-//                owner.showAlert(msg)
-                print(msg)
+                var style = ToastStyle()
+                style.backgroundColor = .systemRed
+                style.messageColor = .white
+                owner.makeToast(msg, duration: 2.0, position: .top, style: style)
             }
             .disposed(by: disposeBag)
     }
