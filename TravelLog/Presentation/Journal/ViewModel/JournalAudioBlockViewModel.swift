@@ -219,6 +219,7 @@ final class JournalAudioBlockViewModel {
             currentTimeRelay.accept("00:00")
             recorder?.stop()
             isRecordingRelay.accept(false)
+            progressRelay.accept(0)
             // 1초 미만이면 무시
             if recordedDuration < 1 {
                 if let url = recordedFileURL {
