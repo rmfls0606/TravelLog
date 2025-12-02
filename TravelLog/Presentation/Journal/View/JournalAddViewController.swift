@@ -424,9 +424,11 @@ final class JournalAddViewController: BaseViewController {
     private func addAudioBlock(){
         emptyContainerView.isHidden = true
         updateSaveButton(enabled: true)
-
-        let card = JournalAudioBlockView()
-        contentStack.addArrangedSubview(card)
+        let audioViewModel = JournalAudioBlockViewModel()   //  뷰모델 생성 및 주입
+        let card = JournalAudioBlockView(vm: audioViewModel)
+           
+            contentStack.addArrangedSubview(card)
+            card.snp.makeConstraints { $0.height.greaterThanOrEqualTo(180) }
         
         card.removeTapped
             .bind(with: self) { owner, _ in
