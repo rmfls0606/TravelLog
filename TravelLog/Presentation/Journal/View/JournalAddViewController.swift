@@ -293,7 +293,7 @@ final class JournalAddViewController: BaseViewController {
                         return JournalAddViewModel.JournalBlockData(type: .text, text: content, linkURL: nil)
                     } else if let linkBlock = $0 as? JournalLinkBlockView, let content = linkBlock.textContent, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         return JournalAddViewModel.JournalBlockData(type: .link, text: nil, linkURL: content)
-                    }else if let photoBlock = $0 as? JournalPhotoBlockView,
+                    } else if let photoBlock = $0 as? JournalPhotoBlockView,
                              !photoBlock.selectedImages.isEmpty ||
                                 !photoBlock.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         // 사진 블록
@@ -303,6 +303,14 @@ final class JournalAddViewController: BaseViewController {
                             linkURL: nil,
                             photoDescription: photoBlock.textContent,
                             photoImages: photoBlock.selectedImages
+                        )
+                    } else if let audioBlock = $0 as? JournalAudioBlockView,
+                              let url = audioBlock.audioFileURL {
+                        return JournalAddViewModel.JournalBlockData(
+                            type: .voice,
+                            text: nil,
+                            linkURL: nil,
+                            voiceFileURL: url
                         )
                     }
                     return nil

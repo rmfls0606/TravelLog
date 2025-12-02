@@ -75,8 +75,8 @@ final class JournalAudioBlockViewModel {
     private var recorder: AVAudioRecorder?
     private var player: AVAudioPlayer?
     private var timer: Timer?
-    private var recordedFileURL: URL?
-    private var recordedDuration: TimeInterval = 0
+    private(set) var recordedFileURL: URL?
+    private(set) var recordedDuration: TimeInterval = 0
     private let progressRelay = BehaviorRelay<Double>(value: 0)
     private let coordinator = AudioCoordinator.shared
 

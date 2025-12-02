@@ -48,6 +48,11 @@ final class JournalAudioBlockView: BaseView {
     let skipBackwardTapped = PublishRelay<Void>()
     let skipForwardTapped = PublishRelay<Void>()
     let removeTapped = PublishRelay<Void>()
+    
+    // 외부 저장 시 녹음 파일 경로 제공
+    var audioFileURL: URL? { viewModel.recordedFileURL }
+    var audioDuration: TimeInterval { viewModel.recordedDuration }
+    func getAudioFileURL() -> URL? { viewModel.recordedFileURL } // convenience for callers
 
     private enum AudioState {
         case idle

@@ -23,7 +23,8 @@ protocol JournalRepositoryType {
         linkDescription: String?,
         linkImage: UIImage?,
         photoDescription: String?,
-        photoImages: [UIImage]?
+        photoImages: [UIImage]?,
+        voiceFileURL: URL?
     ) -> Completable
     func fetchJournalCount(tripId: ObjectId) -> Single<Int>
 }
@@ -40,7 +41,8 @@ final class JournalRepository: JournalRepositoryType {
         linkDescription: String?,
         linkImage: UIImage?,
         photoDescription: String?,
-        photoImages: [UIImage]?
+        photoImages: [UIImage]?,
+        voiceFileURL: URL?
     ) -> Completable {
         return Completable.create { completable in
             do {
@@ -107,6 +109,25 @@ final class JournalRepository: JournalRepositoryType {
                             let filename = "\(block.id.stringValue)_photo_\(index)"
                             LinkMetadataRepositoryImpl.saveImageToDocuments(image, filename: filename)
                             block.imageURLs.append(filename)
+                        }
+                    }
+                    
+                case .voice:
+                    if let sourceURL = voiceFileURL {
+                        let fileManager = FileManager.default
+                        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                            let filename = "\(block.id.stringValue)_voice.m4a"
+                            let destURL = docs.appendingPathComponent(filename)
+                            // 중복 시 덮어쓰기
+                            if fileManager.fileExists(atPath: destURL.path) {
+                                try? fileManager.removeItem(at: destURL)
+                            }
+                            do {
+                                try fileManager.copyItem(at: sourceURL, to: destURL)
+                                block.voiceURL = filename
+                            } catch {
+                                print("Voice copy failed: \(error.localizedDescription)")
+                            }
                         }
                     }
                     

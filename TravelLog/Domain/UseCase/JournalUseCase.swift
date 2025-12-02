@@ -22,6 +22,7 @@ protocol JournalUseCaseType {
         linkImage: UIImage?,
         photoDescription: String?,
         photoImages: [UIImage]?,
+        voiceFileURL: URL?,
         date: Date
     ) -> Completable
     func deleteJournalBlock(journalId: ObjectId, blockId: ObjectId) -> Completable
@@ -49,6 +50,7 @@ final class JournalUseCase: JournalUseCaseType {
         linkImage: UIImage?,
         photoDescription: String?,
         photoImages: [UIImage]?,
+        voiceFileURL: URL?,
         date: Date
     ) -> Completable {
         return Completable.create { [weak self] completable in
@@ -80,7 +82,8 @@ final class JournalUseCase: JournalUseCaseType {
                         linkDescription: linkDescription,
                         linkImage: linkImage,
                         photoDescription: photoDescription,
-                        photoImages: photoImages
+                        photoImages: photoImages,
+                        voiceFileURL: voiceFileURL
                     )
                     .subscribe(completable)
                     .disposed(by: DisposeBag())
@@ -97,7 +100,8 @@ final class JournalUseCase: JournalUseCaseType {
                                 linkDescription: linkDescription,
                                 linkImage: linkImage,
                                 photoDescription: photoDescription,
-                                photoImages: photoImages
+                                photoImages: photoImages,
+                                voiceFileURL: voiceFileURL
                             )
                         }
                         .subscribe(completable)
@@ -137,6 +141,13 @@ final class JournalUseCase: JournalUseCaseType {
                         if fileManager.fileExists(atPath: fileURL.path) {
                             try? fileManager.removeItem(at: fileURL)
                         }
+                    }
+                }
+                
+                if let voiceName = block.voiceURL {
+                    let fileURL = docURL.appendingPathComponent(voiceName)
+                    if fileManager.fileExists(atPath: fileURL.path) {
+                        try? fileManager.removeItem(at: fileURL)
                     }
                 }
                 

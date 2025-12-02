@@ -28,6 +28,7 @@ final class JournalAddViewModel: BaseViewModel {
         let type: JournalBlockType
         let text: String?
         let linkURL: String?
+        let voiceFileURL: URL?
         
         // 메타데이터 확장 필드
         var linkTitle: String? = nil
@@ -37,6 +38,28 @@ final class JournalAddViewModel: BaseViewModel {
         //사진 확장 필드
         var photoDescription: String? = nil
         var photoImages: [UIImage]? = nil
+        
+        init(
+            type: JournalBlockType,
+            text: String? = nil,
+            linkURL: String? = nil,
+            voiceFileURL: URL? = nil,
+            linkTitle: String? = nil,
+            linkDescription: String? = nil,
+            linkImage: UIImage? = nil,
+            photoDescription: String? = nil,
+            photoImages: [UIImage]? = nil
+        ) {
+            self.type = type
+            self.text = text
+            self.linkURL = linkURL
+            self.voiceFileURL = voiceFileURL
+            self.linkTitle = linkTitle
+            self.linkDescription = linkDescription
+            self.linkImage = linkImage
+            self.photoDescription = photoDescription
+            self.photoImages = photoImages
+        }
     }
     
     // MARK: - Properties
@@ -66,6 +89,8 @@ final class JournalAddViewModel: BaseViewModel {
                     case .photo:
                         return !($0.photoImages?.isEmpty ?? true) ||
                                !($0.photoDescription?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                    case .voice:
+                        return $0.voiceFileURL != nil
                     default:
                         return false
                     }
@@ -102,6 +127,7 @@ final class JournalAddViewModel: BaseViewModel {
                                 linkImage: $0.linkImage,
                                 photoDescription: $0.photoDescription,
                                 photoImages: $0.photoImages,
+                                voiceFileURL: $0.voiceFileURL,
                                 date: self.selectedDate
                             )
                         }
