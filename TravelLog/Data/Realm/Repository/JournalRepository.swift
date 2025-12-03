@@ -56,7 +56,15 @@ final class JournalRepository: JournalRepositoryType {
                 block.journalId = journalId
                 block.type = type
                 block.text = text
-                block.createdAt = journal.createdAt
+                // 블록 생성 시각을 실제 저장 시각으로 기록 (00:00 고정 방지)
+                let now = Date()
+                let calendar = Calendar.current
+                var dateComponents = calendar.dateComponents([.year, .month, .day], from: journal.createdAt)
+                let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: now)
+                dateComponents.hour = timeComponents.hour
+                dateComponents.minute = timeComponents.minute
+                dateComponents.second = timeComponents.second
+                block.createdAt = calendar.date(from: dateComponents) ?? now
                 
                 switch type {
                     

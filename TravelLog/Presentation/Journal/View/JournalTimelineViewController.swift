@@ -11,6 +11,8 @@ import RxSwift
 import RxCocoa
 import RealmSwift
 import SafariServices
+import AVFoundation
+import Toast
 
 final class JournalTimelineViewController: BaseViewController {
     
@@ -35,6 +37,13 @@ final class JournalTimelineViewController: BaseViewController {
     private var groupedData: [(date: Date, blocks: [JournalBlockTable])] = []
     private var trip: TravelTable?
     private let deleteTappedSubject = PublishSubject<(ObjectId, ObjectId)>()
+    
+    // Audio playback state
+    private var audioPlayer: AVAudioPlayer?
+    private var playTimer: Timer?
+    private var currentPlayingIndexPath: IndexPath?
+    private var playbackPositions: [IndexPath: TimeInterval] = [:]
+    private var playbackDurations: [IndexPath: TimeInterval] = [:]
     
     // MARK: - Init
     init(tripId: ObjectId) {
@@ -182,6 +191,7 @@ final class JournalTimelineViewController: BaseViewController {
         tableView.register(JournalTextCell.self, forCellReuseIdentifier: JournalTextCell.identifier)
         tableView.register(JournalLinkCell.self, forCellReuseIdentifier: JournalLinkCell.identifier)
         tableView.register(JournalPhotoCell.self, forCellReuseIdentifier: JournalPhotoCell.identifier)
+        tableView.register(JournalAudioCell.self, forCellReuseIdentifier: JournalAudioCell.reuseIdentifier)
         tableView.register(JournalDateHeaderView.self, forHeaderFooterViewReuseIdentifier: JournalDateHeaderView.identifier)
         tableView.register(JournalAddFooterView.self, forHeaderFooterViewReuseIdentifier: JournalAddFooterView.identifier)
         tableView.dataSource = self
@@ -255,6 +265,11 @@ final class JournalTimelineViewController: BaseViewController {
             .subscribe(with: self) { owner, _ in
                 owner.tableView.reloadData()
             }
+            .disposed(by: disposeBag)
+
+        // 앱이 백그라운드로 갈 때 재생 일시정지 (다른 앱 전환 시)
+        NotificationCenter.default.rx.notification(UIApplication.didEnterBackgroundNotification)
+            .bind(with: self) { owner, _ in owner.stopPlayback(resetUI: false, deactivateSession: true) }
             .disposed(by: disposeBag)
     }
     
@@ -383,6 +398,81 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             
             return cell
             
+        case .voice:
+            let cell = tableView.dequeueReusableCell(withIdentifier: JournalAudioCell.reuseIdentifier, for: indexPath) as! JournalAudioCell
+            cell.configure(with: block)
+            cell.isUserInteractionEnabled = true
+            cell.contentView.isUserInteractionEnabled = true
+            if let voiceName = block.voiceURL {
+                guard let resolvedURL = resolveVoiceURL(name: voiceName) else {
+                    cell.setDuration(0)
+                    cell.updateCurrentTime(0, progress: 0)
+                    cell.setPlaying(false)
+                    cell.isUserInteractionEnabled = false
+                    cell.contentView.isUserInteractionEnabled = false
+                    return cell
+                }
+
+                guard FileManager.default.fileExists(atPath: resolvedURL.path) else {
+                    showToast("녹음 파일이 없습니다.")
+                    cell.setDuration(0)
+                    cell.updateCurrentTime(0, progress: 0)
+                    cell.setPlaying(false)
+                    cell.isUserInteractionEnabled = false
+                    cell.contentView.isUserInteractionEnabled = false
+                    return cell
+                }
+                
+                do {
+                    let tempPlayer = try AVAudioPlayer(contentsOf: resolvedURL)
+                    tempPlayer.prepareToPlay()
+                    let duration = tempPlayer.duration
+                    playbackDurations[indexPath] = duration
+                    cell.setDuration(duration)
+                    // 이전 재생 위치가 있으면 표시 (다른 셀 재생으로 멈춘 경우)
+                    let cached = playbackPositions[indexPath] ?? 0
+                    let clamped = max(0, min(duration, cached))
+                    let progress = duration > 0 ? clamped / duration : 0
+                    cell.updateCurrentTime(clamped, progress: progress)
+                    cell.setPlaying(false)
+                    
+                    cell.playTapped
+                        .bind(with: self) { owner, _ in
+                            owner.togglePlay(at: indexPath, url: resolvedURL, duration: duration, cell: cell)
+                        }
+                        .disposed(by: cell.reuseBag)
+                    
+                    cell.skipBackwardTapped
+                        .bind(with: self) { owner, _ in owner.seek(by: -15, cell: cell, at: indexPath) }
+                        .disposed(by: cell.reuseBag)
+                    
+                    cell.skipForwardTapped
+                        .bind(with: self) { owner, _ in owner.seek(by: 15, cell: cell, at: indexPath) }
+                        .disposed(by: cell.reuseBag)
+                    
+                    cell.seekChanged
+                        .bind(with: self) { owner, progress in
+                            owner.seek(toProgress: Double(progress), cell: cell, at: indexPath)
+                        }
+                        .disposed(by: cell.reuseBag)
+                } catch {
+                    showToast("녹음 파일을 재생할 수 없습니다.")
+                    cell.setDuration(0)
+                    cell.updateCurrentTime(0, progress: 0)
+                    cell.setPlaying(false)
+                    playbackDurations[indexPath] = 0
+                    cell.isUserInteractionEnabled = false
+                }
+                
+            } else {
+                cell.setDuration(0)
+                cell.updateCurrentTime(0, progress: 0)
+                cell.setPlaying(false)
+                playbackDurations[indexPath] = 0
+                cell.isUserInteractionEnabled = false
+            }
+            return cell
+            
         default:
             return UITableViewCell()
         }
@@ -396,6 +486,8 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
             linkCell.setIsFirstInTimeline(isFirst)
         }else if let photoCell = cell as? JournalPhotoCell{
             photoCell.setIsFirstInTimeline(isFirst)
+        } else if let audioCell = cell as? JournalAudioCell {
+            audioCell.setIsFirstInTimeline(isFirst)
         }
     }
 }
@@ -417,5 +509,211 @@ extension JournalTimelineViewController {
         
         deleteAction.backgroundColor = .systemRed
         return UISwipeActionsConfiguration(actions: [deleteAction])
+    }
+}
+
+// MARK: - Audio Playback
+private extension JournalTimelineViewController {
+    func togglePlay(at indexPath: IndexPath, url: URL, duration: TimeInterval, cell: JournalAudioCell) {
+        // 다른 셀 정지
+        if let current = currentPlayingIndexPath, current != indexPath {
+            stopPlayback(resetUI: false, deactivateSession: false)
+        }
+        // 동일 셀 토글
+        if currentPlayingIndexPath == indexPath, audioPlayer?.isPlaying == true {
+            if let player = audioPlayer {
+                playbackPositions[indexPath] = player.currentTime
+                player.pause()
+                cell.setPlaying(false)
+                stopTimerOnly()
+                deactivateAudioSession()
+                return
+            }
+        }
+        guard activateAudioSession() else { return }
+
+        do {
+            // 항상 새 플레이어로 초기화 (재생 실패 방지)
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.volume = 1.0
+            audioPlayer?.delegate = self
+
+            guard let player = audioPlayer else {
+                showToast("녹음 파일을 재생할 수 없습니다.")
+                return
+            }
+            let startTime = playbackPositions[indexPath] ?? 0
+            if startTime > 0, startTime < player.duration {
+                player.currentTime = startTime
+            }
+            if duration <= 0 && player.duration <= 0 {
+                showToast("녹음 파일을 재생할 수 없습니다.")
+                return
+            }
+            currentPlayingIndexPath = indexPath
+            if !player.play() {
+                showToast("녹음 파일을 재생할 수 없습니다.")
+                return
+            }
+            cell.setPlaying(true)
+            startTimer(for: cell, duration: player.duration)
+            playbackPositions[indexPath] = player.currentTime
+        } catch {
+            print("Audio play error: \(error.localizedDescription)")
+            showToast("녹음 파일을 재생할 수 없습니다.")
+        }
+    }
+    
+    func startTimer(for cell: JournalAudioCell, duration: TimeInterval) {
+        stopTimerOnly()
+        playTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self, weak cell] _ in
+            guard let self, let player = self.audioPlayer, let cell else { return }
+            let current = player.currentTime
+            let total = player.duration > 0 ? player.duration : duration
+            let progress = total > 0 ? current / total : 0
+            cell.updateCurrentTime(current, progress: progress)
+            if let idx = self.currentPlayingIndexPath {
+                self.playbackPositions[idx] = current
+            }
+            if !player.isPlaying {
+                cell.setPlaying(false)
+                self.stopPlayback()
+            }
+        }
+    }
+    
+    func stopTimerOnly() {
+        playTimer?.invalidate()
+        playTimer = nil
+    }
+    
+    func stopPlayback() {
+        stopPlayback(resetUI: true, deactivateSession: true)
+    }
+
+    private func stopPlayback(resetUI: Bool, deactivateSession: Bool) {
+        let lastIndex = currentPlayingIndexPath
+        let lastTime = audioPlayer?.currentTime ?? 0
+        let lastDuration = audioPlayer?.duration ?? 0
+        audioPlayer?.stop()
+        audioPlayer = nil
+        stopTimerOnly()
+        if let current = currentPlayingIndexPath ?? lastIndex,
+           let cell = tableView.cellForRow(at: current) as? JournalAudioCell {
+            cell.setPlaying(false)
+            if resetUI {
+                cell.updateCurrentTime(0, progress: 0)
+                playbackPositions[current] = 0
+            } else {
+                let clamped = max(0, min(lastDuration, lastTime))
+                let progress = lastDuration > 0 ? clamped / lastDuration : 0
+                cell.updateCurrentTime(clamped, progress: progress)
+                playbackPositions[current] = clamped
+            }
+        }
+        currentPlayingIndexPath = nil
+        if deactivateSession {
+            deactivateAudioSession()
+        }
+    }
+    
+    func seek(by seconds: TimeInterval, cell: JournalAudioCell, at indexPath: IndexPath) {
+        guard let player = audioPlayer, currentPlayingIndexPath == indexPath else { return }
+        let newTime = max(0, min(player.duration, player.currentTime + seconds))
+        player.currentTime = newTime
+        let progress = player.duration > 0 ? newTime / player.duration : 0
+        cell.updateCurrentTime(newTime, progress: progress)
+        if let idx = currentPlayingIndexPath {
+            playbackPositions[idx] = newTime
+        }
+    }
+    
+    func seek(toProgress progress: Double, cell: JournalAudioCell, at indexPath: IndexPath) {
+        let clamped = max(0, min(1, progress))
+
+        // 현재 재생 중인 셀일 때는 실제 플레이어 시킹
+        if let player = audioPlayer, currentPlayingIndexPath == indexPath {
+            let newTime = player.duration * clamped
+            player.currentTime = newTime
+            cell.updateCurrentTime(newTime, progress: clamped)
+            playbackPositions[indexPath] = newTime
+            return
+        }
+
+        // 재생 중이 아닐 때: UI와 캐시만 업데이트 → 다음 재생 시 해당 위치부터 시작
+        let duration = playbackDurations[indexPath] ?? 0
+        let newTime = duration * clamped
+        cell.updateCurrentTime(newTime, progress: clamped)
+        playbackPositions[indexPath] = newTime
+    }
+    
+    func showToast(_ message: String) {
+        var style = ToastStyle()
+        style.backgroundColor = .systemRed
+        style.messageColor = .white
+        view.makeToast(message, duration: 2.0, position: .center, style: style)
+    }
+
+    /// 재생용 오디오 세션 구성 (외부 음원은 재생/일시정지 대응)
+    private func activateAudioSession() -> Bool {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+            try session.setActive(true, options: [])
+            return true
+        } catch {
+            // 한 번 더 비활성화 후 재시도 (다른 세션 설정이 남아 있을 때 대비)
+            try? session.setActive(false, options: [])
+            do {
+                try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+                try session.setActive(true, options: [])
+                return true
+            } catch {
+                print("Audio session error: \(error.localizedDescription)")
+                showToast("오디오 세션을 시작할 수 없습니다.")
+                return false
+            }
+        }
+    }
+
+    private func deactivateAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+    }
+
+    private func resolveVoiceURL(name: String) -> URL? {
+        if name.contains("file://") {
+            if let url = URL(string: name) { return url }
+            return URL(fileURLWithPath: name)
+        }
+        if name.hasPrefix("/") {
+            return URL(fileURLWithPath: name)
+        }
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let url = docs.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+            let alt = url.appendingPathExtension("m4a")
+            if FileManager.default.fileExists(atPath: alt.path) {
+                return alt
+            }
+            return url
+        }
+        return nil
+    }
+}
+
+// MARK: - AVAudioPlayerDelegate
+extension JournalTimelineViewController: AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        if let current = currentPlayingIndexPath,
+           let cell = tableView.cellForRow(at: current) as? JournalAudioCell {
+            cell.setPlaying(false)
+            cell.updateCurrentTime(player.duration, progress: 1.0)
+            playbackPositions[current] = 0
+        }
+        stopPlayback()
     }
 }
