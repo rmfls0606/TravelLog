@@ -44,6 +44,7 @@ final class JournalTimelineViewController: BaseViewController {
     private var currentPlayingIndexPath: IndexPath?
     private var playbackPositions: [IndexPath: TimeInterval] = [:]
     private var playbackDurations: [IndexPath: TimeInterval] = [:]
+    private var isAudioSessionActive = false
     
     // MARK: - Init
     init(tripId: ObjectId) {
@@ -424,9 +425,12 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
                 }
                 
                 do {
-                    let tempPlayer = try AVAudioPlayer(contentsOf: resolvedURL)
-                    tempPlayer.prepareToPlay()
-                    let duration = tempPlayer.duration
+                    // 세션 활성화 없이 길이만 계산 (외부 오디오 중단 방지)
+                    let asset = AVURLAsset(url: resolvedURL)
+                    var duration = CMTimeGetSeconds(asset.duration)
+                    if duration.isNaN || duration.isInfinite {
+                        duration = 0
+                    }
                     playbackDurations[indexPath] = duration
                     cell.setDuration(duration)
                     // 이전 재생 위치가 있으면 표시 (다른 셀 재생으로 멈춘 경우)
@@ -613,9 +617,7 @@ private extension JournalTimelineViewController {
             }
         }
         currentPlayingIndexPath = nil
-        if deactivateSession {
-            deactivateAudioSession()
-        }
+        if deactivateSession { deactivateAudioSession() }
     }
     
     func seek(by seconds: TimeInterval, cell: JournalAudioCell, at indexPath: IndexPath) {
@@ -661,6 +663,7 @@ private extension JournalTimelineViewController {
         do {
             try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
             try session.setActive(true, options: [])
+            isAudioSessionActive = true
             return true
         } catch {
             // 한 번 더 비활성화 후 재시도 (다른 세션 설정이 남아 있을 때 대비)
@@ -668,6 +671,7 @@ private extension JournalTimelineViewController {
             do {
                 try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
                 try session.setActive(true, options: [])
+                isAudioSessionActive = true
                 return true
             } catch {
                 print("Audio session error: \(error.localizedDescription)")
@@ -679,7 +683,10 @@ private extension JournalTimelineViewController {
 
     private func deactivateAudioSession() {
         let session = AVAudioSession.sharedInstance()
-        try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+        if isAudioSessionActive {
+            try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+        }
+        isAudioSessionActive = false
     }
 
     private func resolveVoiceURL(name: String) -> URL? {
