@@ -507,6 +507,11 @@ extension JournalTimelineViewController {
             guard let self else { return }
             let block = self.groupedData[indexPath.section].blocks[indexPath.row]
             guard let journal = block.journal.first else { return }
+
+            // 재생 중인 음성 셀을 삭제하는 경우 재생 정지 및 세션 해제
+            if block.type == .voice, self.currentPlayingIndexPath == indexPath {
+                self.stopPlayback(resetUI: true, deactivateSession: true)
+            }
             
             // ViewModel에 삭제 요청 전달
             self.deleteTappedSubject.onNext((journal.id, block.id))

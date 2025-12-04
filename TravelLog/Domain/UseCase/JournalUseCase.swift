@@ -145,9 +145,22 @@ final class JournalUseCase: JournalUseCaseType {
                 }
                 
                 if let voiceName = block.voiceURL {
-                    let fileURL = docURL.appendingPathComponent(voiceName)
-                    if fileManager.fileExists(atPath: fileURL.path) {
-                        try? fileManager.removeItem(at: fileURL)
+                    // 확장자 유무/절대경로까지 모두 안전하게 제거
+                    let candidates: [URL] = {
+                        if voiceName.hasPrefix("/") {
+                            return [
+                                URL(fileURLWithPath: voiceName),
+                                URL(fileURLWithPath: voiceName).appendingPathExtension("m4a")
+                            ]
+                        } else {
+                            let base = docURL.appendingPathComponent(voiceName)
+                            return [base, base.appendingPathExtension("m4a")]
+                        }
+                    }()
+                    for url in candidates {
+                        if fileManager.fileExists(atPath: url.path) {
+                            try? fileManager.removeItem(at: url)
+                        }
                     }
                 }
                 
