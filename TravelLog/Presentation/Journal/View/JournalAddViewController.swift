@@ -285,6 +285,7 @@ final class JournalAddViewController: BaseViewController {
             .disposed(by: disposeBag)
         
         saveButton.rx.tap
+            .do(onNext: { [weak self] in self?.finalizeAudioBlocks() })
             .map { [weak self] _ -> [JournalAddViewModel.JournalBlockData] in
                 guard let self = self else { return [] }
                 return self.contentStack.arrangedSubviews.compactMap {
@@ -331,6 +332,13 @@ final class JournalAddViewController: BaseViewController {
                 owner.navigationController?.popViewController(animated: true)
             }
             .disposed(by: disposeBag)
+    }
+
+    /// 저장 직전 모든 오디오 블록의 녹음을 마무리해 부분 저장을 가능하게 한다.
+    private func finalizeAudioBlocks() {
+        contentStack.arrangedSubviews
+            .compactMap { $0 as? JournalAudioBlockView }
+            .forEach { $0.finalizeForSave() }
     }
     
     private func updateSaveButton(enabled: Bool) {

@@ -54,6 +54,13 @@ final class JournalAudioBlockView: BaseView {
     var audioDuration: TimeInterval { viewModel.recordedDuration }
     func getAudioFileURL() -> URL? { viewModel.recordedFileURL } // convenience for callers
 
+    /// 저장 직전에 호출해 녹음 중이면 멈추고 파일을 확정한다.
+    func finalizeForSave() {
+        if audioState == .recording {
+            stopTapped.accept(())
+        }
+    }
+
     private enum AudioState {
         case idle
         case recording
