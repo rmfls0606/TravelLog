@@ -236,9 +236,10 @@ final class JournalAudioBlockViewModel {
                 progressRelay.accept(0)
             }
         }
+        // 타이머는 항상 중단 (외부 세션으로 잠시 나가도 재개 시 새로 시작)
+        stopTimer()
         if !external {
             progressRelay.accept(0)
-            stopTimer()
         }
         if !isRecordingRelay.value && !isPlayingRelay.value && !external {
             deactivateSession()
@@ -456,9 +457,9 @@ final class JournalAudioBlockViewModel {
             }
             .disposed(by: disposeBag)
 
-        // 컨트롤센터(WillResignActive)에서는 끊지 않음. 백그라운드 진입 시에만 안전 중지
+        // 컨트롤센터(WillResignActive)에서는 끊지 않음. 백그라운드 진입 시 위치 유지 + 일시정지
         NotificationCenter.default.rx.notification(UIApplication.didEnterBackgroundNotification)
-            .bind(with: self) { owner, _ in owner.stopAll() }
+            .bind(with: self) { owner, _ in owner.stopAll(external: true) }
             .disposed(by: disposeBag)
     }
 
@@ -470,9 +471,9 @@ final class JournalAudioBlockViewModel {
 
         switch type {
         case .began:
-            stopAll()
-            // 외부 작업(전화/기타 앱)으로 중단될 때만 알림 표시
-            alertRelay.accept("오디오 세션이 다른 작업으로 중단되었습니다.")
+            // 이 VM이 실제로 재생/녹음 중일 때만 처리
+            guard isRecordingRelay.value || isPlayingRelay.value else { return }
+            stopAll(external: true)
         case .ended:
             // 세션 재활성화 시도 (필요 시)
             try? audioSession.setActive(true)
