@@ -628,15 +628,24 @@ private extension JournalTimelineViewController {
     }
     
     func seek(by seconds: TimeInterval, cell: JournalAudioCell, at indexPath: IndexPath) {
-        guard ensurePlayerForSeek(at: indexPath, cell: cell) else { return }
-        guard let player = audioPlayer else { return }
-        let newTime = max(0, min(player.duration, player.currentTime + seconds))
-        player.currentTime = newTime
-        let progress = player.duration > 0 ? newTime / player.duration : 0
-        cell.updateCurrentTime(newTime, progress: progress)
-        if let idx = currentPlayingIndexPath {
-            playbackPositions[idx] = newTime
+        // 재생 중인 경우에는 실제 플레이어 위치 이동
+        if let player = audioPlayer, currentPlayingIndexPath == indexPath {
+            let newTime = max(0, min(player.duration, player.currentTime + seconds))
+            player.currentTime = newTime
+            let progress = player.duration > 0 ? newTime / player.duration : 0
+            cell.updateCurrentTime(newTime, progress: progress)
+            playbackPositions[indexPath] = newTime
+            return
         }
+
+        // 재생 중이 아닐 때는 세션을 건드리지 않고 캐시/표시만 갱신
+        let duration = playbackDurations[indexPath] ?? 0
+        guard duration > 0 else { return }
+        let current = playbackPositions[indexPath] ?? 0
+        let newTime = max(0, min(duration, current + seconds))
+        let progress = newTime / duration
+        playbackPositions[indexPath] = newTime
+        cell.updateCurrentTime(newTime, progress: progress)
     }
     
     func seek(toProgress progress: Double, cell: JournalAudioCell, at indexPath: IndexPath) {
@@ -651,13 +660,12 @@ private extension JournalTimelineViewController {
             return
         }
 
-        // 재생 중이 아닐 때: 플레이어를 준비해두고 위치만 이동 (외부 세션은 유지)
-        guard ensurePlayerForSeek(at: indexPath, cell: cell) else { return }
-        let duration = audioPlayer?.duration ?? playbackDurations[indexPath] ?? 0
+        // 재생 중이 아닐 때: 세션을 건드리지 않고 캐시/표시만 갱신
+        let duration = playbackDurations[indexPath] ?? 0
+        guard duration > 0 else { return }
         let newTime = duration * clamped
-        audioPlayer?.currentTime = newTime
-        cell.updateCurrentTime(newTime, progress: clamped)
         playbackPositions[indexPath] = newTime
+        cell.updateCurrentTime(newTime, progress: clamped)
     }
     
     func showToast(_ message: String) {
@@ -692,36 +700,6 @@ private extension JournalTimelineViewController {
             try? session.setActive(false, options: [.notifyOthersOnDeactivation])
         }
         isAudioSessionActive = false
-    }
-
-    /// 스킵/시킹 시 재생 상태가 아니어도 플레이어를 준비해 둘 수 있도록 보조
-    private func ensurePlayerForSeek(at indexPath: IndexPath, cell: JournalAudioCell) -> Bool {
-        if let player = audioPlayer, currentPlayingIndexPath == indexPath {
-            return true
-        }
-        let block = groupedData[indexPath.section].blocks[indexPath.row]
-        guard block.type == .voice,
-              let voiceName = block.voiceURL,
-              let url = resolveVoiceURL(name: voiceName),
-              FileManager.default.fileExists(atPath: url.path) else {
-            return false
-        }
-        do {
-            let tempPlayer = try AVAudioPlayer(contentsOf: url)
-            tempPlayer.prepareToPlay()
-            tempPlayer.delegate = self
-            audioPlayer = tempPlayer
-            currentPlayingIndexPath = indexPath
-            playbackDurations[indexPath] = tempPlayer.duration
-            let cached = playbackPositions[indexPath] ?? 0
-            let clamped = max(0, min(tempPlayer.duration, cached))
-            tempPlayer.currentTime = clamped
-            let progress = tempPlayer.duration > 0 ? clamped / tempPlayer.duration : 0
-            cell.updateCurrentTime(clamped, progress: progress)
-            return true
-        } catch {
-            return false
-        }
     }
 
     private func resolveVoiceURL(name: String) -> URL? {
