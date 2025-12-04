@@ -327,10 +327,18 @@ final class JournalAudioBlockView: BaseView {
 
         output.alertMessage
             .emit(with: self) { owner, msg in
-                var style = ToastStyle()
-                style.backgroundColor = .systemRed
-                style.messageColor = .white
-                owner.makeToast(msg, duration: 2.0, position: .top, style: style)
+                if msg == "음성 기록이 너무 짧습니다." {
+                    var style = ToastStyle()
+                    style.backgroundColor = .systemRed
+                    style.messageColor = .white
+                    owner.makeToast(msg, duration: 2.0, position: .top, style: style)
+                } else {
+                    let alert = UIAlertController(title: "음성 녹음 실패",
+                                                  message: msg,
+                                                  preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "확인", style: .default))
+                    owner.topViewController()?.present(alert, animated: true)
+                }
             }
             .disposed(by: disposeBag)
     }
@@ -386,6 +394,22 @@ final class JournalAudioBlockView: BaseView {
             $0.isEnabled = isEnabled
             $0.alpha = isEnabled ? 1.0 : 0.4
         }
+    }
+
+    private func topViewController(base: UIViewController? = UIApplication.shared.connectedScenes
+        .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+        .first?.rootViewController) -> UIViewController? {
+
+        if let nav = base as? UINavigationController {
+            return topViewController(base: nav.visibleViewController)
+        }
+        if let tab = base as? UITabBarController {
+            return topViewController(base: tab.selectedViewController)
+        }
+        if let presented = base?.presentedViewController {
+            return topViewController(base: presented)
+        }
+        return base
     }
 }
 

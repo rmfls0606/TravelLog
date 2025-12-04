@@ -139,14 +139,6 @@ final class JournalAudioBlockViewModel {
 
     // MARK: - Permissions + Start Recording
     private func checkPermissionAndRecord() {
-
-        guard activateSession(category: .playAndRecord,
-                              mode: .default,
-                              options: [.allowBluetooth, .defaultToSpeaker]) else {
-            alertRelay.accept("오디오 세션 실패")
-            return
-        }
-
         switch audioSession.recordPermission {
         case .granted:
             startRecording()
@@ -188,6 +180,13 @@ final class JournalAudioBlockViewModel {
         ]
 
         do {
+            guard activateSession(category: .playAndRecord,
+                                  mode: .default,
+                                  options: [.allowBluetooth, .defaultToSpeaker]) else {
+                alertRelay.accept("음성 녹음에 실패했습니다. 잠시 후 다시 시도해주세요.")
+                return
+            }
+
             recorder = try AVAudioRecorder(url: url, settings: settings)
             recorder?.isMeteringEnabled = true //리벨 측정 활성화
 
@@ -201,7 +200,7 @@ final class JournalAudioBlockViewModel {
             startTimer()
 
         } catch {
-            alertRelay.accept("녹음 오류 발생: \(error.localizedDescription)")
+            alertRelay.accept("음성 녹음에 실패했습니다. 잠시 후 다시 시도해주세요.")
         }
     }
 
@@ -405,9 +404,7 @@ final class JournalAudioBlockViewModel {
         isSessionActive = false
     }
 
-    // --------------------------------------------------------------------
     // MARK: - Settings Alert
-    // --------------------------------------------------------------------
     private func presentSettingsAlert() {
         DispatchQueue.main.async {
             guard let topVC = self.topViewController() else { return }
