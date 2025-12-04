@@ -79,6 +79,8 @@ final class JournalTimelineViewController: BaseViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         NetworkMonitor.shared.stopMonitoring()
+        // 화면 이동 시 재생 중지 + 외부 세션 복원
+        stopPlayback(resetUI: false, deactivateSession: true)
     }
     
     
@@ -582,7 +584,7 @@ private extension JournalTimelineViewController {
             }
             if !player.isPlaying {
                 cell.setPlaying(false)
-                self.stopPlayback()
+                self.stopTimerOnly() // 재생 정지 시 세션/외부음원은 delegate 또는 별도 로직에서 처리
             }
         }
     }
@@ -661,23 +663,18 @@ private extension JournalTimelineViewController {
     private func activateAudioSession() -> Bool {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
-            try session.setActive(true, options: [])
-            isAudioSessionActive = true
+            // 이미 활성화되어 있으면 재설정 없이 통과 (외부 세션 복원 방지)
+            if !isAudioSessionActive {
+                try session.setCategory(.playback, mode: .default)
+                try session.setActive(true, options: [])
+                try? session.overrideOutputAudioPort(.speaker)
+                isAudioSessionActive = true
+            }
             return true
         } catch {
-            // 한 번 더 비활성화 후 재시도 (다른 세션 설정이 남아 있을 때 대비)
-            try? session.setActive(false, options: [])
-            do {
-                try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
-                try session.setActive(true, options: [])
-                isAudioSessionActive = true
-                return true
-            } catch {
-                print("Audio session error: \(error.localizedDescription)")
-                showToast("오디오 세션을 시작할 수 없습니다.")
-                return false
-            }
+            print("Audio session error: \(error.localizedDescription)")
+            showToast("오디오 세션을 시작할 수 없습니다.")
+            return false
         }
     }
 

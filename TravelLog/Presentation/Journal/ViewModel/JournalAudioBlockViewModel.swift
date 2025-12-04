@@ -12,7 +12,7 @@ import RxSwift
 import RxCocoa
 
 final class JournalAudioBlockViewModel {
-    
+
     private class AudioCoordinator {
         static let shared = AudioCoordinator()
         private init() {}
@@ -71,6 +71,7 @@ final class JournalAudioBlockViewModel {
     // MARK: - Private
     private let disposeBag = DisposeBag()
     private let audioSession = AVAudioSession.sharedInstance()
+    private var isSessionActive = false
 
     private var recorder: AVAudioRecorder?
     private var player: AVAudioPlayer?
@@ -139,15 +140,10 @@ final class JournalAudioBlockViewModel {
     // MARK: - Permissions + Start Recording
     private func checkPermissionAndRecord() {
 
-        do {
-            try audioSession.setCategory(
-                .playAndRecord,
-                mode: .default,
-                options: [.allowBluetooth, .defaultToSpeaker, .mixWithOthers]
-            )
-            try audioSession.setActive(true)
-        } catch {
-            alertRelay.accept("오디오 세션 실패: \(error.localizedDescription)")
+        guard activateSession(category: .playAndRecord,
+                              mode: .default,
+                              options: [.allowBluetooth, .defaultToSpeaker]) else {
+            alertRelay.accept("오디오 세션 실패")
             return
         }
 
@@ -192,8 +188,6 @@ final class JournalAudioBlockViewModel {
         ]
 
         do {
-            try audioSession.setActive(true)
-
             recorder = try AVAudioRecorder(url: url, settings: settings)
             recorder?.isMeteringEnabled = true //리벨 측정 활성화
 
@@ -246,6 +240,9 @@ final class JournalAudioBlockViewModel {
             progressRelay.accept(0)
             stopTimer()
         }
+        if !isRecordingRelay.value && !isPlayingRelay.value && !external {
+            deactivateSession()
+        }
         coordinator.clearIfNeeded(self)
     }
 
@@ -280,11 +277,16 @@ final class JournalAudioBlockViewModel {
             player.pause()
             isPlayingRelay.accept(false)
             stopTimer()
+            deactivateSession()
             return
         }
 
         coordinator.beginPlayback(self)
         do {
+            guard activateSession(category: .playback, mode: .default) else {
+                alertRelay.accept("오디오 세션 실패")
+                return
+            }
             // 기존 플레이어가 없거나 파일이 변경된 경우 새로 준비
             if player == nil || player?.url != url {
                 player = try AVAudioPlayer(contentsOf: url)
@@ -314,6 +316,7 @@ final class JournalAudioBlockViewModel {
 
         } catch {
             alertRelay.accept("재생 오류: \(error.localizedDescription)")
+            deactivateSession()
         }
     }
 
@@ -354,6 +357,7 @@ final class JournalAudioBlockViewModel {
                     stopTimer()
                     currentTimeRelay.accept(format(player.duration))
                     progressRelay.accept(1)
+                    deactivateSession()
                 }
             }
         }
@@ -370,6 +374,34 @@ final class JournalAudioBlockViewModel {
         let clamped = min(0, power)
         let linear = (clamped - minDb) / (-minDb) // 0...1
         return pow(linear, 2.2) // emphasize loud parts, shrink quiet parts
+    }
+
+    // MARK: - Audio Session Helpers
+    private func activateSession(category: AVAudioSession.Category,
+                                 mode: AVAudioSession.Mode,
+                                 options: AVAudioSession.CategoryOptions = []) -> Bool {
+        do {
+            // 이미 활성화되어 있으면 외부 세션에 신호를 보내지 않고 유지
+            if !isSessionActive {
+                try audioSession.setCategory(category, mode: mode, options: options)
+                try audioSession.setActive(true, options: [])
+                isSessionActive = true
+            } else {
+                // 카테고리만 최신으로 갱신
+                try? audioSession.setCategory(category, mode: mode, options: options)
+            }
+            return true
+        } catch {
+            isSessionActive = false
+            return false
+        }
+    }
+
+    private func deactivateSession() {
+        if isSessionActive {
+            try? audioSession.setActive(false, options: [.notifyOthersOnDeactivation])
+        }
+        isSessionActive = false
     }
 
     // --------------------------------------------------------------------
@@ -439,6 +471,7 @@ final class JournalAudioBlockViewModel {
         switch type {
         case .began:
             stopAll()
+            // 외부 작업(전화/기타 앱)으로 중단될 때만 알림 표시
             alertRelay.accept("오디오 세션이 다른 작업으로 중단되었습니다.")
         case .ended:
             // 세션 재활성화 시도 (필요 시)
