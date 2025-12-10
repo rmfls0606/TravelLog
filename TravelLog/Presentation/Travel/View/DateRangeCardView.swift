@@ -26,6 +26,19 @@ enum QUickSelectOption: String, CaseIterable{
             return 7
         }
     }
+    
+    var identifier: String{
+        switch self {
+        case .oneNightTwoDays:
+            return "travel_oneNightTwoDays_btn"
+        case .twoNightsThreeDays:
+            return "travel_twoNightsThreeDays_btn"
+        case .threeNightsFourDays:
+            return "travel_threeNightsFourDays_btn"
+        case .oneWeek:
+            return "travel_oneWeek_btn"
+        }
+    }
 }
 
 final class DateRangeCardView: BaseCardView {
@@ -58,6 +71,8 @@ final class DateRangeCardView: BaseCardView {
         let view = UIView()
         view.layer.cornerRadius = 12
         view.backgroundColor = UIColor.systemGray6.withAlphaComponent(0.2)
+        view.isAccessibilityElement = true
+        view.accessibilityIdentifier = "travel_calendar_view"
         return view
     }()
     
@@ -338,6 +353,7 @@ final class DateRangeCardView: BaseCardView {
             button.backgroundColor = .systemGray6
             button.layer.cornerRadius = 8
             button.setTitleColor(.darkGray, for: .normal)
+            button.accessibilityIdentifier = option.identifier
             quickButtons.append(button)
             quickSelectStack.addArrangedSubview(button)
         }

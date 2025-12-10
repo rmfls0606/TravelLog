@@ -27,6 +27,7 @@ final class DestinationSelectorViewController: BaseViewController {
         field.leftViewMode = .always
         field.rightViewMode = .always
         field.backgroundColor = .systemGray5
+        field.accessibilityIdentifier = "travel_city_field"
         
         let iconContainer = UIView(frame: CGRect(x: 0, y: 0, width: 48, height: 20))
         let leftIcon = UIImageView(image: UIImage(systemName: "magnifyingglass"))
@@ -101,6 +102,7 @@ final class DestinationSelectorViewController: BaseViewController {
                 cellType: CityTableViewCell.self
             )) { _, city, cell in
                 cell.configure(with: city)
+                cell.accessibilityIdentifier = "travel_city_cell_\(city.name)"
             }
             .disposed(by: disposeBag)
         

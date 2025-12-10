@@ -68,16 +68,13 @@ final class CustomCalendarCell: FSCalendarCell {
         }
     }
     
-    func configure(date: Date,
+    func configure(date: String,
                    isToday: Bool,
                    isStart: Bool,
                    isEnd: Bool,
                    inRange: Bool,
                    isWeekend: Bool) {
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        dayLabel.text = formatter.string(from: date)
+        dayLabel.text = date
         
         bgView.backgroundColor = .clear
         bgView.layer.borderWidth = 0

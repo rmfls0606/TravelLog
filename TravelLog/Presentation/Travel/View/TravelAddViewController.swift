@@ -158,7 +158,7 @@ final class TravelAddViewController: BaseViewController {
         
         // 교통수단 버튼 추가
         Transport.allCases.enumerated().forEach { index, item in
-            let button = makeTransportButton(title: item.rawValue, icon: item.iconName)
+            let button = makeTransportButton(transport: item)
             button.tag = index
             transportButtons.append(button)
             transportStack.addArrangedSubview(button)
@@ -228,6 +228,10 @@ final class TravelAddViewController: BaseViewController {
     override func configureView() {
         view.backgroundColor = UIColor.systemGray6
         navigationItem.title = "여행지 설정"
+        
+        departureCard.accessibilityIdentifier = "travel_departCard_view"
+        destinationCard.accessibilityIdentifier = "travel_destCard_view"
+        createButton.accessibilityIdentifier = "travel_create_btn"
     }
     
     override func configureBind() {
@@ -334,15 +338,15 @@ final class TravelAddViewController: BaseViewController {
     }
     
     //MARK: - Component
-    private func makeTransportButton(title: String, icon: String) -> UIButton {
+    private func makeTransportButton(transport: Transport) -> UIButton {
         var config = UIButton.Configuration.filled()
-        config.attributedTitle = AttributedString(title,
+        config.attributedTitle = AttributedString(transport.rawValue,
                                                   attributes: AttributeContainer([.font: UIFont.systemFont(ofSize: 12, weight: .bold)])
         )
         
         let imageConfig = UIImage.SymbolConfiguration(scale: .medium)
         config.preferredSymbolConfigurationForImage = imageConfig
-        config.image = UIImage(systemName: icon)
+        config.image = UIImage(systemName: transport.iconName)
         config.imagePlacement = .top
         config.imagePadding = 8
         config.baseBackgroundColor = .systemGray6
@@ -351,6 +355,7 @@ final class TravelAddViewController: BaseViewController {
         let button = UIButton(configuration: config)
         button.layer.cornerRadius = 12
         button.clipsToBounds = true
+        button.accessibilityIdentifier = transport.identifier
         
         button.configurationUpdateHandler = { btn in
             guard var newConfig = btn.configuration else { return }

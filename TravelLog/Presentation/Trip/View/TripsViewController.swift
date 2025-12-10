@@ -91,6 +91,8 @@ final class TripsViewController: BaseViewController {
         
         headerView.backgroundColor = .clear
         
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = "trip_rightBarButtonItem_btn"
+        
         emptyView.configure(icon: UIImage(systemName: "airplane.departure"), iconTint: .white, gradientStyle: .bluePurple, title: "아직 여행 계획이 없어요", subtitle: "새로운 여행을 계획하고\n멋진 추억을 만들어보세요", buttonTitle: "첫 여행 계획하기", buttonImage: UIImage(systemName: "map"), buttonGradient: .bluePurple)
     }
     

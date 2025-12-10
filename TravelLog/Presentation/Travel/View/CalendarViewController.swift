@@ -13,6 +13,12 @@ import RxCocoa
 
 // MARK: - CalendarViewController
 final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCalendarDataSource {
+    private var formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter
+    }()
+    
     private let headerView = UIView()
     
     private let titleLabel: UILabel = {
@@ -75,6 +81,7 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
     
     private let confirmButton: PrimaryButton = {
         let view = PrimaryButton(title: "확인")
+        view.accessibilityIdentifier = "travel_calendar_confirm_btn"
         view.layer.cornerRadius = 12
         return view
     }()
@@ -174,8 +181,9 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
         guard let cell = calendar.dequeueReusableCell(withIdentifier: CustomCalendarCell.identifier, for: date, at: position) as? CustomCalendarCell else {
             return FSCalendarCell()
         }
-        
+        let day = formatter.string(from: date)
         let isToday = Calendar.current.isDateInToday(date)
+        cell.accessibilityIdentifier = "travel_calendar_cell_\(day)"
         let isStart = selectedStartDate.map { Calendar.current.isDate(date, inSameDayAs: $0) } ?? false
         let isEnd = selectedEndDate.map { Calendar.current.isDate(date, inSameDayAs: $0) } ?? false
         let inRange: Bool
@@ -187,7 +195,7 @@ final class CalendarViewController: BaseViewController, FSCalendarDelegate, FSCa
         let weekday = Calendar.current.component(.weekday, from: date)
         let isWeekend = (weekday == 1 || weekday == 7)
         
-        cell.configure(date: date,
+        cell.configure(date: day,
                        isToday: isToday,
                        isStart: isStart,
                        isEnd: isEnd,

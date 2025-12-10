@@ -25,4 +25,17 @@ enum Transport: String, CaseIterable{
             return "car.fill"
         }
     }
+    
+    var identifier: String{
+        switch self {
+        case .airplane:
+            return "transport_airplane_btn"
+        case .train:
+            return "transport_train_btn"
+        case .bus:
+            return "transport_bus_btn"
+        case .car:
+            return "transport_car_btn"
+        }
+    }
 }
