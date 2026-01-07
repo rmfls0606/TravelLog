@@ -71,7 +71,7 @@ final class JournalAddViewController: BaseViewController {
     override func configureLayout() {
         scrollView.snp.makeConstraints {
             $0.top.leading.trailing.equalTo(view.safeAreaLayoutGuide)
-            $0.bottom.equalTo(addBar.snp.top)
+            $0.bottom.equalTo(addBlockContainer.snp.top)
         }
         
         contentStack.snp.makeConstraints {
@@ -81,7 +81,7 @@ final class JournalAddViewController: BaseViewController {
         
         emptyContainerView.snp.makeConstraints {
             $0.top.equalTo(view.safeAreaLayoutGuide.snp.top)
-            $0.bottom.equalTo(addBar.snp.top)
+            $0.bottom.equalTo(addBlockContainer.snp.top)
             $0.horizontalEdges.equalToSuperview().inset(16)
         }
         
