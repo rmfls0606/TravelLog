@@ -10,14 +10,13 @@
 import {setGlobalOptions} from "firebase-functions";
 // import {onRequest} from "firebase-functions/https";
 // import * as logger from "firebase-functions/logger";
-import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import axios from "axios";
+import {onCall} from "firebase-functions/v2/https";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-//API Key test
+// API Key test
 // export const testEnv = functions.https.onRequest((req, res) => {
 //   const apiKey = process.env.GOOGLE_API_KEY;
 
@@ -27,17 +26,36 @@ const db = admin.firestore();
 //   });
 // });
 
-export const searchCity = functions.https.onCall(async (data, context) => {
-  const query = data.query;
+export const searchCity = onCall(async (request) => {
+  const query = request.data.query;
 
   if (!query) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Query is required"
-    );
+    throw new Error("Query is required");
   }
 
-  return { message: "searchCity working", query };
+  const docId = query.toLowerCase();
+  const cityRef = db.collection("cities").doc(docId);
+  const snapshot = await cityRef.get();
+
+  if (snapshot.exists) {
+    return snapshot.data();
+  }
+
+  const newCity = {
+    cityId: docId,
+    name_en: query,
+    name_ko: query,
+    country_en: "Unknown",
+    country_ko: "알 수 없음",
+    lat: 0,
+    lng: 0,
+    imageUrl: null,
+    updatedAt: Date.now(),
+  };
+
+  await cityRef.set(newCity);
+
+  return newCity;
 });
 
 // Start writing functions

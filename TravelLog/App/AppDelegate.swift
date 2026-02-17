@@ -8,6 +8,7 @@
 import UIKit
 import RealmSwift
 import Firebase
+import FirebaseFunctions
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -19,6 +20,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         FirebaseApp.configure()
         
         migration()
+        
+        let functions = Functions.functions()
+        
+        functions.httpsCallable("searchCity")
+            .call(["query": "Daejeon"]) { result, error in
+                print(result?.data ?? error)
+            }
         
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
