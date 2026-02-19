@@ -7,6 +7,7 @@
 
 import UIKit
 import SnapKit
+import Kingfisher
 
 final class CityTableViewCell: BaseTableViewCell {
     
@@ -15,6 +16,15 @@ final class CityTableViewCell: BaseTableViewCell {
         let view = UIView()
         view.backgroundColor = .white
         view.layer.cornerRadius = 12
+        view.clipsToBounds = true
+        return view
+    }()
+    
+    private let cityThumbnailView: UIImageView = {
+        let view = UIImageView()
+        view.contentMode = .scaleAspectFill
+        view.layer.cornerRadius = 12
+        view.backgroundColor = .lightGray
         view.clipsToBounds = true
         return view
     }()
@@ -51,6 +61,7 @@ final class CityTableViewCell: BaseTableViewCell {
     override func configureHierarchy() {
         stackView.addArrangedSubview(cityLabel)
         stackView.addArrangedSubview(countryLabel)
+        cityContentView.addSubview(cityThumbnailView)
         cityContentView.addSubview(stackView)
         cityContentView.addSubview(chevronIcon)
         
@@ -62,8 +73,15 @@ final class CityTableViewCell: BaseTableViewCell {
             make.horizontalEdges.equalToSuperview().inset(16)
             make.verticalEdges.equalToSuperview().inset(6)
         }
+        
+        cityThumbnailView.snp.makeConstraints { make in
+            make.leading.verticalEdges.equalToSuperview().inset(16)
+            make.width.equalTo(cityThumbnailView.snp.height)
+        }
+        
         stackView.snp.makeConstraints {
-            $0.horizontalEdges.equalToSuperview().inset(16)
+            $0.leading.equalTo(cityThumbnailView.snp.trailing).offset(16)
+            $0.trailing.equalToSuperview().inset(16)
             $0.centerY.equalToSuperview()
         }
         chevronIcon.snp.makeConstraints {
@@ -97,6 +115,11 @@ final class CityTableViewCell: BaseTableViewCell {
         }
         
         cityLabel.text = formattedCity
-        countryLabel.text = "\(city.region)"
+        countryLabel.text = "\(city.country)"
+    
+        if let imageUrl = city.imageUrl,
+           let url = URL(string: imageUrl){
+            cityThumbnailView.kf.setImage(with: url)
+        }
     }
 }
