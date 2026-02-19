@@ -8,10 +8,13 @@
 import Foundation
 import RxSwift
 import RxCocoa
+import FirebaseFunctions
 
 final class DestinationViewModel {
     private let disposeBag = DisposeBag()
     private let fetchCitiesUseCase = FetchCitiesUseCaseImpl()
+    private let createCityUseCase = CreateCityUseCaseImpl()
+    private let functions = Functions.functions(region: "us-central1")
     
     struct Input {
         let searchCityText: ControlProperty<String>
@@ -21,20 +24,34 @@ final class DestinationViewModel {
     }
     
     func transform(input: Input) -> Output {
-        let cities = fetchCitiesUseCase.execute()
+        let cities = input.searchCityText
+            .debounce(.milliseconds(400), scheduler: MainScheduler.instance)
+            .distinctUntilChanged()
+            .flatMapLatest { [weak self] query -> Observable<[City]> in
+                guard let self = self,
+                      !query.isEmpty else{ return .just([])
+                }
+                
+                return self.fetchCitiesUseCase.execute(query: query)
+                    .asObservable()
+                    .flatMapLatest { cities -> Observable<[City]> in
+                        if cities.isEmpty {
+                            return self.createCityUseCase.execute(query: query)
+                                .asObservable()
+                                .flatMapLatest { _ in
+                                    self.fetchCitiesUseCase.execute(query: query)
+                                        .asObservable()
+                                }
+                        }
+                        return .just(cities)
+                    }
+                    .catchAndReturn([])
+            }
             .asDriver(onErrorJustReturn: [])
         
-        let filteredCities = Driver
-            .combineLatest(cities, input.searchCityText.asDriver()) { cities, query in
-                let trimmed = query.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return cities }
-                return cities.filter { $0.name.localizedCaseInsensitiveContains(trimmed) ||
-                    $0.id.localizedCaseInsensitiveContains(trimmed)
-                }
-            }
         
         return Output(
-            filteredCities: filteredCities
+            filteredCities: cities
         )
     }
 }
