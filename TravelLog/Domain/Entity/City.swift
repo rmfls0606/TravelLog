@@ -22,4 +22,6 @@ struct City: Codable {
     let lat: Double
     let lng: Double
     let imageUrl: String?
+    
+    var popularityCount: Int?
 }
