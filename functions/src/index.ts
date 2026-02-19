@@ -12,6 +12,7 @@ import {setGlobalOptions} from "firebase-functions";
 // import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import {onCall} from "firebase-functions/v2/https";
+import axios from "axios";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -27,35 +28,103 @@ const db = admin.firestore();
 // });
 
 export const searchCity = onCall(async (request) => {
-  const query = request.data.query;
+  try {
+    const query = request.data.query;
 
-  if (!query) {
-    throw new Error("Query is required");
+    if (!query) {
+      throw new Error("Query is required");
+    }
+
+    const apiKey = process.env.GOOGLE_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("GOOGLE_API_KEY is not set");
+    }
+
+    const docId = query.toLowerCase();
+    const cityRef = db.collection("cities").doc(docId);
+    const snapshot = await cityRef.get();
+
+    // 캐시 존재
+    if (snapshot.exists) {
+      return snapshot.data();
+    }
+
+    // Google Text Search
+    const textSearchRes = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/textsearch/json",
+      {
+        params: {
+          query: query,
+          // type: "locality",
+          key: apiKey,
+          language: "en",
+        },
+      }
+    );
+
+    const place = textSearchRes.data.results[0];
+    if (!place) {
+      return {
+        error: "City not found",
+        debug: textSearchRes.data,
+      };
+    }
+
+    const placeId = place.place_id;
+
+    // Place Details
+    const detailsRes = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/details/json",
+      {
+        params: {
+          place_id: placeId,
+          key: apiKey,
+          language: "ko",
+          fields: "name,geometry,photos,address_components",
+        },
+      }
+    );
+
+    const details = detailsRes.data.result;
+
+    const lat = details.geometry.location.lat;
+    const lng = details.geometry.location.lng;
+
+    const countryComponent = details.address_components.find(
+      (c: any) => c.types.includes("country")
+    );
+
+    const city = details.name;
+
+    const country = countryComponent?.long_name ?? "알 수 없음";
+
+    // 사진 URL 생성
+    let imageUrl = null;
+    if (details.photos && details.photos.length > 0) {
+      const photoRef = details.photos[0].photo_reference;
+      imageUrl =
+        "https://maps.googleapis.com/maps/api/place/photo" +
+        `?maxwidth=800&photo_reference=${photoRef}&key=${apiKey}`;
+    }
+
+    const newCity = {
+      cityId: docId,
+      name: city,
+      country: country,
+      lat,
+      lng,
+      imageUrl,
+      updatedAt: Date.now(),
+    };
+
+    await cityRef.set(newCity);
+
+    return newCity;
+  } catch (error) {
+    console.error("Error searching city:", error);
+    throw new Error("Failed to search city");
   }
-
-  const docId = query.toLowerCase();
-  const cityRef = db.collection("cities").doc(docId);
-  const snapshot = await cityRef.get();
-
-  if (snapshot.exists) {
-    return snapshot.data();
-  }
-
-  const newCity = {
-    cityId: docId,
-    name_en: query,
-    name_ko: query,
-    country_en: "Unknown",
-    country_ko: "알 수 없음",
-    lat: 0,
-    lng: 0,
-    imageUrl: null,
-    updatedAt: Date.now(),
-  };
-
-  await cityRef.set(newCity);
-
-  return newCity;
 });
 
 // Start writing functions
