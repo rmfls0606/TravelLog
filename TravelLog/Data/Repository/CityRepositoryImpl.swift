@@ -9,13 +9,17 @@ import Foundation
 import RxSwift
 
 final class CityRepositoryImpl: CityRepository {
-    private let dataSource: LocalCityDataSource
+    private let dataSource: CityDataSource
     
-    init(dataSource: LocalCityDataSource = LocalCityDataSource()) {
+    init(dataSource: CityDataSource = FirebaseCityDataSource()) {
         self.dataSource = dataSource
     }
     
-    func fetchCities() -> Single<[City]> {
-        return dataSource.loadCities()
+    func fetchCities(query: String) -> Single<[City]> {
+        return dataSource.loadCities(query: query)
+    }
+    
+    func createCities(query: String) -> Single<City> {
+        return dataSource.createCity(query: query)
     }
 }

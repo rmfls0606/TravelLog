@@ -9,5 +9,5 @@ import Foundation
 import RxSwift
 
 protocol FetchCitiesUseCase {
-    func execute() -> Single<[City]>
+    func execute(query: String) -> Single<[City]>
 }

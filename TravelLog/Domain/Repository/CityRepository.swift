@@ -9,5 +9,6 @@ import Foundation
 import RxSwift
 
 protocol CityRepository {
-    func fetchCities() -> Single<[City]>
+    func fetchCities(query: String) -> Single<[City]>
+    func createCities(query: String) -> Single<City>
 }

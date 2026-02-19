@@ -53,7 +53,7 @@ extension CityTable {
     convenience init(from city: City) {
         self.init()
         self.name = city.name
-        self.nameEn = city.id
+        self.nameEn = city.cityId
         self.country = city.country
         self.continent = "Asia"
         self.iataCode = nil
