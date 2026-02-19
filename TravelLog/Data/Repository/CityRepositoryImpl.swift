@@ -9,17 +9,34 @@ import Foundation
 import RxSwift
 
 final class CityRepositoryImpl: CityRepository {
-    private let dataSource: CityDataSource
+    private let local: CityDataSource
+    private let remote: CityRemoteDataSource
     
-    init(dataSource: CityDataSource = FirebaseCityDataSource()) {
-        self.dataSource = dataSource
-    }
+    init(local: CityDataSource, remote: CityRemoteDataSource) {
+           self.local = local
+           self.remote = remote
+       }
     
-    func fetchCities(query: String) -> Single<[City]> {
-        return dataSource.loadCities(query: query)
-    }
-    
-    func createCities(query: String) -> Single<City> {
-        return dataSource.createCity(query: query)
-    }
+    func searchLocal(query: String) -> Single<[City]> {
+            local.search(query: query)
+        }
+        
+        func searchRemote(query: String) -> Single<[City]> {
+            remote.search(query: query)
+        }
+        
+        func ensureStored(city: City) -> Single<Void> {
+            local.fetchCity(by: city.cityId)
+                .flatMap { existing in
+                    if existing != nil {
+                        return .just(())
+                    } else {
+                        return self.local.save(city: city)
+                    }
+                }
+        }
+        
+        func increasePopularity(cityId: String) -> Single<Void> {
+            local.incrementPopularity(cityId: cityId)
+        }
 }

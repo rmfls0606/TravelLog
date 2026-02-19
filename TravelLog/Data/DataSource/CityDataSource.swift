@@ -8,6 +8,8 @@
 import RxSwift
 
 protocol CityDataSource{
-    func loadCities(query: String) -> Single<[City]>
-    func createCity(query: String) -> Single<City>
+    func search(query: String) -> Single<[City]>
+    func fetchCity(by cityId: String) -> Single<City?>
+    func save(city: City) -> Single<Void>
+    func incrementPopularity(cityId: String) -> Single<Void>
 }
