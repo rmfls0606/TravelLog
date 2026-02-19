@@ -41,37 +41,40 @@ export const searchCity = onCall(async (request) => {
       throw new Error("GOOGLE_API_KEY is not set");
     }
 
-    const docId = query.toLowerCase();
-    const cityRef = db.collection("cities").doc(docId);
+    // Google Text Search
+    const autoRes = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+      {
+        params: {
+          input: query,
+          types: "(cities)",
+          language: "ko",
+          key: apiKey,
+        },
+      }
+    );
+
+    console.log("AUTO STATUS:", autoRes.data.status);
+    console.log("AUTO RESULTS:", autoRes.data.predictions);
+
+    if (autoRes.data.status !== "OK") {
+      throw new Error("Autocomplete 실패");
+    }
+
+    if (!autoRes.data.predictions.length) {
+      throw new Error("도시를 찾을 수 없습니다.");
+    }
+
+    const place = autoRes.data.predictions[0];
+    const placeId = place.place_id;
+
+    const cityRef = db.collection("cities").doc(placeId);
     const snapshot = await cityRef.get();
 
     // 캐시 존재
     if (snapshot.exists) {
       return snapshot.data();
     }
-
-    // Google Text Search
-    const textSearchRes = await axios.get(
-      "https://maps.googleapis.com/maps/api/place/textsearch/json",
-      {
-        params: {
-          query: query,
-          // type: "locality",
-          key: apiKey,
-          language: "en",
-        },
-      }
-    );
-
-    const place = textSearchRes.data.results[0];
-    if (!place) {
-      return {
-        error: "City not found",
-        debug: textSearchRes.data,
-      };
-    }
-
-    const placeId = place.place_id;
 
     // Place Details
     const detailsRes = await axios.get(
@@ -86,6 +89,10 @@ export const searchCity = onCall(async (request) => {
       }
     );
 
+    if (detailsRes.data.status !== "OK") {
+      throw new Error("세부 정보를 가져올 수 없습니다.");
+    }
+
     const details = detailsRes.data.result;
 
     const lat = details.geometry.location.lat;
@@ -96,7 +103,6 @@ export const searchCity = onCall(async (request) => {
     );
 
     const city = details.name;
-
     const country = countryComponent?.long_name ?? "알 수 없음";
 
     // 사진 URL 생성
@@ -109,7 +115,7 @@ export const searchCity = onCall(async (request) => {
     }
 
     const newCity = {
-      cityId: docId,
+      cityId: placeId,
       name: city,
       country: country,
       lat,
