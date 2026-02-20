@@ -16,6 +16,8 @@ final class DestinationViewModel {
     private let ensureStoredUseCase: EnsureCityStoredUseCase
     private let increasePopularityUseCase: IncreaseCityPopularityUseCase
     
+    private let sessionTokenRelay = BehaviorRelay<String>(value: UUID().uuidString)
+
     init() {
         // 간단 DI (나중에 Coordinator/DIContainer로 빼면 됨)
         let local = FirebaseCityDataSource()
@@ -37,24 +39,42 @@ final class DestinationViewModel {
     }
     
     func transform(input: Input) -> Output {
-        let cities = input.searchCityText
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .debounce(.milliseconds(400), scheduler: MainScheduler.instance)
-            .distinctUntilChanged()
-            .flatMapLatest { [fetchCitiesUseCase] q -> Driver<[City]> in
-                guard !q.isEmpty else { return .just([]) }
-                return fetchCitiesUseCase.execute(query: q)
+        //텍스트가 비면 새 세션 토큰 발급(새 검색 시작)
+        input.searchCityText
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { $0.isEmpty }
+                    .distinctUntilChanged()
+                    .subscribe(with: self) { owner, _ in
+                        owner.sessionTokenRelay.accept(UUID().uuidString)
+                    }
+                    .disposed(by: disposeBag)
+        
+        let cities = Observable
+                    .combineLatest(
+                        input.searchCityText.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) },
+                        sessionTokenRelay.asObservable()
+                    )
+                    .debounce(.milliseconds(400), scheduler: MainScheduler.instance)
+                    .distinctUntilChanged { $0.0 == $1.0 } // query 기준
+                    .flatMapLatest { [fetchCitiesUseCase] (q, token) -> Observable<[City]> in
+                        guard !q.isEmpty else { return .just([]) }
+                        return fetchCitiesUseCase.execute(query: q, sessionToken: token)
+                            .asObservable()
+                            .catchAndReturn([])
+                    }
                     .asDriver(onErrorJustReturn: [])
-            }
-            .asDriver(onErrorJustReturn: [])
         
         let didSelectCity = input.selectCity
-            .flatMapLatest { [ensureStoredUseCase, increasePopularityUseCase] city -> Signal<Void> in
-                ensureStoredUseCase.execute(city: city)
-                    .flatMap { increasePopularityUseCase.execute(cityId: city.cityId) }
+                    .flatMapLatest { [ensureStoredUseCase, increasePopularityUseCase] city -> Signal<Void> in
+                        ensureStoredUseCase.execute(city: city)
+                            .flatMap { increasePopularityUseCase.execute(cityId: city.cityId) }
+                            .asSignal(onErrorSignalWith: .empty())
+                    }
+                    .do(onNext: { [sessionTokenRelay] _ in
+                        //선택하면 세션 종료 -> 새 토큰 준비
+                        sessionTokenRelay.accept(UUID().uuidString)
+                    })
                     .asSignal(onErrorSignalWith: .empty())
-            }
-            .asSignal(onErrorSignalWith: .empty())
         
         return Output(filteredCities: cities, didSelectCity: didSelectCity)
     }
