@@ -5,32 +5,30 @@
 //  Created by 이상민 on 2/20/26.
 //
 
-import Foundation
 import RxSwift
 import FirebaseFunctions
 
 final class FunctionsCityRemoteDataSource: CityRemoteDataSource {
+
     private let functions: Functions
 
     init(region: String = "us-central1") {
         self.functions = Functions.functions(region: region)
     }
 
-    func search(query: String, sessionToken: String) -> Single<[City]> {
+    func search(query: String,
+                sessionToken: String) -> Single<[City]> {
+
         Single.create { single in
-            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                single(.success([]))
-                return Disposables.create()
-            }
 
             self.functions.httpsCallable("searchCity")
                 .call([
-                    "query": trimmed,
+                    "query": query,
                     "sessionToken": sessionToken,
                     "language": "ko",
                     "limit": 10
                 ]) { result, error in
+
                     if let error = error {
                         single(.failure(error))
                         return
