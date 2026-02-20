@@ -9,5 +9,5 @@ import RxSwift
 
 protocol CityRemoteDataSource{
     //원격 후보 조회
-    func search(query: String) -> Single<[City]>
+    func search(query: String, sessionToken: String) -> Single<[City]>
 }

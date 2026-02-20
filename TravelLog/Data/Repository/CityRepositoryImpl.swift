@@ -21,8 +21,8 @@ final class CityRepositoryImpl: CityRepository {
             local.search(query: query)
         }
         
-        func searchRemote(query: String) -> Single<[City]> {
-            remote.search(query: query)
+        func searchRemote(query: String, sessionToken: String) -> Single<[City]> {
+            remote.search(query: query, sessionToken: sessionToken)
         }
         
         func ensureStored(city: City) -> Single<Void> {
