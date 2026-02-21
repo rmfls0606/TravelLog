@@ -40,6 +40,10 @@ type CityDoc = {
   popularityCount?: number;
 };
 
+function isKorean(text: string) {
+  return /[가-힣]/.test(text);
+}
+
 function normalize(s: string) {
   return s.trim().toLowerCase();
 }
@@ -93,6 +97,15 @@ async function getOrCreateCityByPlaceId(placeId: string, apiKey: string, languag
   if (detailsRes.data.status !== "OK") return null;
 
   const details = detailsRes.data.result;
+  const types = details.types || [];
+
+  // 도시 타입 검증
+  const isCity =
+   types.includes("locality") ||
+    types.includes("administrative_area_level_1") ||
+    types.includes("administrative_area_level_2") ||
+    types.includes("political");
+  if (!isCity) return null;
 
   // types에 locality/administrative_area_level_1 등이 섞여 들어올 수 있음
   // "도시"로 다루는 범위를 넓히려면 types 검증을 너무 빡세게 하지 않는 게 안정적임.
@@ -134,7 +147,6 @@ async function getOrCreateCityByPlaceId(placeId: string, apiKey: string, languag
 
 export const searchCity = onCall(async (request) => {
   const queryRaw = (request.data?.query ?? "") as string;
-  const sessionToken = (request.data?.sessionToken ?? "") as string;
   const language = ((request.data?.language ?? "ko") as string) || "ko";
   const limit = Math.min(Math.max(Number(request.data?.limit ?? 10), 1), 20);
 
@@ -153,67 +165,59 @@ export const searchCity = onCall(async (request) => {
   // 1) Firestore prefix cache first (always)
   const cached = await prefixSearchCities(lower, limit);
 
-  // ✅ 1글자 입력은 Google 호출 금지 (비용/오염 방어)
+  // 1글자 입력은 Google 호출 금지 (비용/오염 방어)
   if (lower.length < 2) {
     return {cities: cached, source: "cache-only"};
   }
 
-  // 캐시가 충분하면 Google 호출하지 않음
-  if (cached.length >= Math.min(limit, 5)) {
-    return {cities: cached.slice(0, limit), source: "cache"};
-  }
+  // // 캐시가 충분하면 Google 호출하지 않음
+  // if (cached.length >= Math.min(limit, 5)) {
+  //   return {cities: cached.slice(0, limit), source: "cache"};
+  // }
 
-  // 2) Google Autocomplete (session token)
-  const autoRes = await axios.get(
-    "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+  // Google FindPlace (딱 1회)
+  const findRes = await axios.get(
+    "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
     {
       params: {
         input: query,
-        types: "(cities)",
+        inputtype: "textquery",
+        fields: "place_id",
         language,
         key: apiKey,
-        sessiontoken: sessionToken || undefined,
+        ...(isKorean(query) ?
+          {components: "country:kr"} :
+          {}),
       },
     }
   );
 
-  const status = autoRes.data?.status;
-  const predictions = autoRes.data?.predictions ?? [];
+  const status = findRes.data?.status;
+  const candidate = findRes.data?.candidates?.[0];
 
-  if (status !== "OK" || predictions.length === 0) {
+  if (status !== "OK" || !candidate?.place_id) {
     // Google 실패해도 캐시 결과는 반환
     return {cities: cached, source: "cache-google-empty", debug: {status}};
   }
 
-  // 3) pick top N candidates to details+save (비용 방어)
-  const maxGoogleCandidates = Math.min(3, limit); // ✅ 상위 3개만
-  const top = predictions.slice(0, maxGoogleCandidates);
+  const city = await getOrCreateCityByPlaceId(
+    candidate.place_id,
+    apiKey,
+    language
+  );
 
-  // 4) hydrate by placeId: cache hit => return cached doc, else details => save
-  const results: CityDoc[] = [...cached];
-  const seen = new Set(results.map((c) => c.cityId));
-
-  for (const p of top) {
-    const placeId = p.place_id;
-    if (!placeId) continue;
-    if (seen.has(placeId)) continue;
-
-    const city = await getOrCreateCityByPlaceId(placeId, apiKey, language);
-    if (city) {
-      results.push(city);
-      seen.add(placeId);
-    }
+  if (!city) {
+    return {cities: cached.slice(0, limit)};
   }
 
-  // 5) return merged unique list
+  // 4️⃣ prefix + 정확매칭 1개 합치기
+  const merged = [
+    city,
+    ...cached.filter((c) => c.cityId !== city.cityId),
+  ];
+
   return {
-    cities: results.slice(0, limit),
-    source: "cache+google",
-    debug: {
-      cacheCount: cached.length,
-      googleCount: top.length,
-      status,
-    },
+    cities: merged.slice(0, limit),
   };
 });
 
