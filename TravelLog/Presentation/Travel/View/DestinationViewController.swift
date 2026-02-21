@@ -106,11 +106,33 @@ final class DestinationSelectorViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
-        output.filteredCities
-            .drive(with: self) { owner, cities in
-                if cities.isEmpty {
+        Observable
+            .combineLatest(
+                searchField.rx.text.orEmpty,
+                output.filteredCities.asObservable()
+            )
+            .observe(on: MainScheduler.instance)
+            .bind(with: self) { owner, tuple in
+                let (text, cities) = tuple
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if trimmed.isEmpty {
+                    owner.emptyView.configure(
+                        iconName: "magnifyingglass",
+                        title: "여행 도시를 입력해주세요.",
+                        subtitle: "도시 이름을 검색해보세요."
+                    )
                     owner.tableView.backgroundView = owner.emptyView
-                } else {
+                }
+                else if cities.isEmpty {
+                    owner.emptyView.configure(
+                        iconName: "magnifyingglass",
+                        title: "검색 결과가 없습니다.",
+                        subtitle: "단어가 정확한지 확인해보세요."
+                    )
+                    owner.tableView.backgroundView = owner.emptyView
+                }
+                else {
                     owner.tableView.backgroundView = nil
                 }
             }

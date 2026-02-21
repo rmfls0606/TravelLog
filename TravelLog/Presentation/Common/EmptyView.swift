@@ -101,4 +101,10 @@ final class EmptyView: BaseView {
     override func configureView() {
         backgroundColor = .clear
     }
+    
+    func configure(iconName: String, title: String, subtitle: String){
+        iconView.image = UIImage(systemName: iconName)
+        titleLabel.text = title
+        subtitleLabel.text = subtitle
+    }
 }
