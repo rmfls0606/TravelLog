@@ -14,8 +14,6 @@ final class DestinationViewModel {
     private let disposeBag = DisposeBag()
     private let fetchCitiesUseCase: FetchCitiesUseCaseImpl
     private let increasePopularityUseCase: IncreaseCityPopularityUseCase
-    
-    private let sessionTokenRelay = BehaviorRelay<String>(value: UUID().uuidString)
 
     init() {
         let local = FirebaseCityDataSource()
@@ -37,14 +35,13 @@ final class DestinationViewModel {
         let cities = input.searchCityText
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .distinctUntilChanged()
-                    .debounce(.milliseconds(400), scheduler: MainScheduler.instance)
+                    .debounce(.milliseconds(300), scheduler: MainScheduler.instance)
                     .flatMapLatest { [weak self] query -> Driver<[City]> in
                         guard let self = self,
                               !query.isEmpty else { return .just([]) }
 
                         return self.fetchCitiesUseCase
-                            .execute(query: query,
-                                     sessionToken: sessionTokenRelay.value)
+                            .execute(query: query)
                             .asDriver(onErrorJustReturn: [])
                     }
                     .asDriver(onErrorJustReturn: [])

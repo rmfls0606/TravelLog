@@ -15,12 +15,12 @@ final class FetchCitiesUseCaseImpl: FetchCitiesUseCase {
         self.repository = repository
     }
     
-    func execute(query: String, sessionToken: String) -> Single<[City]> {
+    func execute(query: String) -> Single<[City]> {
         //먼저 로컬 -> 없으면 원격 후보
         repository.searchLocal(query: query)
             .flatMap { cities in
                 if !cities.isEmpty { return .just(cities) }
-                return self.repository.searchRemote(query: query, sessionToken: sessionToken)
+                return self.repository.searchRemote(query: query)
             }
     }
 }

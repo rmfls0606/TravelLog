@@ -16,15 +16,13 @@ final class FunctionsCityRemoteDataSource: CityRemoteDataSource {
         self.functions = Functions.functions(region: region)
     }
 
-    func search(query: String,
-                sessionToken: String) -> Single<[City]> {
+    func search(query: String) -> Single<[City]> {
 
         Single.create { single in
 
             self.functions.httpsCallable("searchCity")
                 .call([
                     "query": query,
-                    "sessionToken": sessionToken,
                     "language": "ko",
                     "limit": 10
                 ]) { result, error in
