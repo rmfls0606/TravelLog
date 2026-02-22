@@ -63,14 +63,11 @@ final class DestinationSelectorViewController: BaseViewController {
     
     private lazy var tapGesture = UITapGestureRecognizer()
     
-    private lazy var activityIndicator = UIActivityIndicatorView(style: .medium)
-    
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(searchField)
         view.addSubview(tableView)
         view.addGestureRecognizer(tapGesture)
-        view.addSubview(activityIndicator)
     }
     
     // MARK: - Layout
@@ -86,10 +83,6 @@ final class DestinationSelectorViewController: BaseViewController {
             make.horizontalEdges.equalToSuperview()
             make.bottom.equalToSuperview()
         }
-        
-        activityIndicator.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-        }
     }
     
     // MARK: - View
@@ -98,6 +91,8 @@ final class DestinationSelectorViewController: BaseViewController {
         view.backgroundColor = .systemGray6
         tapGesture.cancelsTouchesInView = false
         tableView.register(CityTableViewCell.self, forCellReuseIdentifier: CityTableViewCell.identifier)
+        tableView.register(CityShimmerTableViewCell.self,
+                           forCellReuseIdentifier: CityShimmerTableViewCell.identifier)
     }
     
     // MARK: - Binding
@@ -107,47 +102,60 @@ final class DestinationSelectorViewController: BaseViewController {
         )
         let output = viewModel.transform(input: input)
         
-        output.cities
-            .drive(tableView.rx.items(
-                cellIdentifier: CityTableViewCell.identifier,
-                cellType: CityTableViewCell.self
-            )) { _, city, cell in
-                cell.configure(with: city)
+        output.items
+            .drive(tableView.rx.items) { tableView, row, item in
+
+                switch item {
+
+                case .skeleton:
+                    let cell = tableView.dequeueReusableCell(
+                        withIdentifier: CityShimmerTableViewCell.identifier,
+                        for: IndexPath(row: row, section: 0)
+                    ) as! CityShimmerTableViewCell
+
+                    cell.start()
+                    return cell
+
+                case .city(let city):
+                    let cell = tableView.dequeueReusableCell(
+                        withIdentifier: CityTableViewCell.identifier,
+                        for: IndexPath(row: row, section: 0)
+                    ) as! CityTableViewCell
+
+                    cell.configure(with: city)
+                    return cell
+                }
             }
             .disposed(by: disposeBag)
         
         output.state
             .drive(with: self) { owner, state in
-                
+
                 switch state {
+
                 case .idle:
-                    owner.activityIndicator.stopAnimating()
                     owner.emptyView.configure(
                         iconName: "magnifyingglass",
                         title: "여행 도시를 입력해주세요.",
                         subtitle: "도시 이름을 검색해보세요."
                     )
                     owner.tableView.backgroundView = owner.emptyView
-                    
+
                 case .loading:
-                    owner.activityIndicator.startAnimating()
                     owner.tableView.backgroundView = nil
-                    
+
                 case .empty:
-                    owner.activityIndicator.stopAnimating()
                     owner.emptyView.configure(
                         iconName: "magnifyingglass",
                         title: "검색 결과가 없습니다.",
                         subtitle: "단어가 정확한지 확인해보세요."
                     )
                     owner.tableView.backgroundView = owner.emptyView
-                    
+
                 case .result:
-                    owner.activityIndicator.stopAnimating()
                     owner.tableView.backgroundView = nil
                 }
             }
             .disposed(by: disposeBag)
     }
 }
-

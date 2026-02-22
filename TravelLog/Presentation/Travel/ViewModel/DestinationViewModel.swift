@@ -10,11 +10,16 @@ import RxSwift
 import RxCocoa
 import FirebaseFunctions
 
+enum CityCellItem {
+    case skeleton
+    case city(City)
+}
+
 enum SearchState {
     case idle
     case loading
     case empty
-    case result([City])
+    case result
 }
 
 final class DestinationViewModel {
@@ -34,43 +39,59 @@ final class DestinationViewModel {
     struct Input {
         let searchCityText: ControlProperty<String>
     }
+    
     struct Output {
         let state: Driver<SearchState>
-        let cities: Driver<[City]>
+        let items: Driver<[CityCellItem]>
     }
     
     func transform(input: Input) -> Output {
-        let citiesRelay = BehaviorRelay<[City]>(value: [])
-
+        let itemsRelay = BehaviorRelay<[CityCellItem]>(value: [])
+        
         let state = input.searchCityText
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .distinctUntilChanged()
+            .debounce(.milliseconds(400), scheduler: MainScheduler.instance)
             .flatMapLatest { [weak self] query -> Observable<SearchState> in
                 
                 guard let self = self else { return .just(.idle) }
                 
                 if query.isEmpty {
-                    citiesRelay.accept([])
+                    itemsRelay.accept([])
                     return .just(.idle)
                 }
                 
-                return Observable.just(.loading)
-                    .concat(
-                        self.fetchCitiesUseCase
-                            .execute(query: query)
-                            .asObservable()
-                            .map { cities in
-                                citiesRelay.accept(cities)
-                                return cities.isEmpty ? .empty : .result(cities)
-                            }
-                            .catchAndReturn(.empty)
-                    )
+                let hasExistingResults = !itemsRelay.value.isEmpty &&
+                itemsRelay.value.contains {
+                    if case .city = $0 { return true }
+                    return false
+                }
+                
+                // 첫 검색일 때만 skeleton
+                if !hasExistingResults {
+                    itemsRelay.accept(Array(repeating: .skeleton, count: 5))
+                }
+                
+                return self.fetchCitiesUseCase
+                    .execute(query: query)
+                    .asObservable()
+                    .map { cities in
+                        if cities.isEmpty {
+                            itemsRelay.accept([])
+                            return .empty
+                        } else {
+                            itemsRelay.accept(cities.map { .city($0) })
+                            return .result
+                        }
+                    }
+                    .catchAndReturn(.empty)
+                    .startWith(.loading)
             }
             .asDriver(onErrorJustReturn: .idle)
         
         return Output(
             state: state,
-            cities: citiesRelay.asDriver()
+            items: itemsRelay.asDriver()
         )
     }
 }
