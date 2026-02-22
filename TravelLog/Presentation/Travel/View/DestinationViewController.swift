@@ -107,64 +107,45 @@ final class DestinationSelectorViewController: BaseViewController {
         )
         let output = viewModel.transform(input: input)
         
-        output.filteredCities
+        output.cities
             .drive(tableView.rx.items(
                 cellIdentifier: CityTableViewCell.identifier,
                 cellType: CityTableViewCell.self
             )) { _, city, cell in
                 cell.configure(with: city)
-                cell.accessibilityIdentifier = "travel_city_cell_\(city.name)"
             }
             .disposed(by: disposeBag)
         
-        Observable
-            .combineLatest(
-                searchField.rx.text.orEmpty,
-                output.filteredCities.asObservable()
-            )
-            .observe(on: MainScheduler.instance)
-            .bind(with: self) { owner, tuple in
-                let (text, cities) = tuple
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                if trimmed.isEmpty {
+        output.state
+            .drive(with: self) { owner, state in
+                
+                switch state {
+                case .idle:
+                    owner.activityIndicator.stopAnimating()
                     owner.emptyView.configure(
                         iconName: "magnifyingglass",
                         title: "여행 도시를 입력해주세요.",
                         subtitle: "도시 이름을 검색해보세요."
                     )
                     owner.tableView.backgroundView = owner.emptyView
-                }
-                else if cities.isEmpty {
+                    
+                case .loading:
+                    owner.activityIndicator.startAnimating()
+                    owner.tableView.backgroundView = nil
+                    
+                case .empty:
+                    owner.activityIndicator.stopAnimating()
                     owner.emptyView.configure(
                         iconName: "magnifyingglass",
                         title: "검색 결과가 없습니다.",
                         subtitle: "단어가 정확한지 확인해보세요."
                     )
                     owner.tableView.backgroundView = owner.emptyView
-                }
-                else {
+                    
+                case .result:
+                    owner.activityIndicator.stopAnimating()
                     owner.tableView.backgroundView = nil
                 }
-            }
-            .disposed(by: disposeBag)
-        
-        tableView.rx.modelSelected(City.self)
-            .bind(with: self) { owner, city in
-                owner.selectedCity.accept(city)
-                owner.navigationController?.popViewController(animated: true)
-            }
-            .disposed(by: disposeBag)
-        
-        tapGesture.rx.event
-            .bind(with: self) { owner, _ in
-                owner.view.endEditing(true)
-            }
-            .disposed(by: disposeBag)
-        
-        output.isLoading
-            .drive(with: self){ owner, loading in
-                loading ? owner.activityIndicator.startAnimating() : owner.activityIndicator.stopAnimating()
             }
             .disposed(by: disposeBag)
     }
