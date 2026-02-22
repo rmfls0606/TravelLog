@@ -100,12 +100,31 @@ async function getOrCreateCityByPlaceId(placeId: string, apiKey: string, languag
   const types = details.types || [];
 
   // 도시 타입 검증
-  const isCity =
-   types.includes("locality") ||
+  const name = details.name ?? "";
+  const countryComponent = (details.address_components || []).find((c: any) =>
+    (c.types || []).includes("country")
+  );
+  const country = countryComponent?.long_name ?? "알 수 없음";
+
+  let isValidCity = false;
+
+  if (country === "대한민국") {
+  // 한국 전용 정책
+    isValidCity =
+    types.includes("locality") ||
     types.includes("administrative_area_level_1") ||
-    types.includes("administrative_area_level_2") ||
-    types.includes("political");
-  if (!isCity) return null;
+    (
+      types.includes("administrative_area_level_2") &&
+      name.endsWith("군")
+    );
+  } else {
+  // 해외 일반화 정책
+    isValidCity =
+    types.includes("locality") ||
+    types.includes("administrative_area_level_1");
+  }
+
+  if (!isValidCity) return null;
 
   // types에 locality/administrative_area_level_1 등이 섞여 들어올 수 있음
   // "도시"로 다루는 범위를 넓히려면 types 검증을 너무 빡세게 하지 않는 게 안정적임.
@@ -113,12 +132,6 @@ async function getOrCreateCityByPlaceId(placeId: string, apiKey: string, languag
   const lng = details.geometry?.location?.lng;
   if (typeof lat !== "number" || typeof lng !== "number") return null;
 
-  const countryComponent = (details.address_components || []).find((c: any) =>
-    (c.types || []).includes("country")
-  );
-
-  const name = details.name ?? "";
-  const country = countryComponent?.long_name ?? "알 수 없음";
 
   let imageUrl: string | null = null;
   if (details.photos && details.photos.length > 0) {
@@ -170,17 +183,26 @@ export const searchCity = onCall(async (request) => {
     return {cities: cached, source: "cache-only"};
   }
 
-  // // 캐시가 충분하면 Google 호출하지 않음
-  // if (cached.length >= Math.min(limit, 5)) {
-  //   return {cities: cached.slice(0, limit), source: "cache"};
-  // }
+  // 캐시가 충분하면 Google 호출하지 않음
+  if (cached.length > 0) {
+    return {cities: cached.slice(0, limit)};
+  }
+
+  let searchText = query;
+
+  if (isKorean(query) &&
+    !query.endsWith("시") &&
+    !query.endsWith("군") &&
+    !query.endsWith("구")) {
+    searchText += " 시"; // "서울" -> "서울 시" (Google 검색 최적화)
+  }
 
   // Google FindPlace (딱 1회)
   const findRes = await axios.get(
     "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
     {
       params: {
-        input: query,
+        input: searchText,
         inputtype: "textquery",
         fields: "place_id",
         language,
@@ -200,6 +222,20 @@ export const searchCity = onCall(async (request) => {
     return {cities: cached, source: "cache-google-empty", debug: {status}};
   }
 
+  // 읍/면/동은 Details 호출 전에 차단
+  const desc =
+    candidate.formatted_address ??
+    candidate.name ??
+    "";
+
+  if (
+    desc.includes("읍") ||
+    desc.includes("면") ||
+    desc.includes("동")
+  ) {
+    return {cities: []};
+  }
+
   const city = await getOrCreateCityByPlaceId(
     candidate.place_id,
     apiKey,
@@ -210,7 +246,7 @@ export const searchCity = onCall(async (request) => {
     return {cities: cached.slice(0, limit)};
   }
 
-  // 4️⃣ prefix + 정확매칭 1개 합치기
+  // prefix + 정확매칭 1개 합치기
   const merged = [
     city,
     ...cached.filter((c) => c.cityId !== city.cityId),
