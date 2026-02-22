@@ -15,23 +15,27 @@ final class FirebaseCityDataSource: CityDataSource{
     
     func search(query: String) -> Single<[City]> {
         Single.create { single in
-            let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !q.isEmpty else {
+            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
                 single(.success([]))
                 return Disposables.create()
             }
             
+            let lower = trimmed.lowercased()
+            let end = lower + "\u{f8ff}"
+            
             self.db.collection(self.collection)
-                .limit(to: 500) // 국내 도시 MVP 기준 안전장치
+                .order(by: "nameLower")
+                .start(at: [lower])
+                .end(at: [end])
+                .limit(to: 20)
                 .getDocuments { snapshot, error in
                     if let error = error {
                         single(.failure(error))
                         return
                     }
-                    let docs = snapshot?.documents ?? []
-                    let lower = q.lowercased()
                     
-                    let cities: [City] = docs.compactMap { doc -> City? in
+                    let cities: [City] =  snapshot?.documents.compactMap { doc in
                         let data = doc.data()
                         
                         guard
@@ -40,9 +44,6 @@ final class FirebaseCityDataSource: CityDataSource{
                             let lat = data["lat"] as? Double,
                             let lng = data["lng"] as? Double
                         else { return nil }
-                        
-                        let match = name.lowercased().contains(lower) || country.lowercased().contains(lower)
-                        guard match else { return nil }
                         
                         var city = City(
                             cityId: doc.documentID,
@@ -54,7 +55,7 @@ final class FirebaseCityDataSource: CityDataSource{
                         )
                         city.popularityCount = data["popularityCount"] as? Int
                         return city
-                    }
+                    } ?? []
                     
                     single(.success(cities))
                 }
@@ -139,6 +140,7 @@ final class FirebaseCityDataSource: CityDataSource{
                     single(.success(()))
                 }
             }
+            
             return Disposables.create()
         }
     }
