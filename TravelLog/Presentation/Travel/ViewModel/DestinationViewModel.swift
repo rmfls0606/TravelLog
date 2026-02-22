@@ -29,23 +29,37 @@ final class DestinationViewModel {
     }
     struct Output {
         private(set) var filteredCities: Driver<[City]>
+        private(set) var isLoading: Driver<Bool>
     }
     
     func transform(input: Input) -> Output {
+        let loadingRelay = BehaviorRelay<Bool>(value: false)
         let cities = input.searchCityText
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .distinctUntilChanged()
                     .debounce(.milliseconds(300), scheduler: MainScheduler.instance)
                     .flatMapLatest { [weak self] query -> Driver<[City]> in
                         guard let self = self,
-                              !query.isEmpty else { return .just([]) }
+                              !query.isEmpty else {
+                            loadingRelay.accept(false)
+                            return .just([])
+                        }
+                        
+                        loadingRelay.accept(true)
 
                         return self.fetchCitiesUseCase
                             .execute(query: query)
+                            .do(onSuccess: { _ in
+                                loadingRelay.accept(false)
+                            }, onError: { _ in
+                                loadingRelay.accept(false)
+                            })
                             .asDriver(onErrorJustReturn: [])
                     }
                     .asDriver(onErrorJustReturn: [])
         
-        return Output(filteredCities: cities)
+        return Output(filteredCities: cities,
+                      isLoading: loadingRelay.asDriver()
+        )
     }
 }

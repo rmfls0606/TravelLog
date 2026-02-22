@@ -63,11 +63,14 @@ final class DestinationSelectorViewController: BaseViewController {
     
     private lazy var tapGesture = UITapGestureRecognizer()
     
+    private lazy var activityIndicator = UIActivityIndicatorView(style: .medium)
+    
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(searchField)
         view.addSubview(tableView)
         view.addGestureRecognizer(tapGesture)
+        view.addSubview(activityIndicator)
     }
     
     // MARK: - Layout
@@ -82,6 +85,10 @@ final class DestinationSelectorViewController: BaseViewController {
             make.top.equalTo(searchField.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview()
             make.bottom.equalToSuperview()
+        }
+        
+        activityIndicator.snp.makeConstraints { make in
+            make.center.equalToSuperview()
         }
     }
     
@@ -152,6 +159,12 @@ final class DestinationSelectorViewController: BaseViewController {
         tapGesture.rx.event
             .bind(with: self) { owner, _ in
                 owner.view.endEditing(true)
+            }
+            .disposed(by: disposeBag)
+        
+        output.isLoading
+            .drive(with: self){ owner, loading in
+                loading ? owner.activityIndicator.startAnimating() : owner.activityIndicator.stopAnimating()
             }
             .disposed(by: disposeBag)
     }
