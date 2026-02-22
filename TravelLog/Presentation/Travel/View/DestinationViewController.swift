@@ -61,10 +61,13 @@ final class DestinationSelectorViewController: BaseViewController {
         subtitle: "도시 이름을 입력해보세요.\n단어가 한글 혹은 영어로 정확한지 확인해보세요."
     )
     
+    private lazy var tapGesture = UITapGestureRecognizer()
+    
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(searchField)
         view.addSubview(tableView)
+        view.addGestureRecognizer(tapGesture)
     }
     
     // MARK: - Layout
@@ -86,6 +89,7 @@ final class DestinationSelectorViewController: BaseViewController {
     override func configureView() {
         navigationItem.title = "여행 도시 선택"
         view.backgroundColor = .systemGray6
+        tapGesture.cancelsTouchesInView = false
         tableView.register(CityTableViewCell.self, forCellReuseIdentifier: CityTableViewCell.identifier)
     }
     
@@ -142,6 +146,12 @@ final class DestinationSelectorViewController: BaseViewController {
             .bind(with: self) { owner, city in
                 owner.selectedCity.accept(city)
                 owner.navigationController?.popViewController(animated: true)
+            }
+            .disposed(by: disposeBag)
+        
+        tapGesture.rx.event
+            .bind(with: self) { owner, _ in
+                owner.view.endEditing(true)
             }
             .disposed(by: disposeBag)
     }
