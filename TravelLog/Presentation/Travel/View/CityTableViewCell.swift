@@ -58,6 +58,12 @@ final class CityTableViewCell: BaseTableViewCell {
     }()
     
     // MARK: - Lifecycle
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        
+        cityThumbnailView.image = nil
+    }
+    
     override func configureHierarchy() {
         stackView.addArrangedSubview(cityLabel)
         stackView.addArrangedSubview(countryLabel)
