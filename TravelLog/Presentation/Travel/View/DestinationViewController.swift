@@ -104,24 +104,20 @@ final class DestinationSelectorViewController: BaseViewController {
         
         output.items
             .drive(tableView.rx.items) { tableView, row, item in
-
                 switch item {
-
                 case .skeleton:
                     let cell = tableView.dequeueReusableCell(
                         withIdentifier: CityShimmerTableViewCell.identifier,
                         for: IndexPath(row: row, section: 0)
                     ) as! CityShimmerTableViewCell
-
                     cell.start()
                     return cell
-
                 case .city(let city):
                     let cell = tableView.dequeueReusableCell(
                         withIdentifier: CityTableViewCell.identifier,
                         for: IndexPath(row: row, section: 0)
                     ) as! CityTableViewCell
-
+                    
                     cell.configure(with: city)
                     return cell
                 }
@@ -130,9 +126,7 @@ final class DestinationSelectorViewController: BaseViewController {
         
         output.state
             .drive(with: self) { owner, state in
-
                 switch state {
-
                 case .idle:
                     owner.emptyView.configure(
                         iconName: "magnifyingglass",
@@ -140,10 +134,8 @@ final class DestinationSelectorViewController: BaseViewController {
                         subtitle: "도시 이름을 검색해보세요."
                     )
                     owner.tableView.backgroundView = owner.emptyView
-
                 case .loading:
                     owner.tableView.backgroundView = nil
-
                 case .empty:
                     owner.emptyView.configure(
                         iconName: "magnifyingglass",
@@ -151,10 +143,22 @@ final class DestinationSelectorViewController: BaseViewController {
                         subtitle: "단어가 정확한지 확인해보세요."
                     )
                     owner.tableView.backgroundView = owner.emptyView
-
                 case .result:
                     owner.tableView.backgroundView = nil
+                case .offline:
+                    owner.emptyView.configure(
+                        iconName: "wifi.slash",
+                        title: "인터넷 연결이 필요합니다.",
+                        subtitle: "새로운 도시를 검색하려면 네트워크에 연결해주세요."
+                    )
+                    owner.tableView.backgroundView = owner.emptyView
                 }
+            }
+            .disposed(by: disposeBag)
+        
+        tapGesture.rx.event
+            .bind(with: self) { owner, _ in
+                owner.view.endEditing(true)
             }
             .disposed(by: disposeBag)
     }

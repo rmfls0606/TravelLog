@@ -16,10 +16,18 @@ final class FetchCitiesUseCaseImpl: FetchCitiesUseCase {
     }
     
     func execute(query: String) -> Single<[City]> {
-        //먼저 로컬 -> 없으면 원격 후보
         repository.searchLocal(query: query)
             .flatMap { cities in
-                if !cities.isEmpty { return .just(cities) }
+                if !cities.isEmpty {
+                    return .just(cities)
+                }
+                
+                // 로컬에 없고, 오프라인이면 즉시 종료
+                if !SimpleNetworkState.shared.isConnected {
+                    return .error(CitySearchError.offline)
+                }
+                
+                // 온라인일 때만 remote
                 return self.repository.searchRemote(query: query)
             }
     }

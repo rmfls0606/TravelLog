@@ -20,6 +20,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         migration()
         
         IQKeyboardManager.shared.isEnabled = true
+        _ = SimpleNetworkState.shared
         
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()

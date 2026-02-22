@@ -20,6 +20,7 @@ enum SearchState {
     case loading
     case empty
     case result
+    case offline
 }
 
 final class DestinationViewModel {
@@ -53,14 +54,13 @@ final class DestinationViewModel {
             .distinctUntilChanged()
             .debounce(.milliseconds(400), scheduler: MainScheduler.instance)
             .flatMapLatest { [weak self] query -> Observable<SearchState> in
-                
-                guard let self = self else { return .just(.idle) }
-                
+                guard let self else { return .just(.idle) }
+
                 if query.isEmpty {
                     itemsRelay.accept([])
                     return .just(.idle)
                 }
-                
+
                 let hasExistingResults = !itemsRelay.value.isEmpty &&
                 itemsRelay.value.contains {
                     if case .city = $0 { return true }
@@ -68,24 +68,32 @@ final class DestinationViewModel {
                 }
                 
                 // 첫 검색일 때만 skeleton
-                if !hasExistingResults {
+                if !hasExistingResults && SimpleNetworkState.shared.isConnected {
                     itemsRelay.accept(Array(repeating: .skeleton, count: 5))
                 }
-                
-                return self.fetchCitiesUseCase
-                    .execute(query: query)
-                    .asObservable()
-                    .map { cities in
-                        if cities.isEmpty {
-                            itemsRelay.accept([])
-                            return .empty
-                        } else {
-                            itemsRelay.accept(cities.map { .city($0) })
-                            return .result
-                        }
-                    }
-                    .catchAndReturn(.empty)
-                    .startWith(.loading)
+
+                return Observable.just(.loading)
+                    .concat(
+                        self.fetchCitiesUseCase.execute(query: query)
+                            .asObservable()
+                            .map { cities -> SearchState in
+                                if cities.isEmpty {
+                                    itemsRelay.accept([])
+                                    return .empty
+                                } else {
+                                    itemsRelay.accept(cities.map { .city($0) })
+                                    return .result
+                                }
+                            }
+                            .catch { error in
+                                if case CitySearchError.offline = error {
+                                    itemsRelay.accept([])
+                                    return .just(.offline)
+                                }
+                                itemsRelay.accept([])
+                                return .just(.empty)
+                            }
+                    )
             }
             .asDriver(onErrorJustReturn: .idle)
         
