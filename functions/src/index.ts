@@ -40,12 +40,55 @@ type CityDoc = {
   popularityCount?: number;
 };
 
-function isKorean(text: string) {
-  return /[가-힣]/.test(text);
-}
-
 function normalize(s: string) {
   return s.trim().toLowerCase();
+}
+
+function cityRank(city: CityDoc, queryLower: string): number {
+  const name = normalize(city.name);
+  const country = normalize(city.country);
+
+  if (name === queryLower) return 0;
+  if (name.startsWith(queryLower)) return 1;
+  if (name.includes(queryLower)) return 2;
+  if (country === queryLower) return 3;
+  if (country.startsWith(queryLower)) return 4;
+  return 5;
+}
+
+function sortCitiesByQuery(cities: CityDoc[], queryLower: string): CityDoc[] {
+  return [...cities].sort((a, b) => {
+    const rankA = cityRank(a, queryLower);
+    const rankB = cityRank(b, queryLower);
+    if (rankA !== rankB) return rankA - rankB;
+
+    const popularityA = a.popularityCount ?? 0;
+    const popularityB = b.popularityCount ?? 0;
+    if (popularityA !== popularityB) return popularityB - popularityA;
+
+    if (a.name.length !== b.name.length) return a.name.length - b.name.length;
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function normalizeCityName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^city of /, "")
+    .replace(/ city$/, "")
+    .replace(/-si$/, "")
+    .replace(/^시티 오브 /, "")
+    .replace(/시$/, "")
+    .replace(/군$/, "")
+    .replace(/구$/, "")
+    .trim();
+}
+
+function isSubCitySuffixQuery(q: string): boolean {
+  const s = q.trim();
+  // "강진읍", "OO면", "OO동" 같은 '행정동/읍면'만 차단
+  return /(읍|면|동)$/.test(s);
 }
 
 // Firestore prefix range query helper
@@ -73,94 +116,174 @@ async function prefixSearchCities(prefix: string, limit: number): Promise<CityDo
   byNameSnap.docs.forEach((d) => map.set(d.id, d.data() as CityDoc));
   byCountrySnap.docs.forEach((d) => map.set(d.id, d.data() as CityDoc));
 
-  return Array.from(map.values()).slice(0, limit);
+  const merged = Array.from(map.values());
+  return sortCitiesByQuery(merged, prefix).slice(0, limit);
 }
 
-async function getOrCreateCityByPlaceId(placeId: string, apiKey: string, language: string): Promise<CityDoc | null> {
-  const ref = db.collection("cities").doc(placeId);
-  const snap = await ref.get();
-  if (snap.exists) return snap.data() as CityDoc;
+async function findPlaceSmart(
+  query: string,
+  apiKey: string
+): Promise<string | null> {
+  const res = await axios.get(
+    "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+    {
+      params: {
+        input: query,
+        types: "(regions)",
+        components: "country:kr",
+        key: apiKey,
+      },
+    }
+  );
 
-  // Details
+  if (res.data?.status !== "OK") return null;
+
+  const predictions = res.data?.predictions ?? [];
+  if (predictions.length === 0) return null;
+
+  const queryLower = normalize(query);
+
+  const scored: Array<{ prediction: any; rank: number; descLength: number }> = predictions
+    .map((p: any) => {
+      const mainText = normalize(p?.structured_formatting?.main_text ?? "");
+      const description = normalize(p?.description ?? "");
+
+      let rank = 5;
+      if (mainText === queryLower) rank = 0;
+      else if (description === queryLower) rank = 1;
+      else if (mainText.startsWith(queryLower)) rank = 2;
+      else if (description.startsWith(queryLower)) rank = 3;
+      else if (description.includes(queryLower)) rank = 4;
+
+      return {prediction: p, rank, descLength: description.length};
+    })
+    .sort((a: { prediction: any; rank: number; descLength: number },
+      b: { prediction: any; rank: number; descLength: number }) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      return a.descLength - b.descLength;
+    });
+
+  return scored[0]?.prediction?.place_id ?? null;
+}
+
+async function getOrCreateCityByPlaceId(
+  placeId: string,
+  apiKey: string,
+  query: string
+): Promise<CityDoc | null> {
   const detailsRes = await axios.get(
     "https://maps.googleapis.com/maps/api/place/details/json",
     {
       params: {
         place_id: placeId,
         key: apiKey,
-        language,
-        fields: "name,geometry,photos,address_components,types",
+        language: "ko",
+        fields: "name,geometry,address_components,types,photos",
       },
     }
   );
 
-  if (detailsRes.data.status !== "OK") return null;
+  if (detailsRes.data?.status !== "OK") return null;
 
   const details = detailsRes.data.result;
-  const types = details.types || [];
-
-  // 도시 타입 검증
   const name = details.name ?? "";
+  const types: string[] = details.types || [];
+
+  // 🔥 대한민국만 허용
   const countryComponent = (details.address_components || []).find((c: any) =>
     (c.types || []).includes("country")
   );
-  const country = countryComponent?.long_name ?? "알 수 없음";
 
-  let isValidCity = false;
-
-  if (country === "대한민국") {
-  // 한국 전용 정책
-    isValidCity =
-    types.includes("locality") ||
-    types.includes("administrative_area_level_1") ||
-    (
-      types.includes("administrative_area_level_2") &&
-      name.endsWith("군")
-    );
-  } else {
-  // 해외 일반화 정책
-    isValidCity =
-    types.includes("locality") ||
-    types.includes("administrative_area_level_1");
+  if (!countryComponent || countryComponent.long_name !== "대한민국") {
+    return null;
   }
 
-  if (!isValidCity) return null;
+  // 🔥 읍/면/동/리 차단
+  if (/(읍|면|동|리)$/.test(name)) {
+    return null;
+  }
 
-  // types에 locality/administrative_area_level_1 등이 섞여 들어올 수 있음
-  // "도시"로 다루는 범위를 넓히려면 types 검증을 너무 빡세게 하지 않는 게 안정적임.
+  // 🔥 한국 행정 단위 허용 범위
+  const isAllowedAdmin =
+    types.includes("locality") ||
+    types.includes("administrative_area_level_1") || // 도
+    types.includes("administrative_area_level_2"); // 시/군/구
+
+  if (!isAllowedAdmin) return null;
+
+  // 🔥 이름 비교 (시/군/구 제거 후 비교)
+  const input = normalizeCityName(query);
+  const result = normalizeCityName(name);
+
+  if (result !== input && !result.startsWith(input)) {
+    return null;
+  }
+
   const lat = details.geometry?.location?.lat;
   const lng = details.geometry?.location?.lng;
   if (typeof lat !== "number" || typeof lng !== "number") return null;
 
-
   let imageUrl: string | null = null;
-  if (details.photos && details.photos.length > 0) {
-    const photoRef = details.photos[0].photo_reference;
+
+  // 1️⃣ 도시 자체 photos 우선
+  if (details.photos?.length > 0) {
+    const bestPhoto = details.photos
+      .sort((a: any, b: any) => (b.width ?? 0) - (a.width ?? 0))[0];
+
+    const photoRef = bestPhoto.photo_reference;
+
     imageUrl =
-      "https://maps.googleapis.com/maps/api/place/photo" +
-      `?maxwidth=800&photo_reference=${photoRef}&key=${apiKey}`;
+      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${photoRef}&key=${apiKey}`;
   }
 
+  // 2️⃣ 도시 사진이 없으면 랜드마크 검색
+  if (!imageUrl) {
+    const landmarkRes = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/textsearch/json",
+      {
+        params: {
+          query: `${name} 랜드마크`,
+          region: "kr",
+          language: "ko",
+          key: apiKey,
+        },
+      }
+    );
+
+    if (landmarkRes.data?.status === "OK") {
+      const landmark = landmarkRes.data.results?.find((r: any) =>
+        r.types?.includes("tourist_attraction")
+      );
+
+      if (landmark?.photos?.length > 0) {
+        const photoRef = landmark.photos[0].photo_reference;
+
+        imageUrl =
+          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${photoRef}&key=${apiKey}`;
+      }
+    }
+  }
   const doc: CityDoc = {
     cityId: placeId,
     name,
-    country,
+    country: "대한민국",
     nameLower: normalize(name),
-    countryLower: normalize(country),
+    countryLower: "대한민국",
     lat,
     lng,
-    imageUrl,
+    imageUrl: imageUrl,
     updatedAt: Date.now(),
     popularityCount: 0,
   };
 
-  await ref.set(doc, {merge: true});
+  await db.collection("cities").doc(placeId).set(doc, {merge: true});
+
   return doc;
 }
 
 export const searchCity = onCall(async (request) => {
   const queryRaw = (request.data?.query ?? "") as string;
-  const language = ((request.data?.language ?? "ko") as string) || "ko";
+  // const language = ((request.data?.language ?? "ko") as string) || "ko";
   const limit = Math.min(Math.max(Number(request.data?.limit ?? 10), 1), 20);
 
   const query = queryRaw.trim();
@@ -171,6 +294,10 @@ export const searchCity = onCall(async (request) => {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_API_KEY is not set");
+  }
+
+  if (isSubCitySuffixQuery(query)) {
+    return {cities: [] as CityDoc[], source: "blocked-subcity"};
   }
 
   const lower = normalize(query);
@@ -188,72 +315,24 @@ export const searchCity = onCall(async (request) => {
     return {cities: cached.slice(0, limit)};
   }
 
-  let searchText = query;
+  const placeId = await findPlaceSmart(query, apiKey);
 
-  if (isKorean(query) &&
-    !query.endsWith("시") &&
-    !query.endsWith("군") &&
-    !query.endsWith("구")) {
-    searchText += " 시"; // "서울" -> "서울 시" (Google 검색 최적화)
-  }
-
-  // Google FindPlace (딱 1회)
-  const findRes = await axios.get(
-    "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
-    {
-      params: {
-        input: searchText,
-        inputtype: "textquery",
-        fields: "place_id",
-        language,
-        key: apiKey,
-        ...(isKorean(query) ?
-          {components: "country:kr"} :
-          {}),
-      },
-    }
-  );
-
-  const status = findRes.data?.status;
-  const candidate = findRes.data?.candidates?.[0];
-
-  if (status !== "OK" || !candidate?.place_id) {
-    // Google 실패해도 캐시 결과는 반환
-    return {cities: cached, source: "cache-google-empty", debug: {status}};
-  }
-
-  // 읍/면/동은 Details 호출 전에 차단
-  const desc =
-    candidate.formatted_address ??
-    candidate.name ??
-    "";
-
-  if (
-    desc.includes("읍") ||
-    desc.includes("면") ||
-    desc.includes("동")
-  ) {
-    return {cities: []};
+  if (!placeId) {
+    return {cities: [], source: "google-empty"};
   }
 
   const city = await getOrCreateCityByPlaceId(
-    candidate.place_id,
+    placeId,
     apiKey,
-    language
+    query // 🔥 language 대신 query 넘긴다
   );
 
   if (!city) {
-    return {cities: cached.slice(0, limit)};
+    return {cities: [], source: "filtered-out"};
   }
 
-  // prefix + 정확매칭 1개 합치기
-  const merged = [
-    city,
-    ...cached.filter((c) => c.cityId !== city.cityId),
-  ];
-
   return {
-    cities: merged.slice(0, limit),
+    cities: [city],
   };
 });
 
