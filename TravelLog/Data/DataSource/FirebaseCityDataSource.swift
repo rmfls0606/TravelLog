@@ -13,166 +13,169 @@ final class FirebaseCityDataSource: CityDataSource {
     private let db = Firestore.firestore()
     private let collection = "cities"
     private let pageLimit = 20
-    
+
     private struct CacheEntry {
         let cities: [City]
         let timestamp: Date
     }
-    
+
     private var memoryCache: [String: CacheEntry] = [:]
-    private let cacheTTL: TimeInterval = 5
-    
+    private let cacheTTL: TimeInterval = 10   // 5초는 너무 짧게 느껴질 수 있어서 10 추천
+    private let workQueue = DispatchQueue(label: "city.search.queue", qos: .userInitiated)
+
+    private func normalized(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func rank(city: City, queryLower: String) -> Int {
+        let name = normalized(city.name)
+        let country = normalized(city.country)
+
+        if name == queryLower { return 0 }
+        if name.hasPrefix(queryLower) { return 1 }
+        if name.contains(queryLower) { return 2 }
+        if country == queryLower { return 3 }
+        if country.hasPrefix(queryLower) { return 4 }
+        return 5
+    }
+
     func search(query: String) -> Single<[City]> {
-        Single.create { single in
-            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                single(.success([]))
-                return Disposables.create()
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .just([]) }
+
+        let lower = normalized(trimmed)
+
+        //prefix 변화에 따른 캐시 정리 (엉뚱한 캐시가 남는 것 방지)
+        //예: "인" -> "인천" -> "인" 반복 시 안전
+        memoryCache.keys
+            .filter { key in !key.hasPrefix(lower) && !lower.hasPrefix(key) }
+            .forEach { memoryCache.removeValue(forKey: $0) }
+
+        //memory cache hit
+        if let entry = memoryCache[lower],
+           Date().timeIntervalSince(entry.timestamp) < cacheTTL {
+            return .just(entry.cities)
+        }
+
+        let end = lower + "\u{f8ff}"
+
+        func decode(_ docs: [QueryDocumentSnapshot]) -> [City] {
+            docs.compactMap { doc in
+                let data = doc.data()
+                guard
+                    let name = data["name"] as? String,
+                    let country = data["country"] as? String,
+                    let lat = data["lat"] as? Double,
+                    let lng = data["lng"] as? Double
+                else { return nil }
+
+                var city = City(
+                    cityId: doc.documentID,
+                    name: name,
+                    country: country,
+                    lat: lat,
+                    lng: lng,
+                    imageUrl: data["imageUrl"] as? String
+                )
+                city.popularityCount = data["popularityCount"] as? Int
+                return city
             }
-            
-            let lower = trimmed.lowercased()
-            if let entry = self.memoryCache[lower],
-               Date().timeIntervalSince(entry.timestamp) < self.cacheTTL {
-                single(.success(entry.cities))
-                return Disposables.create()
-            }
-            let end = lower + "\u{f8ff}"
-            
-            func decode(_ docs: [QueryDocumentSnapshot]) -> [City] {
-                docs.compactMap { doc in
-                    let data = doc.data()
-                    guard
-                        let name = data["name"] as? String,
-                        let country = data["country"] as? String,
-                        let lat = data["lat"] as? Double,
-                        let lng = data["lng"] as? Double
-                    else { return nil }
-                    
-                    var city = City(
-                        cityId: doc.documentID,
-                        name: name,
-                        country: country,
-                        lat: lat,
-                        lng: lng,
-                        imageUrl: data["imageUrl"] as? String
-                    )
-                    city.popularityCount = data["popularityCount"] as? Int
-                    return city
+        }
+
+        func mergeUnique(_ a: [City], _ b: [City]) -> [City] {
+            var map: [String: City] = [:]
+            a.forEach { map[$0.cityId] = $0 }
+            b.forEach { map[$0.cityId] = $0 }
+            return Array(map.values)
+        }
+
+        func runPrefixQueries(source: FirestoreSource, completion: @escaping (Result<[City], Error>) -> Void) {
+            let group = DispatchGroup()
+            var byName: [City] = []
+            var byCountry: [City] = []
+            var firstError: Error?
+
+            group.enter()
+            db.collection(collection)
+                .order(by: "nameLower")
+                .start(at: [lower])
+                .end(at: [end])
+                .limit(to: pageLimit)
+                .getDocuments(source: source) { snap, error in
+                    defer { group.leave() }
+                    if let error = error { firstError = firstError ?? error; return }
+                    byName = decode(snap?.documents ?? [])
                 }
-            }
-            
-            func mergeUnique(_ a: [City], _ b: [City]) -> [City] {
-                var map: [String: City] = [:]
-                a.forEach { map[$0.cityId] = $0 }
-                b.forEach { map[$0.cityId] = $0 }
-                return Array(map.values)
-            }
-            
-            func runPrefixQueries(source: FirestoreSource, completion: @escaping (Result<[City], Error>) -> Void) {
-                let group = DispatchGroup()
-                
-                var byName: [City] = []
-                var byCountry: [City] = []
-                var firstError: Error?
-                
-                // nameLower prefix
-                group.enter()
-                self.db.collection(self.collection)
-                    .order(by: "nameLower")
-                    .start(at: [lower])
-                    .end(at: [end])
-                    .limit(to: self.pageLimit)
-                    .getDocuments(source: source) { snap, error in
-                        defer { group.leave() }
-                        if let error = error { firstError = firstError ?? error; return }
-                        byName = decode(snap?.documents ?? [])
-                    }
-                
-                // countryLower prefix
-                group.enter()
-                self.db.collection(self.collection)
-                    .order(by: "countryLower")
-                    .start(at: [lower])
-                    .end(at: [end])
-                    .limit(to: self.pageLimit)
-                    .getDocuments(source: source) { snap, error in
-                        defer { group.leave() }
-                        if let error = error { firstError = firstError ?? error; return }
-                        byCountry = decode(snap?.documents ?? [])
-                    }
-                
-                group.notify(queue: .main) {
-                    if let error = firstError {
-                        completion(.failure(error))
-                        return
-                    }
-                    let merged = mergeUnique(byName, byCountry)
-                        .sorted { ($0.popularityCount ?? 0) > ($1.popularityCount ?? 0) }
-                    completion(.success(Array(merged.prefix(self.pageLimit))))
+
+            group.enter()
+            db.collection(collection)
+                .order(by: "countryLower")
+                .start(at: [lower])
+                .end(at: [end])
+                .limit(to: pageLimit)
+                .getDocuments(source: source) { snap, error in
+                    defer { group.leave() }
+                    if let error = error { firstError = firstError ?? error; return }
+                    byCountry = decode(snap?.documents ?? [])
                 }
+
+            group.notify(queue: workQueue) {
+                if let error = firstError {
+                    completion(.failure(error))
+                    return
+                }
+
+                let merged = mergeUnique(byName, byCountry)
+                let sorted = merged.sorted { lhs, rhs in
+                    let lhsRank = self.rank(city: lhs, queryLower: lower)
+                    let rhsRank = self.rank(city: rhs, queryLower: lower)
+                    if lhsRank != rhsRank { return lhsRank < rhsRank }
+
+                    let lhsPopularity = lhs.popularityCount ?? 0
+                    let rhsPopularity = rhs.popularityCount ?? 0
+                    if lhsPopularity != rhsPopularity { return lhsPopularity > rhsPopularity }
+
+                    if lhs.name.count != rhs.name.count { return lhs.name.count < rhs.name.count }
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+
+                completion(.success(Array(sorted.prefix(self.pageLimit))))
             }
-            
-            // 1) cache first (빠르게)
+        }
+
+        return Single.create { single in
+            var cancelled = false
+
+            // 1) cache first
             runPrefixQueries(source: .cache) { cacheResult in
+                if cancelled { return }
                 switch cacheResult {
-                    
-                case .success(let cachedCities):
-                    if !cachedCities.isEmpty {
-                        
-                        // 메모리 캐시에 저장
-                        self.memoryCache[lower] = CacheEntry(
-                            cities: cachedCities,
-                            timestamp: Date()
-                        )
-                        
-                        single(.success(cachedCities))
-                        return
-                    }
-                    
-                    // cache 비었으면 default 재시도
+                case .success(let cached) where !cached.isEmpty:
+                    self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
+                    single(.success(cached))
+
+                default:
+                    // 2) default fallback
                     runPrefixQueries(source: .default) { defaultResult in
+                        if cancelled { return }
                         switch defaultResult {
                         case .success(let cities):
-                            
-                            // 메모리 캐시에 저장
-                            self.memoryCache[lower] = CacheEntry(
-                                cities: cities,
-                                timestamp: Date()
-                            )
-                            
+                            self.memoryCache[lower] = CacheEntry(cities: cities, timestamp: Date())
                             single(.success(cities))
-                            
-                        case .failure(let error):
-                            single(.failure(error))
-                        }
-                    }
-                    
-                case .failure:
-                    // cache 실패해도 default 시도
-                    runPrefixQueries(source: .default) { defaultResult in
-                        switch defaultResult {
-                        case .success(let cities):
-                            
-                            self.memoryCache[lower] = CacheEntry(
-                                cities: cities,
-                                timestamp: Date()
-                            )
-                            
-                            single(.success(cities))
-                            
                         case .failure(let error):
                             single(.failure(error))
                         }
                     }
                 }
             }
-            
-            return Disposables.create()
+
+            return Disposables.create {
+                cancelled = true
+            }
         }
     }
-    
-    // 나머지 fetch/save/increment은 그대로 두면 됨
-    func fetchCity(by cityId: String) -> Single<City?> { /* 기존 코드 */ fatalError() }
-    func save(city: City) -> Single<Void> { /* 기존 코드 */ fatalError() }
-    func incrementPopularity(cityId: String) -> Single<Void> { /* 기존 코드 */ fatalError() }
+
+    func fetchCity(by cityId: String) -> Single<City?> { fatalError() }
+    func save(city: City) -> Single<Void> { fatalError() }
+    func incrementPopularity(cityId: String) -> Single<Void> { fatalError() }
 }
