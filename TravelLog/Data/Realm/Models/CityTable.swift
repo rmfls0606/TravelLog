@@ -21,6 +21,7 @@ final class CityTable: Object {
     @Persisted var longitude: Double // 경도
     
     @Persisted var imageURL: String? // 도시 대표 이미지
+    @Persisted var popularityCount: Int // 이미지 선택 카운트
     @Persisted var lastUpdated: Date = Date() // 마지막 갱신일
     
     // 역참조
@@ -35,6 +36,7 @@ final class CityTable: Object {
         iataCode: String? = nil,
         latitude: Double = 0,
         longitude: Double = 0,
+        popularityCount: Int = 0,
         imageURL: String? = nil,
     ) {
         self.init()
@@ -45,6 +47,7 @@ final class CityTable: Object {
         self.iataCode = iataCode
         self.latitude = latitude
         self.longitude = longitude
+        self.popularityCount = popularityCount
         self.imageURL = imageURL
     }
 }
@@ -53,12 +56,13 @@ extension CityTable {
     convenience init(from city: City) {
         self.init()
         self.name = city.name
-        self.nameEn = city.cityId
+        self.nameEn = city.name
         self.country = city.country
         self.continent = "Asia"
         self.iataCode = nil
-        self.latitude = 0
-        self.longitude = 0
-        self.imageURL = nil
+        self.latitude = city.lat
+        self.longitude = city.lng
+        self.imageURL = city.imageUrl
+        self.popularityCount = city.popularityCount ?? 0
     }
 }
