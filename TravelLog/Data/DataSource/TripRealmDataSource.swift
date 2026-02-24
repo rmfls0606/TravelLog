@@ -6,8 +6,10 @@
 //
 
 import Foundation
+import UIKit
 import RealmSwift
 import RxSwift
+import Kingfisher
 
 final class TripRealmDataSource{
     private let fileManager = FileManager.default
@@ -32,7 +34,6 @@ final class TripRealmDataSource{
                     )
 
                     let realm = try Realm()
-                    print(realm.configuration.fileURL)
                     try realm.write {
                         let departureCity: CityTable
                         if let existingDeparture = realm.objects(CityTable.self)
@@ -116,12 +117,25 @@ final class TripRealmDataSource{
             return filename
         }
 
-        guard let data = try? Data(contentsOf: remoteURL) else {
+        if let data = try? Data(contentsOf: remoteURL) {
+            do {
+                try data.write(to: targetURL, options: .atomic)
+                return filename
+            } catch {
+                return nil
+            }
+        }
+
+        // 오프라인 등으로 직접 다운로드 실패 시 Kingfisher 캐시를 로컬 파일로 승격
+        guard let cachedImage = imageFromKingfisherCache(forKey: remoteURLString) else {
             return nil
         }
 
+        let imageData = cachedImage.jpegData(compressionQuality: 0.9) ?? cachedImage.pngData()
+        guard let imageData else { return nil }
+
         do {
-            try data.write(to: targetURL, options: .atomic)
+            try imageData.write(to: targetURL, options: .atomic)
             return filename
         } catch {
             return nil
@@ -157,6 +171,24 @@ final class TripRealmDataSource{
         default:
             return "jpg"
         }
+    }
+
+    private func imageFromKingfisherCache(forKey key: String) -> UIImage? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var image: UIImage?
+
+        ImageCache.default.retrieveImage(forKey: key) { result in
+            defer { semaphore.signal() }
+            switch result {
+            case .success(let value):
+                image = value.image
+            case .failure:
+                image = nil
+            }
+        }
+
+        _ = semaphore.wait(timeout: .now() + 1.5)
+        return image
     }
     
     func fetchTrips() -> Observable<[TravelTable]> {
@@ -221,7 +253,7 @@ final class TripRealmDataSource{
                                 let fileURL = docURL.appendingPathComponent("\(filename).jpg")
                                 if fileManager.fileExists(atPath: fileURL.path) {
                                     try? fileManager.removeItem(at: fileURL)
-                                    print("🗑️ Deleted image:", fileURL.lastPathComponent)
+                                    print("Deleted image:", fileURL.lastPathComponent)
                                 }
                             }
                         }
