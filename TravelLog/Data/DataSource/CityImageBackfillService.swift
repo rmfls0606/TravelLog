@@ -107,9 +107,11 @@ final class CityImageBackfillService {
     }
 
     private func process(snapshot item: CitySnapshot, forceRemote: Bool) {
-        // forceRemote 경로에서는 네트워크 상태 플래그와 무관하게 원격 조회를 우선한다.
-        let isOnline = forceRemote || SimpleNetworkState.shared.isConnected
-        print("[CityBackfill] start cityId=\(item.id) names=\(item.names) online=\(isOnline) force=\(forceRemote) imageURL=\(item.imageURL ?? "nil") local=\(item.localImageFilename ?? "nil")")
+        // forceRemote: Firestore 원격 조회 우선 시도 플래그
+        // Functions는 실제 온라인일 때만 호출한다.
+        let actuallyOnline = SimpleNetworkState.shared.isConnected
+        let useRemoteFirestore = forceRemote || actuallyOnline
+        print("[CityBackfill] start cityId=\(item.id) names=\(item.names) online=\(actuallyOnline) force=\(forceRemote) imageURL=\(item.imageURL ?? "nil") local=\(item.localImageFilename ?? "nil")")
         var foundDocId: String? = item.cityDocId
         var resolvedImageURL: String? = item.imageURL
         var filename: String?
@@ -126,7 +128,7 @@ final class CityImageBackfillService {
 
         // 2) imageURL가 없거나 로컬 저장 실패면 Firestore 조회
         if forceRemote || resolvedImageURL == nil || filename == nil {
-            let source: FirestoreSource = isOnline ? .default : .cache
+            let source: FirestoreSource = useRemoteFirestore ? .default : .cache
             let firestoreResult = self.fetchImageFromFirestore(
                 cityDocId: item.cityDocId,
                 cityNames: item.names,
@@ -143,8 +145,10 @@ final class CityImageBackfillService {
             }
         }
 
-        // 3) 온라인인데 아직 imageURL 없으면 Functions fallback
-        if resolvedImageURL == nil && isOnline {
+        // 3) Functions fallback
+        // forceRemote는 화면 갱신 목적의 적극 경로이므로 네트워크 플래그가 false여도 시도한다.
+        let canTryFunctions = forceRemote || actuallyOnline
+        if resolvedImageURL == nil && canTryFunctions {
             resolvedImageURL = self.fetchImageURLFromFunction(cityNames: item.names, country: item.country)
             print("[CityBackfill] function result cityId=\(item.id) url=\(resolvedImageURL ?? "nil")")
         }
