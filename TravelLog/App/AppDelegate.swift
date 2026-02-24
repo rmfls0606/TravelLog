@@ -10,17 +10,23 @@ import RealmSwift
 import Firebase
 import IQKeyboardManagerSwift
 import Kingfisher
+import RxSwift
+import RxCocoa
 internal import Realm
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
+    private lazy var cityImageBackfillService = CityImageBackfillService()
+    private let disposeBag = DisposeBag()
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         FirebaseApp.configure()
         
         migration()
         configureImageCache()
-        CityImageBackfillService().backfillMissingCityImages()
+        cityImageBackfillService.backfillMissingCityImages()
+        bindNetworkTriggeredCityImageBackfill()
         
         IQKeyboardManager.shared.isEnabled = true
         _ = SimpleNetworkState.shared
@@ -74,5 +80,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         cache.memoryStorage.config.expiration = .seconds(300)
         cache.diskStorage.config.sizeLimit = 200 * 1024 * 1024
         cache.diskStorage.config.expiration = .days(7)
+    }
+
+    private func bindNetworkTriggeredCityImageBackfill() {
+        SimpleNetworkState.shared.isConnectedDriver
+            .distinctUntilChanged()
+            .skip(1)
+            .filter { $0 }
+            .drive(with: self) { owner, _ in
+                owner.cityImageBackfillService.backfillMissingCityImages()
+            }
+            .disposed(by: disposeBag)
     }
 }
