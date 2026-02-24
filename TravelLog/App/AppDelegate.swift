@@ -10,16 +10,17 @@ import RealmSwift
 import Firebase
 import IQKeyboardManagerSwift
 import Kingfisher
+internal import Realm
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-    
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         FirebaseApp.configure()
         
         migration()
         configureImageCache()
+        CityImageBackfillService().backfillMissingCityImages()
         
         IQKeyboardManager.shared.isEnabled = true
         _ = SimpleNetworkState.shared
@@ -52,7 +53,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             //JournalBlockTable에 링크 미리보기를 위한 linkTitle, linkDescription, linkImagePath 컬럼 추가
             if oldSchemaVersion < 1 {}
             if oldSchemaVersion < 2 {}
-            if oldSchemaVersion < 3 {}
+            if oldSchemaVersion < 3 {
+                migration.enumerateObjects(ofType: CityTable.className()) { _, newObject in
+                    newObject?["localImageFilename"] = nil
+                }
+            }
         }
         
         Realm.Configuration.defaultConfiguration = config

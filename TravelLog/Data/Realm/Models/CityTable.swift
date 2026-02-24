@@ -21,6 +21,7 @@ final class CityTable: Object {
     @Persisted var longitude: Double // 경도
     
     @Persisted var imageURL: String? // 도시 대표 이미지
+    @Persisted var localImageFilename: String? // 오프라인용 로컬 이미지 파일명
     @Persisted var popularityCount: Int // 이미지 선택 카운트
     @Persisted var lastUpdated: Date = Date() // 마지막 갱신일
     
@@ -38,6 +39,7 @@ final class CityTable: Object {
         longitude: Double = 0,
         popularityCount: Int = 0,
         imageURL: String? = nil,
+        localImageFilename: String? = nil,
     ) {
         self.init()
         self.name = name
@@ -49,6 +51,7 @@ final class CityTable: Object {
         self.longitude = longitude
         self.popularityCount = popularityCount
         self.imageURL = imageURL
+        self.localImageFilename = localImageFilename
     }
 }
 
@@ -63,6 +66,7 @@ extension CityTable {
         self.latitude = city.lat
         self.longitude = city.lng
         self.imageURL = city.imageUrl
+        self.localImageFilename = nil
         self.popularityCount = city.popularityCount ?? 0
     }
 }

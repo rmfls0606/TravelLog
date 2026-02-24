@@ -380,10 +380,17 @@ final class TripCardCell: BaseTableViewCell {
     
     // MARK: - Configure
     func configure(with trip: TravelTable, journalCount: Int) {
-        if let imageUrl = trip.destination?.imageURL,
-           let url = URL(string: imageUrl){
+        cityImageView.kf.cancelDownloadTask()
+
+        if let localFilename = trip.destination?.localImageFilename,
+           let localURL = cityImageFileURL(filename: localFilename),
+           FileManager.default.fileExists(atPath: localURL.path),
+           let localImage = UIImage(contentsOfFile: localURL.path) {
+            cityImageView.image = localImage
+        } else if let imageUrl = trip.destination?.imageURL,
+                  let url = URL(string: imageUrl) {
             cityImageView.kf.setImage(with: url)
-        }else{
+        } else {
             cityImageView.image = .seoul
         }
         
@@ -475,6 +482,15 @@ final class TripCardCell: BaseTableViewCell {
         } else {
             return .completed
         }
+    }
+
+    private func cityImageFileURL(filename: String) -> URL? {
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return documents
+            .appendingPathComponent("CityImages", isDirectory: true)
+            .appendingPathComponent(filename)
     }
 }
 
