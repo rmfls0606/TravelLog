@@ -14,6 +14,7 @@ import SafariServices
 import AVFoundation
 import Toast
 import Kingfisher
+import Network
 internal import Realm
 
 final class JournalTimelineViewController: BaseViewController {
@@ -48,6 +49,10 @@ final class JournalTimelineViewController: BaseViewController {
     private var playbackPositions: [IndexPath: TimeInterval] = [:]
     private var playbackDurations: [IndexPath: TimeInterval] = [:]
     private var isAudioSessionActive = false
+    private var pathMonitor: NWPathMonitor?
+    private let pathMonitorQueue = DispatchQueue(label: "journal.vc.network.monitor")
+    private var lastNetworkSatisfied: Bool?
+    private var lastForceBackfillAt: Date?
     
     // MARK: - Init
     init(tripId: ObjectId) {
@@ -67,6 +72,17 @@ final class JournalTimelineViewController: BaseViewController {
             cornerRadius: 16
         )
         updateTableViewHeight()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        startNetworkMonitorIfNeeded()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -90,6 +106,11 @@ final class JournalTimelineViewController: BaseViewController {
         destinationCityToken = nil
         // 화면 이동 시 재생 중지 + 외부 세션 복원
         stopPlayback(resetUI: false, deactivateSession: true)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        stopNetworkMonitor()
     }
     
     
@@ -299,7 +320,10 @@ final class JournalTimelineViewController: BaseViewController {
             .filter { $0 }
             .drive(with: self) { owner, _ in
                 if let cityId = owner.trip?.destination?.id {
-                    CityImageBackfillService.shared.backfillCityImageIfNeeded(cityObjectId: cityId)
+                    CityImageBackfillService.shared.backfillCityImageIfNeeded(
+                        cityObjectId: cityId,
+                        forceRemote: true
+                    )
                 }
             }
             .disposed(by: disposeBag)
@@ -375,6 +399,52 @@ final class JournalTimelineViewController: BaseViewController {
         return documents
             .appendingPathComponent("CityImages", isDirectory: true)
             .appendingPathComponent(filename)
+    }
+
+    private func startNetworkMonitorIfNeeded() {
+        guard pathMonitor == nil else { return }
+        let monitor = NWPathMonitor()
+        pathMonitor = monitor
+
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let isSatisfied = (path.status == .satisfied)
+            self.lastNetworkSatisfied = isSatisfied
+            print("[JournalVC] NWPath status=\(path.status)")
+
+            DispatchQueue.main.async {
+                self.triggerForceBackfillIfNeeded()
+            }
+        }
+
+        monitor.start(queue: pathMonitorQueue)
+        lastNetworkSatisfied = (monitor.currentPath.status == .satisfied)
+    }
+
+    private func stopNetworkMonitor() {
+        pathMonitor?.cancel()
+        pathMonitor = nil
+        lastNetworkSatisfied = nil
+    }
+
+    @objc
+    private func handleDidBecomeActive() {
+        triggerForceBackfillIfNeeded()
+    }
+
+    private func triggerForceBackfillIfNeeded() {
+        let now = Date()
+        if let last = lastForceBackfillAt, now.timeIntervalSince(last) < 2.0 {
+            return
+        }
+        lastForceBackfillAt = now
+        CityImageBackfillService.shared.backfillMissingCityImages()
+        if let cityId = trip?.destination?.id {
+            CityImageBackfillService.shared.backfillCityImageIfNeeded(
+                cityObjectId: cityId,
+                forceRemote: true
+            )
+        }
     }
 }
 

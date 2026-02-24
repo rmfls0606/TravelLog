@@ -27,7 +27,9 @@ final class CityImageBackfillService {
         let id: ObjectId
         let cityDocId: String?
         let names: [String]
+        let country: String
         let imageURL: String?
+        let localImageFilename: String?
     }
 
     private init() {}
@@ -56,11 +58,18 @@ final class CityImageBackfillService {
                         city.name.trimmingCharacters(in: .whitespacesAndNewlines),
                         city.nameEn.trimmingCharacters(in: .whitespacesAndNewlines)
                     ].filter { !$0.isEmpty }))
-                    return CitySnapshot(id: city.id, cityDocId: city.cityDocId, names: names, imageURL: city.imageURL)
+                    return CitySnapshot(
+                        id: city.id,
+                        cityDocId: city.cityDocId,
+                        names: names,
+                        country: city.country,
+                        imageURL: city.imageURL,
+                        localImageFilename: city.localImageFilename
+                    )
                 }
 
                 for item in snapshots {
-                    self.process(snapshot: item)
+                    self.process(snapshot: item, forceRemote: false)
                 }
             } catch {
                 print("City image backfill failed:", error.localizedDescription)
@@ -68,12 +77,14 @@ final class CityImageBackfillService {
         }
     }
 
-    func backfillCityImageIfNeeded(cityObjectId: ObjectId) {
+    func backfillCityImageIfNeeded(cityObjectId: ObjectId, forceRemote: Bool = false) {
         queue.async {
             do {
                 let realm = try Realm()
                 guard let city = realm.object(ofType: CityTable.self, forPrimaryKey: cityObjectId) else { return }
-                guard city.imageURL == nil || city.localImageFilename == nil else { return }
+                if !forceRemote {
+                    guard city.imageURL == nil || city.localImageFilename == nil else { return }
+                }
 
                 let names = Array(Set([
                     city.name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -84,54 +95,73 @@ final class CityImageBackfillService {
                     id: city.id,
                     cityDocId: city.cityDocId,
                     names: names,
-                    imageURL: city.imageURL
+                    country: city.country,
+                    imageURL: city.imageURL,
+                    localImageFilename: city.localImageFilename
                 )
-                self.process(snapshot: snapshot)
+                self.process(snapshot: snapshot, forceRemote: forceRemote)
             } catch {
                 print("City image single backfill failed:", error.localizedDescription)
             }
         }
     }
 
-    private func process(snapshot item: CitySnapshot) {
-        let isOnline = SimpleNetworkState.shared.isConnected
-        var foundDocId: String?
-        let resolvedImageURL: String?
+    private func process(snapshot item: CitySnapshot, forceRemote: Bool) {
+        // forceRemote 경로에서는 네트워크 상태 플래그와 무관하게 원격 조회를 우선한다.
+        let isOnline = forceRemote || SimpleNetworkState.shared.isConnected
+        print("[CityBackfill] start cityId=\(item.id) names=\(item.names) online=\(isOnline) force=\(forceRemote) imageURL=\(item.imageURL ?? "nil") local=\(item.localImageFilename ?? "nil")")
+        var foundDocId: String? = item.cityDocId
+        var resolvedImageURL: String? = item.imageURL
+        var filename: String?
 
-        if isOnline {
+        // 1) imageURL가 이미 있으면 먼저 로컬 파일 백필 시도 (Kingfisher -> Data)
+        if !forceRemote, let existingURL = resolvedImageURL, !existingURL.isEmpty {
+            print("[CityBackfill] use existing imageURL first cityId=\(item.id)")
+            filename = self.downloadAndStoreImageIfNeeded(
+                remoteURLString: existingURL,
+                preferredKey: item.names.first ?? "city"
+            )
+            print("[CityBackfill] existing imageURL local save result cityId=\(item.id) filename=\(filename ?? "nil")")
+        }
+
+        // 2) imageURL가 없거나 로컬 저장 실패면 Firestore 조회
+        if forceRemote || resolvedImageURL == nil || filename == nil {
+            let source: FirestoreSource = isOnline ? .default : .cache
             let firestoreResult = self.fetchImageFromFirestore(
                 cityDocId: item.cityDocId,
                 cityNames: item.names,
-                source: .default
+                source: source
             )
-            foundDocId = firestoreResult?.cityDocId
-
-            if let firestoreImageURL = firestoreResult?.imageURL {
-                resolvedImageURL = firestoreImageURL
-            } else if let existing = item.imageURL, !existing.isEmpty {
-                resolvedImageURL = existing
+            if let url = firestoreResult?.imageURL {
+                resolvedImageURL = url
+                print("[CityBackfill] firestore hit cityId=\(item.id) url=\(url)")
+                if let docId = firestoreResult?.cityDocId, !docId.isEmpty {
+                    foundDocId = docId
+                }
             } else {
-                resolvedImageURL = self.fetchImageURLFromFunction(cityNames: item.names)
-            }
-        } else {
-            // 오프라인에서는 빠르게: 기존 URL/문서ID 캐시만 활용 (name prefix 조회 생략)
-            if let existing = item.imageURL, !existing.isEmpty {
-                resolvedImageURL = existing
-            } else if let docId = item.cityDocId, !docId.isEmpty,
-                      let cachedURL = imageURLFromDocumentId(docId, source: .cache) {
-                foundDocId = docId
-                resolvedImageURL = cachedURL
-            } else {
-                return
+                print("[CityBackfill] firestore miss cityId=\(item.id)")
             }
         }
 
-        guard let resolvedImageURL else { return }
+        // 3) 온라인인데 아직 imageURL 없으면 Functions fallback
+        if resolvedImageURL == nil && isOnline {
+            resolvedImageURL = self.fetchImageURLFromFunction(cityNames: item.names, country: item.country)
+            print("[CityBackfill] function result cityId=\(item.id) url=\(resolvedImageURL ?? "nil")")
+        }
 
-        let filename = self.downloadAndStoreImageIfNeeded(
-            remoteURLString: resolvedImageURL,
-            preferredKey: item.names.first ?? "city"
-        )
+        guard let finalURL = resolvedImageURL else {
+            print("[CityBackfill] stop no imageURL cityId=\(item.id)")
+            return
+        }
+
+        // 4) 아직 local 파일이 없으면 최종 URL로 다시 시도
+        if filename == nil {
+            filename = self.downloadAndStoreImageIfNeeded(
+                remoteURLString: finalURL,
+                preferredKey: item.names.first ?? "city"
+            )
+            print("[CityBackfill] final local save result cityId=\(item.id) filename=\(filename ?? "nil")")
+        }
 
         do {
             let writeRealm = try Realm()
@@ -141,12 +171,13 @@ final class CityImageBackfillService {
                 if let foundDocId, !foundDocId.isEmpty {
                     target.cityDocId = foundDocId
                 }
-                target.imageURL = resolvedImageURL
+                target.imageURL = finalURL
                 if let filename {
                     target.localImageFilename = filename
                 }
                 target.lastUpdated = Date()
             }
+            print("[CityBackfill] realm write done cityId=\(item.id) imageURL=\(finalURL) local=\(filename ?? target.localImageFilename ?? "nil")")
         } catch {
             print("City image write failed:", error.localizedDescription)
         }
@@ -229,6 +260,23 @@ final class CityImageBackfillService {
                     return (imageURL: url, cityDocId: doc.documentID)
                 }
             }
+
+            // 4) legacy prefix on name (nameLower가 없는 문서 fallback)
+            let legacyDocs = documents(
+                from: db.collection("cities")
+                    .order(by: "name")
+                    .start(at: [trimmed])
+                    .end(at: [trimmed + "\u{f8ff}"])
+                    .limit(to: 10),
+                source: source
+            )
+
+            for doc in legacyDocs {
+                let data = doc.data()
+                if let url = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String), !url.isEmpty {
+                    return (imageURL: url, cityDocId: doc.documentID)
+                }
+            }
         }
 
         return nil
@@ -237,29 +285,39 @@ final class CityImageBackfillService {
     private func imageURLFromDocumentId(_ cityDocId: String, source: FirestoreSource) -> String? {
         let semaphore = DispatchSemaphore(value: 0)
         var result: String?
+        var err: Error?
 
-        db.collection("cities").document(cityDocId).getDocument(source: source) { snapshot, _ in
+        db.collection("cities").document(cityDocId).getDocument(source: source) { snapshot, error in
             defer { semaphore.signal() }
+            err = error
             guard let data = snapshot?.data() else { return }
             result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
         }
 
         let timeout: TimeInterval = (source == .cache) ? 1.2 : 5.0
         _ = semaphore.wait(timeout: .now() + timeout)
+        if let err {
+            print("[CityBackfill] docId query error source=\(source) id=\(cityDocId) error=\(err.localizedDescription)")
+        }
         return result
     }
 
     private func documents(from query: FirebaseFirestore.Query, source: FirestoreSource) -> [QueryDocumentSnapshot] {
         let semaphore = DispatchSemaphore(value: 0)
         var result: [QueryDocumentSnapshot] = []
+        var err: Error?
 
-        query.getDocuments(source: source) { snapshot, _ in
+        query.getDocuments(source: source) { snapshot, error in
             defer { semaphore.signal() }
+            err = error
             result = snapshot?.documents ?? []
         }
 
         let timeout: TimeInterval = (source == .cache) ? 1.2 : 5.0
         _ = semaphore.wait(timeout: .now() + timeout)
+        if let err {
+            print("[CityBackfill] query error source=\(source) error=\(err.localizedDescription)")
+        }
         return result
     }
 
@@ -289,10 +347,17 @@ final class CityImageBackfillService {
         return 5
     }
 
-    private func fetchImageURLFromFunction(cityNames: [String]) -> String? {
-        let queries = cityNames
+    private func fetchImageURLFromFunction(cityNames: [String], country: String) -> String? {
+        let baseQueries = cityNames
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+
+        var queries = baseQueries
+        let countryTrimmed = country.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !countryTrimmed.isEmpty {
+            queries.append(contentsOf: baseQueries.map { "\($0) \(countryTrimmed)" })
+        }
+        queries = Array(Set(queries))
 
         guard !queries.isEmpty else { return nil }
 
@@ -305,8 +370,11 @@ final class CityImageBackfillService {
                     "query": cityName,
                     "language": "ko",
                     "limit": 10
-                ]) { value, _ in
+                ]) { value, error in
                     defer { semaphore.signal() }
+                    if let error {
+                        print("[CityBackfill] function error query=\(cityName) error=\(error.localizedDescription)")
+                    }
                     guard
                         let root = value?.data as? [String: Any],
                         let cities = root["cities"] as? [[String: Any]],
@@ -340,8 +408,9 @@ final class CityImageBackfillService {
         else { return nil }
 
         let sanitized = sanitizeFilename(preferredKey)
+        let urlHash = stableHash(remoteURLString)
         let fileExtension = normalizedImageExtension(from: remoteURL)
-        let filename = "city_\(sanitized).\(fileExtension)"
+        let filename = "city_\(sanitized)_\(urlHash).\(fileExtension)"
         let targetURL = cityImageDirectory.appendingPathComponent(filename)
 
         if fileManager.fileExists(atPath: targetURL.path) {
@@ -401,6 +470,16 @@ final class CityImageBackfillService {
         default:
             return "jpg"
         }
+    }
+
+    // Deterministic hash for filename versioning by URL (stable across launches)
+    private func stableHash(_ value: String) -> String {
+        var hash: UInt64 = 1469598103934665603
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1099511628211
+        }
+        return String(hash, radix: 16)
     }
 
     private func imageFromKingfisherCache(forKey key: String) -> UIImage? {

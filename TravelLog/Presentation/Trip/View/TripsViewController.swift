@@ -10,6 +10,7 @@ import SnapKit
 import RxSwift
 import RxCocoa
 import RealmSwift
+import Network
 internal import Realm
 
 final class TripsViewController: BaseViewController {
@@ -42,19 +43,40 @@ final class TripsViewController: BaseViewController {
     private var cityToken: NotificationToken?
     private let tripSelectedRelay = PublishRelay<TravelTable>()
     private lazy var emptyView = CustomEmptyView()
+    private var pathMonitor: NWPathMonitor?
+    private let pathMonitorQueue = DispatchQueue(label: "trip.vc.network.monitor")
+    private var lastNetworkSatisfied: Bool?
+    private var lastForceBackfillAt: Date?
     
     // MARK: - Lifecycle
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureTableHeaderView()
         CityImageBackfillService.shared.backfillMissingCityImages()
+        backfillVisibleTripDestinations()
         observeCityImageChangesIfNeeded()
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        startNetworkMonitorIfNeeded()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         cityToken?.invalidate()
         cityToken = nil
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        stopNetworkMonitor()
     }
     
     // MARK: - Hierarchy
@@ -176,6 +198,14 @@ final class TripsViewController: BaseViewController {
                 CityImageBackfillService.shared.backfillMissingCityImages()
             })
             .disposed(by: disposeBag)
+
+        SimpleNetworkState.shared.isConnectedDriver
+            .distinctUntilChanged()
+            .filter { $0 }
+            .drive(with: self) { owner, _ in
+                owner.backfillVisibleTripDestinations()
+            }
+            .disposed(by: disposeBag)
     }
 
     private func observeCityImageChangesIfNeeded() {
@@ -192,6 +222,59 @@ final class TripsViewController: BaseViewController {
             case .error:
                 break
             }
+        }
+    }
+
+    private func startNetworkMonitorIfNeeded() {
+        guard pathMonitor == nil else { return }
+        let monitor = NWPathMonitor()
+        pathMonitor = monitor
+
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self else { return }
+            let isSatisfied = (path.status == .satisfied)
+            self.lastNetworkSatisfied = isSatisfied
+            print("[TripVC] NWPath status=\(path.status)")
+
+            DispatchQueue.main.async {
+                self.triggerForceBackfillIfNeeded()
+            }
+        }
+
+        monitor.start(queue: pathMonitorQueue)
+        lastNetworkSatisfied = (monitor.currentPath.status == .satisfied)
+    }
+
+    private func stopNetworkMonitor() {
+        pathMonitor?.cancel()
+        pathMonitor = nil
+        lastNetworkSatisfied = nil
+    }
+
+    @objc
+    private func handleDidBecomeActive() {
+        triggerForceBackfillIfNeeded()
+    }
+
+    private func triggerForceBackfillIfNeeded() {
+        let now = Date()
+        if let last = lastForceBackfillAt, now.timeIntervalSince(last) < 2.0 {
+            return
+        }
+        lastForceBackfillAt = now
+        CityImageBackfillService.shared.backfillMissingCityImages()
+        backfillVisibleTripDestinations(forceRemote: true)
+    }
+
+    private func backfillVisibleTripDestinations(forceRemote: Bool = false) {
+        let destinations = realm.objects(TravelTable.self)
+            .compactMap(\.destination)
+        let uniqueIds = Set(destinations.map(\.id))
+        for cityId in uniqueIds {
+            CityImageBackfillService.shared.backfillCityImageIfNeeded(
+                cityObjectId: cityId,
+                forceRemote: forceRemote
+            )
         }
     }
     

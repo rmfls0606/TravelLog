@@ -119,8 +119,9 @@ final class TripRealmDataSource{
         else { return nil }
 
         let sanitized = sanitizeFilename(preferredKey)
+        let urlHash = stableHash(remoteURLString)
         let fileExtension = normalizedImageExtension(from: remoteURL)
-        let filename = "city_\(sanitized).\(fileExtension)"
+        let filename = "city_\(sanitized)_\(urlHash).\(fileExtension)"
         let targetURL = cityImageDirectory.appendingPathComponent(filename)
 
         if fileManager.fileExists(atPath: targetURL.path) {
@@ -181,6 +182,16 @@ final class TripRealmDataSource{
         default:
             return "jpg"
         }
+    }
+
+    // Deterministic hash for filename versioning by URL (stable across launches)
+    private func stableHash(_ value: String) -> String {
+        var hash: UInt64 = 1469598103934665603
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1099511628211
+        }
+        return String(hash, radix: 16)
     }
 
     private func imageFromKingfisherCache(forKey key: String) -> UIImage? {
