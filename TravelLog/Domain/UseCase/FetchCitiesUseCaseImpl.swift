@@ -17,9 +17,21 @@ final class FetchCitiesUseCaseImpl: FetchCitiesUseCase {
     
     func execute(query: String) -> Single<[City]> {
         repository.searchLocal(query: query)
+            .catch { error in
+                // local 단계에서 연결 에러면 remote로 넘기지 않고 즉시 offline 처리
+                if self.isConnectivityError(error) {
+                    return .error(CitySearchError.offline)
+                }
+                return .error(error)
+            }
             .flatMap { cities in
                 if !cities.isEmpty {
                     return .just(cities)
+                }
+
+                // 오프라인이면 remote(functions) 재시도하지 않는다.
+                if !SimpleNetworkState.shared.isConnected {
+                    return .error(CitySearchError.offline)
                 }
 
                 // 로컬에 없으면 remote를 시도하고,
