@@ -35,16 +35,27 @@ final class TripRealmDataSource{
 
                     let realm = try Realm()
                     try realm.write {
+                        func findExistingCity(_ city: CityTable) -> CityTable? {
+                            if let docId = city.cityDocId, !docId.isEmpty,
+                               let byDocId = realm.objects(CityTable.self)
+                                .filter("cityDocId == %@", docId)
+                                .first {
+                                return byDocId
+                            }
+                            return realm.objects(CityTable.self)
+                                .filter("name == %@", city.name)
+                                .first
+                        }
+
                         let departureCity: CityTable
-                        if let existingDeparture = realm.objects(CityTable.self)
-                            .filter("name == %@", departure.name)
-                            .first {
+                        if let existingDeparture = findExistingCity(departure) {
                             existingDeparture.nameEn = departure.nameEn
                             existingDeparture.country = departure.country
                             existingDeparture.continent = departure.continent
                             existingDeparture.iataCode = departure.iataCode
                             existingDeparture.latitude = departure.latitude
                             existingDeparture.longitude = departure.longitude
+                            existingDeparture.cityDocId = departure.cityDocId ?? existingDeparture.cityDocId
                             existingDeparture.imageURL = departure.imageURL
                             existingDeparture.localImageFilename = departureLocalFilename ?? existingDeparture.localImageFilename
                             existingDeparture.popularityCount = departure.popularityCount
@@ -58,15 +69,14 @@ final class TripRealmDataSource{
                         
                         //도착 도시: 이름 기준으로 중복 체크
                         let destinationCity: CityTable
-                        if let existingDestination = realm.objects(CityTable.self)
-                            .filter("name == %@", destination.name)
-                            .first {
+                        if let existingDestination = findExistingCity(destination) {
                             existingDestination.nameEn = destination.nameEn
                             existingDestination.country = destination.country
                             existingDestination.continent = destination.continent
                             existingDestination.iataCode = destination.iataCode
                             existingDestination.latitude = destination.latitude
                             existingDestination.longitude = destination.longitude
+                            existingDestination.cityDocId = destination.cityDocId ?? existingDestination.cityDocId
                             existingDestination.imageURL = destination.imageURL
                             existingDestination.localImageFilename = destinationLocalFilename ?? existingDestination.localImageFilename
                             existingDestination.popularityCount = destination.popularityCount

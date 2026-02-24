@@ -47,7 +47,7 @@ final class TripsViewController: BaseViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureTableHeaderView()
-        CityImageBackfillService().backfillMissingCityImages()
+        CityImageBackfillService.shared.backfillMissingCityImages()
         observeCityImageChangesIfNeeded()
     }
 
@@ -167,6 +167,14 @@ final class TripsViewController: BaseViewController {
                 let vc = TravelAddViewController()
                 owner.navigationController?.pushViewController(vc, animated: true)
             }
+            .disposed(by: disposeBag)
+
+        SimpleNetworkState.shared.isConnectedDriver
+            .distinctUntilChanged()
+            .filter { $0 }
+            .drive(onNext: { _ in
+                CityImageBackfillService.shared.backfillMissingCityImages()
+            })
             .disposed(by: disposeBag)
     }
 

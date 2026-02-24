@@ -19,6 +19,7 @@ final class CityTable: Object {
     @Persisted var iataCode: String? // 공항 코드 (CDG 등)
     @Persisted var latitude: Double // 위도
     @Persisted var longitude: Double // 경도
+    @Persisted var cityDocId: String? // Firestore cities document id
     
     @Persisted var imageURL: String? // 도시 대표 이미지
     @Persisted var localImageFilename: String? // 오프라인용 로컬 이미지 파일명
@@ -38,6 +39,7 @@ final class CityTable: Object {
         latitude: Double = 0,
         longitude: Double = 0,
         popularityCount: Int = 0,
+        cityDocId: String? = nil,
         imageURL: String? = nil,
         localImageFilename: String? = nil,
     ) {
@@ -50,6 +52,7 @@ final class CityTable: Object {
         self.latitude = latitude
         self.longitude = longitude
         self.popularityCount = popularityCount
+        self.cityDocId = cityDocId
         self.imageURL = imageURL
         self.localImageFilename = localImageFilename
     }
@@ -65,6 +68,7 @@ extension CityTable {
         self.iataCode = nil
         self.latitude = city.lat
         self.longitude = city.lng
+        self.cityDocId = city.cityId
         self.imageURL = city.imageUrl
         self.localImageFilename = nil
         self.popularityCount = city.popularityCount ?? 0

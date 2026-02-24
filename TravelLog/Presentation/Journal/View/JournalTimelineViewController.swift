@@ -71,7 +71,10 @@ final class JournalTimelineViewController: BaseViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        CityImageBackfillService().backfillMissingCityImages()
+        CityImageBackfillService.shared.backfillMissingCityImages()
+        if let cityId = trip?.destination?.id {
+            CityImageBackfillService.shared.backfillCityImageIfNeeded(cityObjectId: cityId)
+        }
         if let tripId = trip?.id {
             // 네트워크 복구 시: 최초 미시도만 복구(오늘 몇 번 와도 중복 호출 안 나게 NWPathMonitor가 보장)
             NetworkMonitor.shared.startMonitoring(for: tripId)
@@ -281,6 +284,24 @@ final class JournalTimelineViewController: BaseViewController {
         // 앱이 백그라운드로 갈 때 재생 일시정지 (다른 앱 전환 시)
         NotificationCenter.default.rx.notification(UIApplication.didEnterBackgroundNotification)
             .bind(with: self) { owner, _ in owner.stopPlayback(resetUI: false, deactivateSession: true) }
+            .disposed(by: disposeBag)
+
+        SimpleNetworkState.shared.isConnectedDriver
+            .distinctUntilChanged()
+            .filter { $0 }
+            .drive(onNext: { _ in
+                CityImageBackfillService.shared.backfillMissingCityImages()
+            })
+            .disposed(by: disposeBag)
+
+        SimpleNetworkState.shared.isConnectedDriver
+            .distinctUntilChanged()
+            .filter { $0 }
+            .drive(with: self) { owner, _ in
+                if let cityId = owner.trip?.destination?.id {
+                    CityImageBackfillService.shared.backfillCityImageIfNeeded(cityObjectId: cityId)
+                }
+            }
             .disposed(by: disposeBag)
     }
     
