@@ -213,7 +213,7 @@ final class FirebaseCityDataSource: CityDataSource {
                 case .success(let cached) where !cached.isEmpty:
                     // 캐시에 일부 결과만 있을 수 있어 서버 결과로 보강
                     // (예: 캐시 2개만 존재하면 그대로 고정되는 문제 방지)
-                    if cached.count >= self.pageLimit || !SimpleNetworkState.shared.isConnected {
+                    if cached.count >= self.pageLimit {
                         self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
                         single(.success(cached))
                         return
@@ -235,10 +235,6 @@ final class FirebaseCityDataSource: CityDataSource {
                     }
 
                 default:
-                    if !SimpleNetworkState.shared.isConnected {
-                        single(.success([]))
-                        return
-                    }
                     // 2) default fallback
                     runPrefixQueries(source: .default) { defaultResult in
                         if cancelled { return }

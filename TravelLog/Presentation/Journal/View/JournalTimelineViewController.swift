@@ -13,6 +13,8 @@ import RealmSwift
 import SafariServices
 import AVFoundation
 import Toast
+import Kingfisher
+internal import Realm
 
 final class JournalTimelineViewController: BaseViewController {
     
@@ -36,6 +38,7 @@ final class JournalTimelineViewController: BaseViewController {
     private let realm = try! Realm()
     private var groupedData: [(date: Date, blocks: [JournalBlockTable])] = []
     private var trip: TravelTable?
+    private var destinationCityToken: NotificationToken?
     private let deleteTappedSubject = PublishSubject<(ObjectId, ObjectId)>()
     
     // Audio playback state
@@ -68,6 +71,7 @@ final class JournalTimelineViewController: BaseViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        CityImageBackfillService().backfillMissingCityImages()
         if let tripId = trip?.id {
             // 네트워크 복구 시: 최초 미시도만 복구(오늘 몇 번 와도 중복 호출 안 나게 NWPathMonitor가 보장)
             NetworkMonitor.shared.startMonitoring(for: tripId)
@@ -79,6 +83,8 @@ final class JournalTimelineViewController: BaseViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         NetworkMonitor.shared.stopMonitoring()
+        destinationCityToken?.invalidate()
+        destinationCityToken = nil
         // 화면 이동 시 재생 중지 + 외부 세션 복원
         stopPlayback(resetUI: false, deactivateSession: true)
     }
@@ -89,6 +95,7 @@ final class JournalTimelineViewController: BaseViewController {
         if let trip = realm.object(ofType: TravelTable.self, forPrimaryKey: tripId) {
             self.trip = trip
             title = trip.destination?.name ?? "여행 기록"
+            observeDestinationCityChanges()
         } else {
             title = "여행 기록"
         }
@@ -171,6 +178,7 @@ final class JournalTimelineViewController: BaseViewController {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy.MM.dd"
             countryLabel.text = "\(formatter.string(from: trip.startDate)) - \(formatter.string(from: trip.endDate))"
+            updateTripHeaderImage(with: trip)
         }
         
         addMemoryView.configure(
@@ -296,6 +304,56 @@ final class JournalTimelineViewController: BaseViewController {
         groupedData = grouped
             .sorted { $0.key < $1.key }
             .map { (date: $0.key, blocks: $0.value.sorted { $0.createdAt < $1.createdAt }) }
+    }
+
+    private func observeDestinationCityChanges() {
+        destinationCityToken?.invalidate()
+        guard let destination = trip?.destination else { return }
+
+        destinationCityToken = destination.observe { [weak self] change in
+            guard let self else { return }
+            switch change {
+            case .change(_, let properties):
+                let needsImageRefresh = properties.contains { change in
+                    change.name == "localImageFilename" || change.name == "imageURL"
+                }
+                guard needsImageRefresh, let trip = self.trip else { return }
+                DispatchQueue.main.async {
+                    self.updateTripHeaderImage(with: trip)
+                }
+            case .deleted, .error:
+                break
+            }
+        }
+    }
+
+    private func updateTripHeaderImage(with trip: TravelTable) {
+        tripImageView.kf.cancelDownloadTask()
+
+        if let localFilename = trip.destination?.localImageFilename,
+           let localURL = cityImageFileURL(filename: localFilename),
+           FileManager.default.fileExists(atPath: localURL.path),
+           let localImage = UIImage(contentsOfFile: localURL.path) {
+            tripImageView.image = localImage
+            return
+        }
+
+        if let imageURL = trip.destination?.imageURL,
+           let url = URL(string: imageURL) {
+            tripImageView.kf.setImage(with: url)
+            return
+        }
+
+        tripImageView.image = .seoul
+    }
+
+    private func cityImageFileURL(filename: String) -> URL? {
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return documents
+            .appendingPathComponent("CityImages", isDirectory: true)
+            .appendingPathComponent(filename)
     }
 }
 

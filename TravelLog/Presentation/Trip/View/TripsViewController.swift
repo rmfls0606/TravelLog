@@ -9,6 +9,8 @@ import UIKit
 import SnapKit
 import RxSwift
 import RxCocoa
+import RealmSwift
+internal import Realm
 
 final class TripsViewController: BaseViewController {
 
@@ -36,6 +38,8 @@ final class TripsViewController: BaseViewController {
     
     private let viewModel = TripsViewModel()
     private let disposeBag = DisposeBag()
+    private let realm = try! Realm()
+    private var cityToken: NotificationToken?
     private let tripSelectedRelay = PublishRelay<TravelTable>()
     private lazy var emptyView = CustomEmptyView()
     
@@ -43,6 +47,14 @@ final class TripsViewController: BaseViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureTableHeaderView()
+        CityImageBackfillService().backfillMissingCityImages()
+        observeCityImageChangesIfNeeded()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        cityToken?.invalidate()
+        cityToken = nil
     }
     
     // MARK: - Hierarchy
@@ -149,13 +161,30 @@ final class TripsViewController: BaseViewController {
                 print("삭제 실패: \(message)")
             }
             .disposed(by: disposeBag)
-        
+
         emptyView.actionButton.rx.tap
             .bind(with: self) { owner, _ in
                 let vc = TravelAddViewController()
                 owner.navigationController?.pushViewController(vc, animated: true)
             }
             .disposed(by: disposeBag)
+    }
+
+    private func observeCityImageChangesIfNeeded() {
+        guard cityToken == nil else { return }
+        cityToken = realm.objects(CityTable.self).observe { [weak self] change in
+            guard let self else { return }
+            switch change {
+            case .initial:
+                break
+            case .update:
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                }
+            case .error:
+                break
+            }
+        }
     }
     
     // MARK: - Header Configuration (Frame 기반)

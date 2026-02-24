@@ -6,9 +6,11 @@
 //
 
 import Foundation
+import UIKit
 import RealmSwift
 import FirebaseFirestore
 import FirebaseFunctions
+import Kingfisher
 
 final class CityImageBackfillService {
     private let db = Firestore.firestore()
@@ -30,8 +32,21 @@ final class CityImageBackfillService {
                 }
 
                 for item in snapshots {
-                    let firestoreImageURL = self.fetchImageURLFromFirestore(cityName: item.name)
-                    let resolvedImageURL = firestoreImageURL ?? self.fetchImageURLFromFunction(cityName: item.name)
+                    let isOnline = SimpleNetworkState.shared.isConnected
+                    let firestoreSource: FirestoreSource = isOnline ? .default : .cache
+                    let firestoreImageURL = self.fetchImageURLFromFirestore(
+                        cityName: item.name,
+                        source: firestoreSource
+                    )
+
+                    let resolvedImageURL: String?
+                    if let firestoreImageURL {
+                        resolvedImageURL = firestoreImageURL
+                    } else if isOnline {
+                        resolvedImageURL = self.fetchImageURLFromFunction(cityName: item.name)
+                    } else {
+                        resolvedImageURL = nil
+                    }
                     guard let resolvedImageURL else { continue }
 
                     let filename = self.downloadAndStoreImageIfNeeded(
@@ -58,14 +73,14 @@ final class CityImageBackfillService {
         }
     }
 
-    private func fetchImageURLFromFirestore(cityName: String) -> String? {
+    private func fetchImageURLFromFirestore(cityName: String, source: FirestoreSource) -> String? {
         let semaphore = DispatchSemaphore(value: 0)
         var result: String?
 
         db.collection("cities")
             .whereField("name", isEqualTo: cityName)
             .limit(to: 1)
-            .getDocuments { snapshot, _ in
+            .getDocuments(source: source) { snapshot, _ in
                 defer { semaphore.signal() }
                 guard let doc = snapshot?.documents.first else { return }
                 result = doc.data()["imageUrl"] as? String
@@ -122,16 +137,28 @@ final class CityImageBackfillService {
             return filename
         }
 
-        guard let data = try? Data(contentsOf: remoteURL) else {
-            return nil
+        // 1) Kingfisher 캐시 우선 사용
+        if let cachedImage = imageFromKingfisherCache(forKey: remoteURLString),
+           let cachedData = cachedImage.jpegData(compressionQuality: 0.9) ?? cachedImage.pngData() {
+            do {
+                try cachedData.write(to: targetURL, options: .atomic)
+                return filename
+            } catch {
+                return nil
+            }
         }
 
-        do {
-            try data.write(to: targetURL, options: .atomic)
-            return filename
-        } catch {
-            return nil
+        // 2) 캐시에 없으면 네트워크 다운로드 시도
+        if let data = try? Data(contentsOf: remoteURL) {
+            do {
+                try data.write(to: targetURL, options: .atomic)
+                return filename
+            } catch {
+                return nil
+            }
         }
+
+        return nil
     }
 
     private func cityImageDirectoryURL() -> URL? {
@@ -163,5 +190,23 @@ final class CityImageBackfillService {
         default:
             return "jpg"
         }
+    }
+
+    private func imageFromKingfisherCache(forKey key: String) -> UIImage? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var image: UIImage?
+
+        ImageCache.default.retrieveImage(forKey: key) { result in
+            defer { semaphore.signal() }
+            switch result {
+            case .success(let value):
+                image = value.image
+            case .failure:
+                image = nil
+            }
+        }
+
+        _ = semaphore.wait(timeout: .now() + 1.5)
+        return image
     }
 }
