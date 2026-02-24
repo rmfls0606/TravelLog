@@ -309,18 +309,6 @@ final class JournalTimelineViewController: BaseViewController {
             .bind(with: self) { owner, _ in owner.stopPlayback(resetUI: false, deactivateSession: true) }
             .disposed(by: disposeBag)
 
-        SimpleNetworkState.shared.isConnectedDriver
-            .distinctUntilChanged()
-            .filter { $0 }
-            .drive(with: self) { owner, _ in
-                if let cityId = owner.trip?.destination?.id {
-                    CityImageBackfillService.shared.backfillCityImageIfNeeded(
-                        cityObjectId: cityId,
-                        forceRemote: true
-                    )
-                }
-            }
-            .disposed(by: disposeBag)
     }
     
     // MARK: - Update Height
