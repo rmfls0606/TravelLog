@@ -9,6 +9,7 @@ import UIKit
 import RealmSwift
 import Firebase
 import IQKeyboardManagerSwift
+import Kingfisher
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -18,6 +19,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         FirebaseApp.configure()
         
         migration()
+        configureImageCache()
         
         IQKeyboardManager.shared.isEnabled = true
         _ = SimpleNetworkState.shared
@@ -60,5 +62,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             print("Realm Migration 실패:", error.localizedDescription)
         }
     }
-}
 
+    private func configureImageCache() {
+        let cache = ImageCache.default
+        cache.memoryStorage.config.totalCostLimit = 50 * 1024 * 1024
+        cache.memoryStorage.config.expiration = .seconds(300)
+        cache.diskStorage.config.sizeLimit = 200 * 1024 * 1024
+        cache.diskStorage.config.expiration = .days(7)
+    }
+}

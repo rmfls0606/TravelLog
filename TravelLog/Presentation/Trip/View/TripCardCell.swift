@@ -230,6 +230,7 @@ final class TripCardCell: BaseTableViewCell {
     
     override func prepareForReuse() {
         super.prepareForReuse()
+        cityImageView.kf.cancelDownloadTask()
         cityImageView.image = .seoul
         disposeBag = DisposeBag()
     }

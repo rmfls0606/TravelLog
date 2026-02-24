@@ -60,7 +60,7 @@ final class CityTableViewCell: BaseTableViewCell {
     // MARK: - Lifecycle
     override func prepareForReuse() {
         super.prepareForReuse()
-        
+        cityThumbnailView.kf.cancelDownloadTask()
         cityThumbnailView.image = nil
     }
     
