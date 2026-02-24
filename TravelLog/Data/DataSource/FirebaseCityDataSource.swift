@@ -59,14 +59,24 @@ final class FirebaseCityDataSource: CityDataSource {
 
         let end = lower + "\u{f8ff}"
 
+        func asDouble(_ value: Any?) -> Double? {
+            if let number = value as? NSNumber { return number.doubleValue }
+            if let double = value as? Double { return double }
+            if let int = value as? Int { return Double(int) }
+            if let string = value as? String { return Double(string) }
+            return nil
+        }
+
         func decode(_ docs: [QueryDocumentSnapshot]) -> [City] {
             docs.compactMap { doc in
                 let data = doc.data()
+                let lat = asDouble(data["lat"])
+                let lng = asDouble(data["lng"])
                 guard
                     let name = data["name"] as? String,
                     let country = data["country"] as? String,
-                    let lat = data["lat"] as? Double,
-                    let lng = data["lng"] as? Double
+                    let lat,
+                    let lng
                 else { return nil }
 
                 var city = City(
@@ -91,8 +101,10 @@ final class FirebaseCityDataSource: CityDataSource {
 
         func runPrefixQueries(source: FirestoreSource, completion: @escaping (Result<[City], Error>) -> Void) {
             let group = DispatchGroup()
-            var byName: [City] = []
-            var byCountry: [City] = []
+            var byNameLower: [City] = []
+            var byCountryLower: [City] = []
+            var byNameLegacy: [City] = []
+            var byCountryLegacy: [City] = []
             var firstError: Error?
 
             group.enter()
@@ -104,7 +116,7 @@ final class FirebaseCityDataSource: CityDataSource {
                 .getDocuments(source: source) { snap, error in
                     defer { group.leave() }
                     if let error = error { firstError = firstError ?? error; return }
-                    byName = decode(snap?.documents ?? [])
+                    byNameLower = decode(snap?.documents ?? [])
                 }
 
             group.enter()
@@ -116,7 +128,32 @@ final class FirebaseCityDataSource: CityDataSource {
                 .getDocuments(source: source) { snap, error in
                     defer { group.leave() }
                     if let error = error { firstError = firstError ?? error; return }
-                    byCountry = decode(snap?.documents ?? [])
+                    byCountryLower = decode(snap?.documents ?? [])
+                }
+
+            // 하위호환: 과거 문서(nameLower/countryLower 미존재)도 prefix 검색에 포함
+            group.enter()
+            db.collection(collection)
+                .order(by: "name")
+                .start(at: [trimmed])
+                .end(at: [trimmed + "\u{f8ff}"])
+                .limit(to: pageLimit)
+                .getDocuments(source: source) { snap, error in
+                    defer { group.leave() }
+                    if let error = error { firstError = firstError ?? error; return }
+                    byNameLegacy = decode(snap?.documents ?? [])
+                }
+
+            group.enter()
+            db.collection(collection)
+                .order(by: "country")
+                .start(at: [trimmed])
+                .end(at: [trimmed + "\u{f8ff}"])
+                .limit(to: pageLimit)
+                .getDocuments(source: source) { snap, error in
+                    defer { group.leave() }
+                    if let error = error { firstError = firstError ?? error; return }
+                    byCountryLegacy = decode(snap?.documents ?? [])
                 }
 
             group.notify(queue: workQueue) {
@@ -125,7 +162,10 @@ final class FirebaseCityDataSource: CityDataSource {
                     return
                 }
 
-                let merged = mergeUnique(byName, byCountry)
+                let merged = mergeUnique(
+                    mergeUnique(byNameLower, byCountryLower),
+                    mergeUnique(byNameLegacy, byCountryLegacy)
+                )
                 let sorted = merged.sorted { lhs, rhs in
                     let lhsRank = self.rank(city: lhs, queryLower: lower)
                     let rhsRank = self.rank(city: rhs, queryLower: lower)
@@ -151,8 +191,28 @@ final class FirebaseCityDataSource: CityDataSource {
                 if cancelled { return }
                 switch cacheResult {
                 case .success(let cached) where !cached.isEmpty:
-                    self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
-                    single(.success(cached))
+                    // 캐시에 일부 결과만 있을 수 있어 서버 결과로 보강
+                    // (예: 캐시 2개만 존재하면 그대로 고정되는 문제 방지)
+                    if cached.count >= self.pageLimit {
+                        self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
+                        single(.success(cached))
+                        return
+                    }
+
+                    runPrefixQueries(source: .default) { defaultResult in
+                        if cancelled { return }
+                        switch defaultResult {
+                        case .success(let fresh) where !fresh.isEmpty:
+                            self.memoryCache[lower] = CacheEntry(cities: fresh, timestamp: Date())
+                            single(.success(fresh))
+                        case .success:
+                            self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
+                            single(.success(cached))
+                        case .failure:
+                            self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
+                            single(.success(cached))
+                        }
+                    }
 
                 default:
                     // 2) default fallback
