@@ -25,6 +25,15 @@ final class TripRealmDataSource{
                     if let existingDeparture = realm.objects(CityTable.self)
                         .filter("name == %@", departure.name)
                         .first {
+                        existingDeparture.nameEn = departure.nameEn
+                        existingDeparture.country = departure.country
+                        existingDeparture.continent = departure.continent
+                        existingDeparture.iataCode = departure.iataCode
+                        existingDeparture.latitude = departure.latitude
+                        existingDeparture.longitude = departure.longitude
+                        existingDeparture.imageURL = departure.imageURL
+                        existingDeparture.popularityCount = departure.popularityCount
+                        existingDeparture.lastUpdated = Date()
                         departureCity = existingDeparture
                     } else {
                         realm.add(departure, update: .modified)
@@ -36,6 +45,15 @@ final class TripRealmDataSource{
                     if let existingDestination = realm.objects(CityTable.self)
                         .filter("name == %@", destination.name)
                         .first {
+                        existingDestination.nameEn = destination.nameEn
+                        existingDestination.country = destination.country
+                        existingDestination.continent = destination.continent
+                        existingDestination.iataCode = destination.iataCode
+                        existingDestination.latitude = destination.latitude
+                        existingDestination.longitude = destination.longitude
+                        existingDestination.imageURL = destination.imageURL
+                        existingDestination.popularityCount = destination.popularityCount
+                        existingDestination.lastUpdated = Date()
                         destinationCity = existingDestination
                     } else {
                         realm.add(destination, update: .modified)

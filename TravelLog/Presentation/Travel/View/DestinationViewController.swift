@@ -156,6 +156,17 @@ final class DestinationSelectorViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
+        tableView.rx.modelSelected(CityCellItem.self)
+            .compactMap { item -> City? in
+                guard case let .city(city) = item else { return nil }
+                return city
+            }
+            .bind(with: self) { owner, city in
+                owner.selectedCity.accept(city)
+                owner.navigationController?.popViewController(animated: true)
+            }
+            .disposed(by: disposeBag)
+        
         tapGesture.rx.event
             .bind(with: self) { owner, _ in
                 owner.view.endEditing(true)

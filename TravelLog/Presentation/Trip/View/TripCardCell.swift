@@ -10,6 +10,7 @@ import SnapKit
 import RxSwift
 import RxCocoa
 import RealmSwift
+import Kingfisher
 
 // MARK: - TripCardCell
 final class TripCardCell: BaseTableViewCell {
@@ -229,6 +230,7 @@ final class TripCardCell: BaseTableViewCell {
     
     override func prepareForReuse() {
         super.prepareForReuse()
+        cityImageView.image = .seoul
         disposeBag = DisposeBag()
     }
     
@@ -365,7 +367,7 @@ final class TripCardCell: BaseTableViewCell {
         continueButton.snp.makeConstraints { make in
             make.top.equalTo(memorySummaryCard.snp.bottom).offset(16)
             make.horizontalEdges.equalToSuperview().inset(16)
-//            make.height.equalTo(48)
+            //            make.height.equalTo(48)
             make.bottom.equalToSuperview().inset(16)
         }
     }
@@ -377,6 +379,13 @@ final class TripCardCell: BaseTableViewCell {
     
     // MARK: - Configure
     func configure(with trip: TravelTable, journalCount: Int) {
+        if let imageUrl = trip.destination?.imageURL,
+           let url = URL(string: imageUrl){
+            cityImageView.kf.setImage(with: url)
+        }else{
+            cityImageView.image = .seoul
+        }
+        
         cityLabel.text = trip.destination?.name
         countryLabel.text = trip.destination?.country
         departureCityLabel.text = trip.departure?.name ?? "-"
@@ -393,7 +402,7 @@ final class TripCardCell: BaseTableViewCell {
         durationBadge.text = calculateDuration(start: trip.startDate, end: trip.endDate)
         
         let status = determineState(trip: trip)
-           updateStatusBadge(status)
+        updateStatusBadge(status)
         
         let summary = MemorySummary(journalCount: journalCount, status: status)
         memorySummaryCard.update(with: summary)
