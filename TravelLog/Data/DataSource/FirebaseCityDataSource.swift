@@ -115,7 +115,12 @@ final class FirebaseCityDataSource: CityDataSource {
                 .limit(to: pageLimit)
                 .getDocuments(source: source) { snap, error in
                     defer { group.leave() }
-                    if let error = error { firstError = firstError ?? error; return }
+                    if let error = error {
+                        if source != .cache {
+                            firstError = firstError ?? error
+                        }
+                        return
+                    }
                     byNameLower = decode(snap?.documents ?? [])
                 }
 
@@ -127,7 +132,12 @@ final class FirebaseCityDataSource: CityDataSource {
                 .limit(to: pageLimit)
                 .getDocuments(source: source) { snap, error in
                     defer { group.leave() }
-                    if let error = error { firstError = firstError ?? error; return }
+                    if let error = error {
+                        if source != .cache {
+                            firstError = firstError ?? error
+                        }
+                        return
+                    }
                     byCountryLower = decode(snap?.documents ?? [])
                 }
 
@@ -140,7 +150,12 @@ final class FirebaseCityDataSource: CityDataSource {
                 .limit(to: pageLimit)
                 .getDocuments(source: source) { snap, error in
                     defer { group.leave() }
-                    if let error = error { firstError = firstError ?? error; return }
+                    if let error = error {
+                        if source != .cache {
+                            firstError = firstError ?? error
+                        }
+                        return
+                    }
                     byNameLegacy = decode(snap?.documents ?? [])
                 }
 
@@ -152,7 +167,12 @@ final class FirebaseCityDataSource: CityDataSource {
                 .limit(to: pageLimit)
                 .getDocuments(source: source) { snap, error in
                     defer { group.leave() }
-                    if let error = error { firstError = firstError ?? error; return }
+                    if let error = error {
+                        if source != .cache {
+                            firstError = firstError ?? error
+                        }
+                        return
+                    }
                     byCountryLegacy = decode(snap?.documents ?? [])
                 }
 
@@ -193,7 +213,7 @@ final class FirebaseCityDataSource: CityDataSource {
                 case .success(let cached) where !cached.isEmpty:
                     // 캐시에 일부 결과만 있을 수 있어 서버 결과로 보강
                     // (예: 캐시 2개만 존재하면 그대로 고정되는 문제 방지)
-                    if cached.count >= self.pageLimit {
+                    if cached.count >= self.pageLimit || !SimpleNetworkState.shared.isConnected {
                         self.memoryCache[lower] = CacheEntry(cities: cached, timestamp: Date())
                         single(.success(cached))
                         return
@@ -215,6 +235,10 @@ final class FirebaseCityDataSource: CityDataSource {
                     }
 
                 default:
+                    if !SimpleNetworkState.shared.isConnected {
+                        single(.success([]))
+                        return
+                    }
                     // 2) default fallback
                     runPrefixQueries(source: .default) { defaultResult in
                         if cancelled { return }
