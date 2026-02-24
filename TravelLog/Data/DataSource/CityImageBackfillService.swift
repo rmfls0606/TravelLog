@@ -294,7 +294,7 @@ final class CityImageBackfillService {
             result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
         }
 
-        let timeout: TimeInterval = (source == .cache) ? 1.2 : 5.0
+        let timeout: TimeInterval = (source == .cache) ? 0.6 : 2.0
         _ = semaphore.wait(timeout: .now() + timeout)
         if let err {
             print("[CityBackfill] docId query error source=\(source) id=\(cityDocId) error=\(err.localizedDescription)")
@@ -313,7 +313,7 @@ final class CityImageBackfillService {
             result = snapshot?.documents ?? []
         }
 
-        let timeout: TimeInterval = (source == .cache) ? 1.2 : 5.0
+        let timeout: TimeInterval = (source == .cache) ? 0.6 : 2.0
         _ = semaphore.wait(timeout: .now() + timeout)
         if let err {
             print("[CityBackfill] query error source=\(source) error=\(err.localizedDescription)")
@@ -391,7 +391,7 @@ final class CityImageBackfillService {
                     result = cities.first?["imageUrl"] as? String
                 }
 
-            _ = semaphore.wait(timeout: .now() + 8)
+            _ = semaphore.wait(timeout: .now() + 3.0)
             if let result, !result.isEmpty {
                 return result
             }

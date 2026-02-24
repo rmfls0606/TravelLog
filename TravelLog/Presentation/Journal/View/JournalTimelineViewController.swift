@@ -87,9 +87,11 @@ final class JournalTimelineViewController: BaseViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        CityImageBackfillService.shared.backfillMissingCityImages()
         if let cityId = trip?.destination?.id {
-            CityImageBackfillService.shared.backfillCityImageIfNeeded(cityObjectId: cityId)
+            CityImageBackfillService.shared.backfillCityImageIfNeeded(
+                cityObjectId: cityId,
+                forceRemote: true
+            )
         }
         if let tripId = trip?.id {
             // 네트워크 복구 시: 최초 미시도만 복구(오늘 몇 번 와도 중복 호출 안 나게 NWPathMonitor가 보장)
@@ -310,14 +312,6 @@ final class JournalTimelineViewController: BaseViewController {
         SimpleNetworkState.shared.isConnectedDriver
             .distinctUntilChanged()
             .filter { $0 }
-            .drive(onNext: { _ in
-                CityImageBackfillService.shared.backfillMissingCityImages()
-            })
-            .disposed(by: disposeBag)
-
-        SimpleNetworkState.shared.isConnectedDriver
-            .distinctUntilChanged()
-            .filter { $0 }
             .drive(with: self) { owner, _ in
                 if let cityId = owner.trip?.destination?.id {
                     CityImageBackfillService.shared.backfillCityImageIfNeeded(
@@ -438,7 +432,6 @@ final class JournalTimelineViewController: BaseViewController {
             return
         }
         lastForceBackfillAt = now
-        CityImageBackfillService.shared.backfillMissingCityImages()
         if let cityId = trip?.destination?.id {
             CityImageBackfillService.shared.backfillCityImageIfNeeded(
                 cityObjectId: cityId,

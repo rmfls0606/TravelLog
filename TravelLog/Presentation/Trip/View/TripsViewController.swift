@@ -52,8 +52,7 @@ final class TripsViewController: BaseViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureTableHeaderView()
-        CityImageBackfillService.shared.backfillMissingCityImages()
-        backfillVisibleTripDestinations()
+        backfillVisibleTripDestinations(forceRemote: true)
         observeCityImageChangesIfNeeded()
     }
 
@@ -191,21 +190,6 @@ final class TripsViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
 
-        SimpleNetworkState.shared.isConnectedDriver
-            .distinctUntilChanged()
-            .filter { $0 }
-            .drive(onNext: { _ in
-                CityImageBackfillService.shared.backfillMissingCityImages()
-            })
-            .disposed(by: disposeBag)
-
-        SimpleNetworkState.shared.isConnectedDriver
-            .distinctUntilChanged()
-            .filter { $0 }
-            .drive(with: self) { owner, _ in
-                owner.backfillVisibleTripDestinations()
-            }
-            .disposed(by: disposeBag)
     }
 
     private func observeCityImageChangesIfNeeded() {
@@ -262,7 +246,6 @@ final class TripsViewController: BaseViewController {
             return
         }
         lastForceBackfillAt = now
-        CityImageBackfillService.shared.backfillMissingCityImages()
         backfillVisibleTripDestinations(forceRemote: true)
     }
 
