@@ -85,7 +85,7 @@ final class FirebaseCityDataSource: CityDataSource {
                     country: country,
                     lat: lat,
                     lng: lng,
-                    imageUrl: data["imageUrl"] as? String
+                    imageUrl: (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
                 )
                 city.popularityCount = data["popularityCount"] as? Int
                 return city

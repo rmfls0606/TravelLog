@@ -366,8 +366,16 @@ final class JournalTimelineViewController: BaseViewController {
         }
 
         if let imageURL = trip.destination?.imageURL,
-           let url = URL(string: imageURL) {
-            tripImageView.kf.setImage(with: url)
+           let url = normalizedURL(from: imageURL) {
+            tripImageView.image = .seoul
+            tripImageView.kf.setImage(with: url) { [weak self] result in
+                switch result {
+                case .success:
+                    break
+                case .failure:
+                    self?.tripImageView.image = .seoul
+                }
+            }
             return
         }
 
@@ -383,6 +391,14 @@ final class JournalTimelineViewController: BaseViewController {
             .appendingPathComponent(filename)
     }
 
+    private func normalizedURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed) { return url }
+        let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        guard let encoded else { return nil }
+        return URL(string: encoded)
+    }
+
     private func startNetworkMonitorIfNeeded() {
         guard pathMonitor == nil else { return }
         let monitor = NWPathMonitor()
@@ -392,7 +408,6 @@ final class JournalTimelineViewController: BaseViewController {
             guard let self else { return }
             let isSatisfied = (path.status == .satisfied)
             self.lastNetworkSatisfied = isSatisfied
-            print("[JournalVC] NWPath status=\(path.status)")
 
             DispatchQueue.main.async {
                 self.triggerForceBackfillIfNeeded()

@@ -110,48 +110,48 @@ final class CityImageBackfillService {
         // Policy:
         // - forceRemote == false: cache only, no functions
         // - forceRemote == true: remote(default) + functions fallback
-        print("[CityBackfill] start cityId=\(item.id) names=\(item.names) force=\(forceRemote) imageURL=\(item.imageURL ?? "nil") local=\(item.localImageFilename ?? "nil")")
         var foundDocId: String? = item.cityDocId
         var resolvedImageURL: String? = item.imageURL
         var filename: String?
 
         // 1) imageURL가 이미 있으면 먼저 로컬 파일 백필 시도 (Kingfisher -> Data)
         if !forceRemote, let existingURL = resolvedImageURL, !existingURL.isEmpty {
-            print("[CityBackfill] use existing imageURL first cityId=\(item.id)")
             filename = self.downloadAndStoreImageIfNeeded(
                 remoteURLString: existingURL,
                 preferredKey: item.names.first ?? "city"
             )
-            print("[CityBackfill] existing imageURL local save result cityId=\(item.id) filename=\(filename ?? "nil")")
         }
 
-        // 2) imageURL가 없거나 로컬 저장 실패면 Firestore 조회
-        if forceRemote || resolvedImageURL == nil || filename == nil {
-            let source: FirestoreSource = forceRemote ? .default : .cache
-            let firestoreResult = self.fetchImageFromFirestore(
-                cityDocId: item.cityDocId,
-                cityNames: item.names,
-                source: source
-            )
-            if let url = firestoreResult?.imageURL {
-                resolvedImageURL = url
-                print("[CityBackfill] firestore hit cityId=\(item.id) url=\(url)")
-                if let docId = firestoreResult?.cityDocId, !docId.isEmpty {
-                    foundDocId = docId
+        func resolveURLOnce() -> String? {
+            if forceRemote || resolvedImageURL == nil || filename == nil {
+                let source: FirestoreSource = forceRemote ? .default : .cache
+                let firestoreResult = self.fetchImageFromFirestore(
+                    cityDocId: item.cityDocId,
+                    cityNames: item.names,
+                    source: source
+                )
+                if let url = firestoreResult?.imageURL {
+                    resolvedImageURL = url
+                    if let docId = firestoreResult?.cityDocId, !docId.isEmpty {
+                        foundDocId = docId
+                    }
                 }
-            } else {
-                print("[CityBackfill] firestore miss cityId=\(item.id)")
             }
+
+            if resolvedImageURL == nil && forceRemote {
+                resolvedImageURL = self.fetchImageURLFromFunction(cityNames: item.names, country: item.country, timeout: 6.0)
+            }
+            return resolvedImageURL
         }
 
-        // 3) forceRemote 경로에서만 Functions fallback
-        if resolvedImageURL == nil && forceRemote {
-            resolvedImageURL = self.fetchImageURLFromFunction(cityNames: item.names, country: item.country)
-            print("[CityBackfill] function result cityId=\(item.id) url=\(resolvedImageURL ?? "nil")")
+        _ = resolveURLOnce()
+
+        // forceRemote는 네트워크 흔들림을 고려해 1회 재시도
+        if forceRemote && resolvedImageURL == nil {
+            _ = resolveURLOnce()
         }
 
-        guard let finalURL = resolvedImageURL else {
-            print("[CityBackfill] stop no imageURL cityId=\(item.id)")
+        guard var finalURL = resolvedImageURL else {
             return
         }
 
@@ -161,7 +161,6 @@ final class CityImageBackfillService {
                 remoteURLString: finalURL,
                 preferredKey: item.names.first ?? "city"
             )
-            print("[CityBackfill] final local save result cityId=\(item.id) filename=\(filename ?? "nil")")
         }
 
         do {
@@ -178,7 +177,6 @@ final class CityImageBackfillService {
                 }
                 target.lastUpdated = Date()
             }
-            print("[CityBackfill] realm write done cityId=\(item.id) imageURL=\(finalURL) local=\(filename ?? target.localImageFilename ?? "nil")")
         } catch {
             print("City image write failed:", error.localizedDescription)
         }
@@ -295,11 +293,9 @@ final class CityImageBackfillService {
             result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
         }
 
-        let timeout: TimeInterval = (source == .cache) ? 0.6 : 2.0
+        let timeout: TimeInterval = (source == .cache) ? 0.8 : 5.0
         _ = semaphore.wait(timeout: .now() + timeout)
-        if let err {
-            print("[CityBackfill] docId query error source=\(source) id=\(cityDocId) error=\(err.localizedDescription)")
-        }
+        _ = err
         return result
     }
 
@@ -314,11 +310,9 @@ final class CityImageBackfillService {
             result = snapshot?.documents ?? []
         }
 
-        let timeout: TimeInterval = (source == .cache) ? 0.6 : 2.0
+        let timeout: TimeInterval = (source == .cache) ? 0.8 : 5.0
         _ = semaphore.wait(timeout: .now() + timeout)
-        if let err {
-            print("[CityBackfill] query error source=\(source) error=\(err.localizedDescription)")
-        }
+        _ = err
         return result
     }
 
@@ -348,7 +342,7 @@ final class CityImageBackfillService {
         return 5
     }
 
-    private func fetchImageURLFromFunction(cityNames: [String], country: String) -> String? {
+    private func fetchImageURLFromFunction(cityNames: [String], country: String, timeout: TimeInterval = 3.0) -> String? {
         let baseQueries = cityNames
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -373,9 +367,7 @@ final class CityImageBackfillService {
                     "limit": 10
                 ]) { value, error in
                     defer { semaphore.signal() }
-                    if let error {
-                        print("[CityBackfill] function error query=\(cityName) error=\(error.localizedDescription)")
-                    }
+                    _ = error
                     guard
                         let root = value?.data as? [String: Any],
                         let cities = root["cities"] as? [[String: Any]],
@@ -392,7 +384,7 @@ final class CityImageBackfillService {
                     result = cities.first?["imageUrl"] as? String
                 }
 
-            _ = semaphore.wait(timeout: .now() + 3.0)
+            _ = semaphore.wait(timeout: .now() + timeout)
             if let result, !result.isEmpty {
                 return result
             }
@@ -404,7 +396,7 @@ final class CityImageBackfillService {
     private func downloadAndStoreImageIfNeeded(remoteURLString: String?, preferredKey: String) -> String? {
         guard
             let remoteURLString,
-            let remoteURL = URL(string: remoteURLString),
+            let remoteURL = normalizedURL(from: remoteURLString),
             let cityImageDirectory = cityImageDirectoryURL()
         else { return nil }
 
@@ -418,9 +410,9 @@ final class CityImageBackfillService {
             return filename
         }
 
-        // 1) Kingfisher 캐시 우선 사용
-        if let cachedImage = imageFromKingfisherCache(forKey: remoteURLString),
-           let cachedData = cachedImage.jpegData(compressionQuality: 0.9) ?? cachedImage.pngData() {
+        // 도시선택 셀과 동일한 Kingfisher 파이프라인으로 캐시/네트워크 조회
+        if let image = retrieveImageViaKingfisher(rawKey: remoteURLString, normalizedURL: remoteURL),
+           let cachedData = image.jpegData(compressionQuality: 0.9) ?? image.pngData() {
             do {
                 try cachedData.write(to: targetURL, options: .atomic)
                 return filename
@@ -429,17 +421,15 @@ final class CityImageBackfillService {
             }
         }
 
-        // 2) 캐시에 없으면 네트워크 다운로드 시도
-        if let data = try? Data(contentsOf: remoteURL) {
-            do {
-                try data.write(to: targetURL, options: .atomic)
-                return filename
-            } catch {
-                return nil
-            }
-        }
-
         return nil
+    }
+
+    private func normalizedURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed) { return url }
+        let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        guard let encoded else { return nil }
+        return URL(string: encoded)
     }
 
     private func cityImageDirectoryURL() -> URL? {
@@ -483,21 +473,50 @@ final class CityImageBackfillService {
         return String(hash, radix: 16)
     }
 
-    private func imageFromKingfisherCache(forKey key: String) -> UIImage? {
+    private func retrieveImageViaKingfisher(rawKey: String, normalizedURL: URL) -> UIImage? {
+        if let cached = imageFromKingfisherCache(rawKey: rawKey, normalizedURL: normalizedURL) {
+            return cached
+        }
+
         let semaphore = DispatchSemaphore(value: 0)
         var image: UIImage?
+        var failureMessage: String?
 
-        ImageCache.default.retrieveImage(forKey: key) { result in
+        KingfisherManager.shared.retrieveImage(with: normalizedURL) { result in
             defer { semaphore.signal() }
             switch result {
             case .success(let value):
                 image = value.image
             case .failure:
                 image = nil
+                failureMessage = "\(result)"
             }
         }
 
-        _ = semaphore.wait(timeout: .now() + 1.5)
+        _ = semaphore.wait(timeout: .now() + 10.0)
+        _ = failureMessage
         return image
+    }
+
+    private func imageFromKingfisherCache(rawKey: String, normalizedURL: URL) -> UIImage? {
+        let trimmed = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let keys = Array(Set([rawKey, trimmed, normalizedURL.absoluteString]))
+        for key in keys {
+            let semaphore = DispatchSemaphore(value: 0)
+            var image: UIImage?
+
+            ImageCache.default.retrieveImage(forKey: key) { result in
+                defer { semaphore.signal() }
+                switch result {
+                case .success(let value):
+                    image = value.image
+                case .failure:
+                    break
+                }
+            }
+            _ = semaphore.wait(timeout: .now() + 1.0)
+            if let image { return image }
+        }
+        return nil
     }
 }

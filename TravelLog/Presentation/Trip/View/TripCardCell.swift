@@ -388,8 +388,16 @@ final class TripCardCell: BaseTableViewCell {
            let localImage = UIImage(contentsOfFile: localURL.path) {
             cityImageView.image = localImage
         } else if let imageUrl = trip.destination?.imageURL,
-                  let url = URL(string: imageUrl) {
-            cityImageView.kf.setImage(with: url)
+                  let url = normalizedURL(from: imageUrl) {
+            cityImageView.image = .seoul
+            cityImageView.kf.setImage(with: url) { [weak self] result in
+                switch result {
+                case .success:
+                    break
+                case .failure:
+                    self?.cityImageView.image = .seoul
+                }
+            }
         } else {
             cityImageView.image = .seoul
         }
@@ -414,6 +422,14 @@ final class TripCardCell: BaseTableViewCell {
         
         let summary = MemorySummary(journalCount: journalCount, status: status)
         memorySummaryCard.update(with: summary)
+    }
+
+    private func normalizedURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed) { return url }
+        let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        guard let encoded else { return nil }
+        return URL(string: encoded)
     }
     
     private func calculateDuration(start: Date, end: Date) -> String {

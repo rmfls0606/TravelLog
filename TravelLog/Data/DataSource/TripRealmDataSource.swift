@@ -10,9 +10,13 @@ import UIKit
 import RealmSwift
 import RxSwift
 import Kingfisher
+import FirebaseFirestore
+import FirebaseFunctions
 
 final class TripRealmDataSource{
     private let fileManager = FileManager.default
+    private lazy var db: Firestore = Firestore.firestore()
+    private lazy var functions: Functions = Functions.functions(region: "us-central1")
 
     func createTrip(
         departure: CityTable,
@@ -24,6 +28,13 @@ final class TripRealmDataSource{
         return Completable.create { completable in
             DispatchQueue.global(qos: .userInitiated).async {
                 do{
+                    if departure.imageURL == nil || departure.imageURL?.isEmpty == true {
+                        departure.imageURL = self.resolveImageURLIfNeeded(for: departure)
+                    }
+                    if destination.imageURL == nil || destination.imageURL?.isEmpty == true {
+                        destination.imageURL = self.resolveImageURLIfNeeded(for: destination)
+                    }
+
                     let departureLocalFilename = self.downloadAndStoreImageIfNeeded(
                         remoteURLString: departure.imageURL,
                         preferredKey: departure.nameEn.isEmpty ? departure.name : departure.nameEn
@@ -111,10 +122,126 @@ final class TripRealmDataSource{
         }
     }
 
+    private func resolveImageURLIfNeeded(for city: CityTable) -> String? {
+        let names = Array(Set([
+            city.name.trimmingCharacters(in: .whitespacesAndNewlines),
+            city.nameEn.trimmingCharacters(in: .whitespacesAndNewlines)
+        ].filter { !$0.isEmpty }))
+        guard !names.isEmpty else { return nil }
+
+        if let docId = city.cityDocId, !docId.isEmpty,
+           let byDocId = fetchImageURLByDocId(docId, timeout: 5.0) {
+            return byDocId
+        }
+
+        for raw in names {
+            let lower = raw.lowercased()
+            let end = lower + "\u{f8ff}"
+
+            if let exact = firstImageURL(
+                query: db.collection("cities").whereField("name", isEqualTo: raw).limit(to: 1),
+                source: .default,
+                timeout: 5.0
+            ) {
+                return exact
+            }
+
+            if let exactLower = firstImageURL(
+                query: db.collection("cities").whereField("nameLower", isEqualTo: lower).limit(to: 1),
+                source: .default,
+                timeout: 5.0
+            ) {
+                return exactLower
+            }
+
+            if let prefix = firstImageURL(
+                query: db.collection("cities")
+                    .order(by: "nameLower")
+                    .start(at: [lower])
+                    .end(at: [end])
+                    .limit(to: 5),
+                source: .default,
+                timeout: 5.0
+            ) {
+                return prefix
+            }
+        }
+
+        return fetchImageURLFromFunction(names: names, country: city.country, timeout: 6.0)
+    }
+
+    private func fetchImageURLByDocId(_ docId: String, timeout: TimeInterval) -> String? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: String?
+
+        db.collection("cities").document(docId).getDocument(source: .default) { snapshot, _ in
+            defer { semaphore.signal() }
+            guard let data = snapshot?.data() else { return }
+            result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
+        }
+
+        _ = semaphore.wait(timeout: .now() + timeout)
+        return result
+    }
+
+    private func firstImageURL(
+        query: FirebaseFirestore.Query,
+        source: FirestoreSource,
+        timeout: TimeInterval
+    ) -> String? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: String?
+
+        query.getDocuments(source: source) { snapshot, _ in
+            defer { semaphore.signal() }
+            guard let doc = snapshot?.documents.first else { return }
+            let data = doc.data()
+            result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
+        }
+
+        _ = semaphore.wait(timeout: .now() + timeout)
+        return result
+    }
+
+    private func fetchImageURLFromFunction(names: [String], country: String, timeout: TimeInterval) -> String? {
+        var queries = names
+        let countryTrimmed = country.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !countryTrimmed.isEmpty {
+            queries.append(contentsOf: names.map { "\($0) \(countryTrimmed)" })
+        }
+        queries = Array(Set(queries))
+
+        for query in queries {
+            let semaphore = DispatchSemaphore(value: 0)
+            var result: String?
+
+            functions.httpsCallable("searchCity")
+                .call([
+                    "query": query,
+                    "language": "ko",
+                    "limit": 10
+                ]) { value, _ in
+                    defer { semaphore.signal() }
+                    guard
+                        let root = value?.data as? [String: Any],
+                        let cities = root["cities"] as? [[String: Any]],
+                        !cities.isEmpty
+                    else { return }
+                    result = cities.first?["imageUrl"] as? String
+                }
+
+            _ = semaphore.wait(timeout: .now() + timeout)
+            if let result, !result.isEmpty {
+                return result
+            }
+        }
+        return nil
+    }
+
     private func downloadAndStoreImageIfNeeded(remoteURLString: String?, preferredKey: String) -> String? {
         guard
             let remoteURLString,
-            let remoteURL = URL(string: remoteURLString),
+            let remoteURL = normalizedURL(from: remoteURLString),
             let cityImageDirectory = cityImageDirectoryURL()
         else { return nil }
 
@@ -128,29 +255,24 @@ final class TripRealmDataSource{
             return filename
         }
 
-        if let data = try? Data(contentsOf: remoteURL) {
+        if let image = retrieveImageViaKingfisher(rawKey: remoteURLString, normalizedURL: remoteURL),
+           let imageData = image.jpegData(compressionQuality: 0.9) ?? image.pngData() {
             do {
-                try data.write(to: targetURL, options: .atomic)
+                try imageData.write(to: targetURL, options: .atomic)
                 return filename
             } catch {
                 return nil
             }
         }
+        return nil
+    }
 
-        // 오프라인 등으로 직접 다운로드 실패 시 Kingfisher 캐시를 로컬 파일로 승격
-        guard let cachedImage = imageFromKingfisherCache(forKey: remoteURLString) else {
-            return nil
-        }
-
-        let imageData = cachedImage.jpegData(compressionQuality: 0.9) ?? cachedImage.pngData()
-        guard let imageData else { return nil }
-
-        do {
-            try imageData.write(to: targetURL, options: .atomic)
-            return filename
-        } catch {
-            return nil
-        }
+    private func normalizedURL(from raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed) { return url }
+        let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        guard let encoded else { return nil }
+        return URL(string: encoded)
     }
 
     private func cityImageDirectoryURL() -> URL? {
@@ -194,22 +316,51 @@ final class TripRealmDataSource{
         return String(hash, radix: 16)
     }
 
-    private func imageFromKingfisherCache(forKey key: String) -> UIImage? {
+    private func retrieveImageViaKingfisher(rawKey: String, normalizedURL: URL) -> UIImage? {
+        if let cached = imageFromKingfisherCache(rawKey: rawKey, normalizedURL: normalizedURL) {
+            return cached
+        }
+
         let semaphore = DispatchSemaphore(value: 0)
         var image: UIImage?
+        var failureMessage: String?
 
-        ImageCache.default.retrieveImage(forKey: key) { result in
+        KingfisherManager.shared.retrieveImage(with: normalizedURL) { result in
             defer { semaphore.signal() }
             switch result {
             case .success(let value):
                 image = value.image
             case .failure:
                 image = nil
+                failureMessage = "\(result)"
             }
         }
 
-        _ = semaphore.wait(timeout: .now() + 1.5)
+        _ = semaphore.wait(timeout: .now() + 10.0)
+        _ = failureMessage
         return image
+    }
+
+    private func imageFromKingfisherCache(rawKey: String, normalizedURL: URL) -> UIImage? {
+        let trimmed = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let keys = Array(Set([rawKey, trimmed, normalizedURL.absoluteString]))
+        for key in keys {
+            let semaphore = DispatchSemaphore(value: 0)
+            var image: UIImage?
+
+            ImageCache.default.retrieveImage(forKey: key) { result in
+                defer { semaphore.signal() }
+                switch result {
+                case .success(let value):
+                    image = value.image
+                case .failure:
+                    break
+                }
+            }
+            _ = semaphore.wait(timeout: .now() + 1.0)
+            if let image { return image }
+        }
+        return nil
     }
     
     func fetchTrips() -> Observable<[TravelTable]> {

@@ -218,7 +218,6 @@ final class TripsViewController: BaseViewController {
             guard let self else { return }
             let isSatisfied = (path.status == .satisfied)
             self.lastNetworkSatisfied = isSatisfied
-            print("[TripVC] NWPath status=\(path.status)")
 
             DispatchQueue.main.async {
                 self.triggerForceBackfillIfNeeded()
