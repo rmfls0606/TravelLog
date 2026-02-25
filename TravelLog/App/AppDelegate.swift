@@ -48,17 +48,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     private func migration(){
         
-        let config = Realm.Configuration(schemaVersion: 4) { migration, oldSchemaVersion in
+        let config = Realm.Configuration(schemaVersion: 3) { migration, oldSchemaVersion in
             //JournalBlockTable에 링크 미리보기를 위한 linkTitle, linkDescription, linkImagePath 컬럼 추가
             if oldSchemaVersion < 1 {}
             if oldSchemaVersion < 2 {}
             if oldSchemaVersion < 3 {
                 migration.enumerateObjects(ofType: CityTable.className()) { _, newObject in
                     newObject?["localImageFilename"] = nil
-                }
-            }
-            if oldSchemaVersion < 4 {
-                migration.enumerateObjects(ofType: CityTable.className()) { _, newObject in
                     newObject?["cityDocId"] = nil
                 }
             }
