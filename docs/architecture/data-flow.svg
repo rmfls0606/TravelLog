@@ -1,0 +1,152 @@
+<svg width="1680" height="980" viewBox="0 0 1680 980" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TripRoad architecture data flow">
+  <defs>
+    <style>
+      .title { font: 800 30px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; fill: #0f172a; }
+      .sub { font: 500 14px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; fill: #64748b; }
+      .col { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; rx: 16; ry: 16; }
+      .chip { font: 700 13px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; fill: #0f172a; }
+      .h { font: 700 15px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; fill: #0f172a; }
+      .t { font: 500 13px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; fill: #334155; }
+      .k { font: 700 12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; fill: #1e293b; }
+
+      .card { fill: #ffffff; stroke-width: 1.8; rx: 12; ry: 12; }
+      .ui { stroke: #2563eb; }
+      .domain { stroke: #0f766e; }
+      .data { stroke: #7c3aed; }
+      .ext { stroke: #ea580c; }
+
+      .line-main { stroke: #2563eb; stroke-width: 2.8; fill: none; }
+      .line-bg { stroke: #475569; stroke-width: 2.2; fill: none; stroke-dasharray: 8 7; }
+
+      .badge { fill: #eef2ff; stroke: #c7d2fe; stroke-width: 1; rx: 999; ry: 999; }
+      .legendBox { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1; rx: 12; ry: 12; }
+    </style>
+
+    <marker id="arrowMain" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2563eb" />
+    </marker>
+    <marker id="arrowBg" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569" />
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1680" height="980" fill="#ffffff"/>
+
+  <text x="48" y="58" class="title">TripRoad Architecture Data Flow</text>
+  <text x="48" y="84" class="sub">MVVM + Clean Architecture / Cache-First Search + Fallback / Local-First Storage</text>
+
+  <rect x="48" y="110" width="288" height="760" class="col"/>
+  <rect x="352" y="110" width="288" height="760" class="col"/>
+  <rect x="656" y="110" width="288" height="760" class="col"/>
+  <rect x="960" y="110" width="304" height="760" class="col"/>
+  <rect x="1280" y="110" width="352" height="760" class="col"/>
+
+  <rect x="66" y="126" width="78" height="30" class="legendBox"/><text x="82" y="146" class="chip">UI</text>
+  <rect x="370" y="126" width="122" height="30" class="legendBox"/><text x="386" y="146" class="chip">Presentation</text>
+  <rect x="674" y="126" width="94" height="30" class="legendBox"/><text x="690" y="146" class="chip">Domain</text>
+  <rect x="978" y="126" width="70" height="30" class="legendBox"/><text x="994" y="146" class="chip">Data</text>
+  <rect x="1298" y="126" width="96" height="30" class="legendBox"/><text x="1314" y="146" class="chip">External</text>
+
+  <rect x="70" y="182" width="244" height="88" class="card ui"/>
+  <text x="86" y="214" class="h">Trips / Travel Add</text>
+  <text x="86" y="236" class="t">TripsViewController</text>
+  <text x="86" y="256" class="t">TravelAddViewController</text>
+
+  <rect x="70" y="292" width="244" height="88" class="card ui"/>
+  <text x="86" y="324" class="h">City Search</text>
+  <text x="86" y="346" class="t">DestinationSelectorVC</text>
+  <text x="86" y="366" class="t">도시 선택/자동완성</text>
+
+  <rect x="70" y="402" width="244" height="108" class="card ui"/>
+  <text x="86" y="434" class="h">Journal</text>
+  <text x="86" y="456" class="t">JournalTimelineVC</text>
+  <text x="86" y="476" class="t">JournalAddVC</text>
+  <text x="86" y="496" class="t">텍스트/링크/사진/음성</text>
+
+  <rect x="374" y="182" width="244" height="96" class="card ui"/>
+  <text x="390" y="214" class="h">Trip ViewModels</text>
+  <text x="390" y="236" class="t">TripsViewModel</text>
+  <text x="390" y="256" class="t">TravelAddViewModel</text>
+  <text x="390" y="276" class="t">Rx Input / Output</text>
+
+  <rect x="374" y="300" width="244" height="96" class="card ui"/>
+  <text x="390" y="332" class="h">Search ViewModel</text>
+  <text x="390" y="354" class="t">DestinationViewModel</text>
+  <text x="390" y="374" class="t">debounce 400ms / skeleton 5</text>
+
+  <rect x="374" y="418" width="244" height="132" class="card ui"/>
+  <text x="390" y="450" class="h">Journal ViewModels</text>
+  <text x="390" y="472" class="t">JournalTimelineViewModel</text>
+  <text x="390" y="492" class="t">JournalAddViewModel</text>
+  <text x="390" y="512" class="t">PhotoPickerViewModel</text>
+  <text x="390" y="532" class="t">JournalAudioBlockViewModel</text>
+
+  <rect x="678" y="192" width="244" height="86" class="card domain"/>
+  <text x="694" y="224" class="h">Search UseCases</text>
+  <text x="694" y="246" class="t">FetchCities / IncreasePopularity</text>
+
+  <rect x="678" y="300" width="244" height="96" class="card domain"/>
+  <text x="694" y="332" class="h">Trip UseCases</text>
+  <text x="694" y="354" class="t">CreateTrip / FetchTrip</text>
+  <text x="694" y="374" class="t">DeleteTrip</text>
+
+  <rect x="678" y="418" width="244" height="96" class="card domain"/>
+  <text x="694" y="450" class="h">Journal UseCases</text>
+  <text x="694" y="472" class="t">JournalUseCase</text>
+  <text x="694" y="492" class="t">FetchJournalCount</text>
+
+  <rect x="978" y="182" width="268" height="106" class="card data"/>
+  <text x="994" y="214" class="h">Repository Implementations</text>
+  <text x="994" y="236" class="t">City / Trip / Journal / LinkMetadata</text>
+  <text x="994" y="256" class="t">RepositoryImpl + DataSource 조합</text>
+  <text x="994" y="276" class="t">UseCase 의존성 주입</text>
+
+  <rect x="978" y="310" width="268" height="118" class="card data"/>
+  <text x="994" y="342" class="h">Realm</text>
+  <text x="994" y="364" class="t">TravelTable / CityTable</text>
+  <text x="994" y="384" class="t">JournalTable / JournalBlockTable</text>
+  <text x="994" y="404" class="t">NotificationToken 기반 UI 반영</text>
+
+  <rect x="978" y="450" width="268" height="98" class="card data"/>
+  <text x="994" y="482" class="h">Local Files</text>
+  <text x="994" y="504" class="t">CityImages / link preview / voice(.m4a)</text>
+  <text x="994" y="524" class="t">localImageFilename 우선 렌더링</text>
+
+  <rect x="978" y="570" width="268" height="104" class="card ui"/>
+  <text x="994" y="602" class="h">CityImageBackfillService</text>
+  <text x="994" y="624" class="t">Firestore 조회 -> miss 시 Functions</text>
+  <text x="994" y="644" class="t">URL 확보 -> File 저장 -> Realm writeback</text>
+
+  <rect x="1298" y="192" width="316" height="96" class="card ext"/>
+  <text x="1314" y="224" class="h">Firestore (cities)</text>
+  <text x="1314" y="246" class="t">prefix query(nameLower/countryLower)</text>
+  <text x="1314" y="266" class="t">page limit 20</text>
+
+  <rect x="1298" y="310" width="316" height="96" class="card ext"/>
+  <text x="1314" y="342" class="h">Firebase Functions</text>
+  <text x="1314" y="364" class="t">searchCity (region: us-central1)</text>
+  <text x="1314" y="384" class="t">limit 10~20 / place_id 중심</text>
+
+  <rect x="1298" y="428" width="316" height="96" class="card ext"/>
+  <text x="1314" y="460" class="h">Google Places API</text>
+  <text x="1314" y="482" class="t">Autocomplete / Details / Photo</text>
+  <text x="1314" y="502" class="t">정확도 + 필터링 기반 보강</text>
+
+  <line x1="314" y1="336" x2="374" y2="348" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="618" y1="348" x2="678" y2="235" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="922" y1="235" x2="978" y2="236" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="1246" y1="236" x2="1298" y2="236" class="line-main" marker-end="url(#arrowMain)"/>
+
+  <line x1="314" y1="220" x2="374" y2="228" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="618" y1="228" x2="678" y2="336" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="922" y1="336" x2="978" y2="364" class="line-main" marker-end="url(#arrowMain)"/>
+
+  <line x1="314" y1="456" x2="374" y2="474" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="618" y1="474" x2="678" y2="474" class="line-main" marker-end="url(#arrowMain)"/>
+  <line x1="922" y1="474" x2="978" y2="500" class="line-main" marker-end="url(#arrowMain)"/>
+
+  <line x1="1112" y1="570" x2="1112" y2="548" class="line-bg" marker-end="url(#arrowBg)"/>
+  <line x1="1246" y1="622" x2="1298" y2="352" class="line-bg" marker-end="url(#arrowBg)"/>
+  <line x1="1246" y1="622" x2="1298" y2="236" class="line-bg" marker-end="url(#arrowBg)"/>
+
+</svg>
