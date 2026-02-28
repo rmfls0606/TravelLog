@@ -8,7 +8,43 @@
 ## 1. 한 줄 소개
 `여행의 순간을 텍스트·링크·사진·음성으로 기록하고, 타임라인으로 다시 돌아보는 여행 기록 앱`
 
-## 2. 스크린샷
+## 2. 주요 기능
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>🧭 여행 카드 생성</b><br>
+    <span style="color:#111111;">교통수단·일정·출발/도착지 입력</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>🔎 도시 검색 최적화</b><br>
+    <span style="color:#111111;">Firestore 캐시 우선 + Functions 보강</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>📝 블록형 여행 기록</b><br>
+    <span style="color:#111111;">텍스트·링크·사진·음성 블록 구성</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>📅 타임라인 조회</b><br>
+    <span style="color:#111111;">날짜 기준 여행 기록 그룹화</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>🔗 링크 미리보기</b><br>
+    <span style="color:#111111;">URL 정규화 + 메타데이터 자동 추출</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>🖼️ 커스텀 사진 선택기</b><br>
+    <span style="color:#111111;">저화질 → 고화질 2단계 로딩 + 페이지네이션 + 다중 선택 최적화</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>🎙️ 음성 메모</b><br>
+    <span style="color:#111111;">단일 오디오 세션 관리 + 인터럽션/라우트 변경 대응</span>
+  </div>
+  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
+    <b>📴 오프라인 대응</b><br>
+    <span style="color:#111111;">로컬 저장 + 네트워크 복구 시 자동 보정</span>
+  </div>
+</div>
+
+## 3. 스크린샷
 <table>
   <tr>
     <td align="center" width="25%">여행 목록 화면</td>
@@ -24,11 +60,11 @@
   </tr>
 </table>
 
-## 3. 기술 스택
+## 4. 기술 스택
 | Category | Stack | Version |
 | --- | --- | --- |
-| App Target | ![iOS](https://img.shields.io/badge/iOS-16.0-000000?logo=apple&logoColor=white) | iOS Deployment Target `16.0`, Marketing Version `1.5.0` |
-| Language | ![Swift](https://img.shields.io/badge/Swift-5-FA7343?logo=swift&logoColor=white) | Swift `5.0` |
+| App Target | ![iOS](https://img.shields.io/badge/iOS-16.0+-000000?logo=apple&logoColor=white) | iOS Deployment Target `16.0+` |
+| Language | ![Swift](https://img.shields.io/badge/Swift-5-FA7343?logo=swift&logoColor=white) | Swift `5` |
 | UI | ![UIKit](https://img.shields.io/badge/UIKit-2396F3) ![SnapKit](https://img.shields.io/badge/SnapKit-1F8CE6) | SnapKit `5.7.1` |
 | Reactive | ![RxSwift](https://img.shields.io/badge/RxSwift-B7178C?logo=reactivex&logoColor=white) ![RxCocoa](https://img.shields.io/badge/RxCocoa-B7178C) | RxSwift/RxCocoa `6.10.1` |
 | Local DB | ![Realm](https://img.shields.io/badge/Realm-39477F?logo=realm&logoColor=white) | RealmSwift `20.0.3` |
@@ -37,7 +73,7 @@
 | UX / Utility | ![FSCalendar](https://img.shields.io/badge/FSCalendar-34A853) ![Toast--Swift](https://img.shields.io/badge/Toast--Swift-555555) ![IQKeyboardManager](https://img.shields.io/badge/IQKeyboardManager-3A3A3A) | FSCalendar `2.8.4`, Toast-Swift `5.1.1`, IQKeyboardManager `8.0.2` |
 | Functions Runtime | ![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) | Node.js `24`, TypeScript `5.7.3`, firebase-functions `7.0.0` |
 
-## 4. 아키텍처 설명
+## 5. 아키텍처 설명
 - 패턴: MVVM + Clean Architecture
 - 레이어:
 - `Presentation`: ViewController + ViewModel (입력/상태 관리)
@@ -47,27 +83,48 @@
 ### Architecture DFD
 ![Architecture Flow](docs/architecture/DataFlow.jpg)
 
-## 5. 핵심 기술 포인트
-- 도시 검색 하이브리드 구조
-- Firestore prefix 검색(`nameLower`, `countryLower`) 우선
-- 캐시 miss 시 Functions `searchCity` 호출
-- `place_id` 기반 저장으로 중복/무결성 개선
+## 6. 핵심 기술 포인트
+### 1) 도시 검색 하이브리드 구조 (Cache-First + Fallback)
+- 문제: 도시 자동완성에서 정확도/응답속도/외부 API 비용을 동시에 관리해야 했습니다.
+- 해결 방식:
+- Firestore prefix 검색(`nameLower`, `countryLower`)을 1차로 수행
+- 결과 부족/미존재 시 Firebase Functions `searchCity`로 fallback
+- `place_id` 기준 저장으로 중복 데이터 방지
+- 효과: 캐시 hit 구간은 빠르게 응답하고, miss 구간만 원격 보강하여 비용과 품질을 균형화했습니다.
 
-- 링크 미리보기 파이프라인
-- URL 정규화(`https` 자동 보정 포함)
-- `LPMetadataProvider`로 title/description/image 추출
-- Realm + 문서 디렉토리 파일 저장
+### 2) 링크 미리보기 파이프라인
+- 문제: 사용자가 입력한 URL 형식이 다양하고, 오프라인/실패 상황에서 미리보기 누락이 발생했습니다.
+- 해결 방식:
+- `URLNormalizer`로 URL 정규화(스키마 보정 포함)
+- `LPMetadataProvider`로 제목/설명/이미지 추출
+- 이미지를 문서 디렉토리에 저장하고 Realm에 메타데이터 기록
+- 효과: 링크 블록이 단순 URL 텍스트가 아닌, 재진입 시에도 유지되는 미리보기 카드로 동작합니다.
 
-- 도시 이미지 백필(Backfill)
-- 과거 데이터(`imageURL`, `localImageFilename` 누락) 자동 보정
-- Firestore 조회 -> miss 시 Functions fallback -> 로컬 파일 저장 -> Realm 업데이트
-- 화면은 `localImageFilename` 우선 렌더링, URL fallback
+### 3) 도시 이미지 백필(Backfill) + 로컬 우선 렌더링
+- 문제: 과거 데이터에는 `imageURL`, `localImageFilename`이 비어 있는 경우가 있어 화면 일관성이 떨어졌습니다.
+- 해결 방식:
+- 백필 서비스에서 Firestore 조회 -> miss 시 Functions 호출
+- 획득한 URL 이미지를 로컬 파일로 저장 후 Realm 갱신
+- UI는 `localImageFilename` 우선, 없을 때만 URL fallback
+- 효과: 네트워크 상태와 무관하게 재방문 시 이미지 안정성이 높아졌습니다.
 
-- 실시간 상태 반영
-- `NWPathMonitor` 기반 네트워크 상태 감지
-- Realm `NotificationToken`으로 데이터 변경 시 화면 갱신
+### 4) 커스텀 사진 선택기 (대용량 대응)
+- 문제: 대량 이미지 환경에서 `reloadData()` 중심 갱신은 성능 저하/깜빡임/크래시 위험이 있었습니다.
+- 해결 방식:
+- 페이지네이션 + `insertItems` 기반 증분 렌더링
+- `AsyncStream`으로 저화질 -> 고화질 2단계 로딩
+- iCloud nil 콜백 분기 처리 + `NSCache` 썸네일 캐싱
+- 효과: 초기 체감 속도와 스크롤 안정성을 함께 확보했습니다.
 
-## 6. 성능 개선
+### 5) 음성 메모 안정화 (단일 세션 관리)
+- 문제: 다중 블록 재생/녹음, 라우트 변경, 인터럽션 상황에서 오디오 세션 충돌이 발생할 수 있었습니다.
+- 해결 방식:
+- `AudioCoordinator`로 단일 녹음/재생 세션 보장
+- 인터럽션/라우트 변경/백그라운드 진입 시 `stopAll()` 처리
+- 실제 재생/녹음 시점에만 세션 활성화
+- 효과: 예외 상황에서도 재생/녹음 상태가 꼬이지 않도록 안정성을 높였습니다.
+
+## 7. 성능 개선
 > 아래 수치는 코드에 반영된 운영 수치입니다.
 
 - 검색 입력 제어
@@ -98,7 +155,7 @@
 - 타이머 업데이트 주기: `0.05초`
 - 세션 충돌 시 `stopAll()`로 단일 오디오 세션 유지
 
-## 7. 트러블슈팅
+## 8. 트러블슈팅
 - 도시 검색 시 이상 데이터/중복 데이터 유입
 - 원인: query 문자열 기반 저장, 불완전한 정규화
 - 해결: `place_id` 문서 키 사용 + 도시 타입 필터링 + prefix 캐시 우선 구조
@@ -119,7 +176,17 @@
 - 원인: 세션 활성/비활성 경계 불명확
 - 해결: 실제 녹음/재생 시점에만 세션 활성화, 인터럽션/라우트 변경 시 안전 중지
 
-## 8. 폴더 구조
+
+
+
+
+
+
+
+
+
+
+## 9. 폴더 구조
 ```text
 TripRoad
 ├─ TravelLog
@@ -143,16 +210,7 @@ TripRoad
 └─ Firebase
 ```
 
-## 9. 실행 방법
-### iOS
-1. `TravelLog.xcodeproj` 열기
-2. Swift Package 의존성 Resolve
-3. Firebase iOS 앱 등록 후 `GoogleService-Info.plist`를 프로젝트 루트에 추가
-4. Run (iOS 16.0+)
-
-### Firebase Functions (선택)
-1. `cd functions`
-2. `npm install`
-3. `npm run build`
-4. `npm run deploy`
-5. 환경 변수 `GOOGLE_API_KEY` 설정
+고려사항
+트러블 슈팅
+고민한 점
+성능 개선
