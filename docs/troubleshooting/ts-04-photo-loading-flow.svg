@@ -1,0 +1,81 @@
+<svg width="1200" height="640" viewBox="0 0 1200 640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font: 700 28px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .sub { font: 500 15px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif; fill: #334155; }
+      .h { font: 700 16px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .b { font: 500 14px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif; fill: #334155; }
+      .tag { font: 700 12px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif; fill: #1e3a8a; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="640" fill="#f8fafc"/>
+  <text x="32" y="50" class="title">Photo Loading Flow (NSCache + AsyncStream + iCloud)</text>
+  <text x="32" y="76" class="sub">썸네일 로딩에서 캐시 우선, iCloud 지연 콜백 대기, 저화질→고화질 치환 전략</text>
+
+  <rect x="32" y="104" width="1136" height="500" rx="16" fill="#ffffff" stroke="#e2e8f0"/>
+
+  <rect x="64" y="144" width="220" height="76" rx="12" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="84" y="174" class="h">요청 시작</text>
+  <text x="84" y="196" class="b">셀 표시 / 썸네일 요청</text>
+
+  <rect x="334" y="144" width="240" height="76" rx="12" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="354" y="174" class="h">NSCache hit?</text>
+  <text x="354" y="196" class="b">key: asset 식별자</text>
+
+  <rect x="624" y="126" width="240" height="76" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="644" y="156" class="h">YES</text>
+  <text x="644" y="178" class="b">즉시 이미지 표시</text>
+
+  <rect x="624" y="244" width="240" height="76" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="644" y="274" class="h">NO</text>
+  <text x="644" y="296" class="b">Photos requestImage 호출</text>
+
+  <line x1="284" y1="182" x2="334" y2="182" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="574" y1="170" x2="624" y2="164" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="574" y1="206" x2="624" y2="282" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <rect x="914" y="244" width="220" height="76" rx="12" fill="#eef2ff" stroke="#c7d2fe"/>
+  <text x="934" y="274" class="h">AsyncStream 콜백</text>
+  <text x="934" y="296" class="b">image / info 수신</text>
+
+  <line x1="864" y1="282" x2="914" y2="282" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <rect x="64" y="366" width="300" height="84" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="84" y="398" class="h">iCloud 지연 콜백 검사</text>
+  <text x="84" y="420" class="b">image == nil &amp;&amp; isInCloud == true ?</text>
+
+  <rect x="414" y="366" width="300" height="84" rx="12" fill="#ecfeff" stroke="#a5f3fc"/>
+  <text x="434" y="398" class="h">YES: 대기 유지</text>
+  <text x="434" y="420" class="b">종료하지 않고 다음 콜백 대기</text>
+
+  <rect x="764" y="366" width="370" height="84" rx="12" fill="#fefce8" stroke="#fde68a"/>
+  <text x="784" y="398" class="h">NO: 이미지 처리</text>
+  <text x="784" y="420" class="b">이미지 yield -> isDegraded 판별</text>
+
+  <line x1="1024" y1="320" x2="214" y2="366" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="364" y1="408" x2="414" y2="408" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <line x1="714" y1="408" x2="764" y2="408" stroke="#64748b" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+  <rect x="64" y="494" width="460" height="86" rx="12" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="84" y="526" class="h">isDegraded == true</text>
+  <text x="84" y="548" class="b">저화질 즉시 표시 (placeholder 대체)</text>
+  <text x="84" y="568" class="b">고화질 콜백 대기</text>
+
+  <rect x="564" y="494" width="570" height="86" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="584" y="526" class="h">isDegraded == false (최종)</text>
+  <text x="584" y="548" class="b">고화질로 교체 + NSCache 저장 + continuation.finish()</text>
+  <text x="584" y="568" class="b">빠른 재진입/왕복 스크롤에서 캐시 hit로 즉시 표시</text>
+
+  <line x1="900" y1="450" x2="294" y2="494" stroke="#2563eb" stroke-width="2.2" marker-end="url(#arrowBlue)"/>
+  <line x1="964" y1="450" x2="844" y2="494" stroke="#2563eb" stroke-width="2.2" marker-end="url(#arrowBlue)"/>
+
+  <rect x="930" y="140" width="188" height="24" rx="8" fill="#dbeafe"/>
+  <text x="946" y="157" class="tag">cache-first</text>
+</svg>
