@@ -1,0 +1,20 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="360" fill="#f8fafc"/>
+<text x="28" y="44" font-size="28" font-family="-apple-system,Segoe UI" font-weight="700" fill="#0f172a">Design Decisions Summary</text>
+<rect x="28" y="80" width="272" height="240" rx="14" fill="#fff" stroke="#bfdbfe"/>
+<text x="46" y="114" font-size="18" font-weight="700" fill="#1d4ed8">검색 구조</text>
+<text x="46" y="146" font-size="14" fill="#334155">cache-first + fallback</text>
+<text x="46" y="170" font-size="14" fill="#334155">정확도/속도/비용 균형</text>
+<rect x="320" y="80" width="272" height="240" rx="14" fill="#fff" stroke="#bfdbfe"/>
+<text x="338" y="114" font-size="18" font-weight="700" fill="#1d4ed8">링크 정책</text>
+<text x="338" y="146" font-size="14" fill="#334155">정규화 + TTL + 재시도</text>
+<text x="338" y="170" font-size="14" fill="#334155">실패 상태를 데이터로 관리</text>
+<rect x="612" y="80" width="272" height="240" rx="14" fill="#fff" stroke="#bfdbfe"/>
+<text x="630" y="114" font-size="18" font-weight="700" fill="#1d4ed8">데이터 호환성</text>
+<text x="630" y="146" font-size="14" fill="#334155">legacy 하위호환 조회</text>
+<text x="630" y="170" font-size="14" fill="#334155">백필로 품질 점진 복구</text>
+<rect x="904" y="80" width="268" height="240" rx="14" fill="#fff" stroke="#bfdbfe"/>
+<text x="922" y="114" font-size="18" font-weight="700" fill="#1d4ed8">오디오 안정성</text>
+<text x="922" y="146" font-size="14" fill="#334155">단일 세션 + 이벤트 규칙</text>
+<text x="922" y="170" font-size="14" fill="#334155">예외 상황 재현성 확보</text>
+</svg>

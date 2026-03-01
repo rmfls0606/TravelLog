@@ -1,0 +1,98 @@
+<svg width="1320" height="660" viewBox="0 0 1320 660" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Legacy data compatibility and backfill flow">
+  <defs>
+    <style>
+      .title{font:700 30px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;fill:#0f172a}
+      .txt{font:600 14px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;fill:#1e293b}
+      .small{font:500 13px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;fill:#334155}
+      .box{fill:#fff;stroke:#cbd5e1;stroke-width:1.5;rx:12;ry:12}
+      .legacy{fill:#fff7ed;stroke:#fdba74;stroke-width:1.5;rx:12;ry:12}
+      .flow{fill:#eff6ff;stroke:#93c5fd;stroke-width:1.5;rx:12;ry:12}
+      .ok{fill:#f0fdf4;stroke:#86efac;stroke-width:1.5;rx:12;ry:12}
+      .line{stroke:#2563eb;stroke-width:2.4;fill:none}
+      .line2{stroke:#64748b;stroke-width:2;fill:none}
+    </style>
+    <marker id="arrowB" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1320" height="660" fill="#f8fafc"/>
+  <text x="28" y="48" class="title">Legacy Compatibility + Backfill Flow</text>
+
+  <rect x="28" y="86" width="260" height="92" class="legacy"/>
+  <text x="48" y="116" class="txt">기존 사용자 데이터</text>
+  <text x="48" y="138" class="small">- city imageURL/localFilename nil</text>
+  <text x="48" y="160" class="small">- nameLower/countryLower 미보유 문서</text>
+
+  <rect x="326" y="86" width="250" height="92" class="flow"/>
+  <text x="346" y="116" class="txt">앱 실행 / 화면 진입</text>
+  <text x="346" y="138" class="small">Trips/Timeline 진입 시 감지</text>
+  <text x="346" y="160" class="small">백필 대상 수집</text>
+
+  <rect x="614" y="86" width="260" height="92" class="flow"/>
+  <text x="634" y="116" class="txt">Backfill Service</text>
+  <text x="634" y="138" class="small">Firestore 조회 -> miss 시 Functions</text>
+  <text x="634" y="160" class="small">도시 이미지 URL 확보</text>
+
+  <rect x="912" y="86" width="380" height="92" class="flow"/>
+  <text x="932" y="116" class="txt">이미지 저장 + 데이터 갱신</text>
+  <text x="932" y="138" class="small">FileManager(CityImages) 저장</text>
+  <text x="932" y="160" class="small">Realm(city.imageURL/localImageFilename) write</text>
+
+  <rect x="326" y="220" width="250" height="92" class="flow"/>
+  <text x="346" y="250" class="txt">UI 반영</text>
+  <text x="346" y="272" class="small">Realm NotificationToken 감지</text>
+  <text x="346" y="294" class="small">화면 이미지 즉시 갱신</text>
+
+  <rect x="614" y="220" width="260" height="92" class="ok"/>
+  <text x="634" y="250" class="txt">결과 1: 과거 데이터 복구</text>
+  <text x="634" y="272" class="small">기존 기록도 현재 정책 품질로 정렬</text>
+  <text x="634" y="294" class="small">화면 일관성 회복</text>
+
+  <rect x="912" y="220" width="380" height="92" class="ok"/>
+  <text x="932" y="250" class="txt">결과 2: 오프라인 안정성 강화</text>
+  <text x="932" y="272" class="small">localImageFilename 우선 렌더링</text>
+  <text x="932" y="294" class="small">캐시 만료 후에도 로컬 파일 기반 표시</text>
+
+  <line x1="288" y1="132" x2="326" y2="132" class="line" marker-end="url(#arrowB)"/>
+  <line x1="576" y1="132" x2="614" y2="132" class="line" marker-end="url(#arrowB)"/>
+  <line x1="874" y1="132" x2="912" y2="132" class="line" marker-end="url(#arrowB)"/>
+  <line x1="1038" y1="178" x2="446" y2="220" class="line" marker-end="url(#arrowB)"/>
+  <line x1="576" y1="266" x2="614" y2="266" class="line" marker-end="url(#arrowB)"/>
+  <line x1="874" y1="266" x2="912" y2="266" class="line" marker-end="url(#arrowB)"/>
+
+  <rect x="28" y="356" width="1264" height="96" rx="12" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="48" y="388" class="txt">왜 필요한가?</text>
+  <text x="48" y="412" class="small">- 버전 업 후 기존 사용자 데이터가 품질 저하 없이 동작해야 서비스 신뢰도가 유지됩니다.</text>
+  <text x="48" y="434" class="small">- 마이그레이션으로 해결하기 어려운 원격 의존 필드는 런타임 백필로 점진 복구가 필요합니다.</text>
+
+  <text x="28" y="492" class="txt">오프라인 이미지 처리 플로우</text>
+
+  <rect x="28" y="510" width="230" height="92" class="flow"/>
+  <text x="48" y="542" class="txt">imageURL 존재</text>
+  <text x="48" y="564" class="small">로컬 파일 확보 시도 시작</text>
+
+  <rect x="286" y="510" width="240" height="92" class="flow"/>
+  <text x="306" y="542" class="txt">1차 시도</text>
+  <text x="306" y="564" class="small">Kingfisher cache hit 저장</text>
+
+  <rect x="554" y="510" width="240" height="92" class="flow"/>
+  <text x="574" y="542" class="txt">2차 시도</text>
+  <text x="574" y="564" class="small">cache miss -> Data 다운로드 저장</text>
+
+  <rect x="822" y="510" width="220" height="92" class="legacy"/>
+  <text x="842" y="542" class="txt">실패 처리</text>
+  <text x="842" y="564" class="small">기본 이미지 표시</text>
+
+  <rect x="1070" y="510" width="222" height="92" class="ok"/>
+  <text x="1090" y="542" class="txt">복구 처리</text>
+  <text x="1090" y="564" class="small">온라인 복구 시 백필 재시도</text>
+
+  <line x1="258" y1="556" x2="286" y2="556" class="line" marker-end="url(#arrowB)"/>
+  <line x1="526" y1="556" x2="554" y2="556" class="line" marker-end="url(#arrowB)"/>
+  <line x1="794" y1="556" x2="822" y2="556" class="line" marker-end="url(#arrowB)"/>
+  <line x1="1042" y1="556" x2="1070" y2="556" class="line" marker-end="url(#arrowB)"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="420" fill="#f8fafc"/>
+<text x="28" y="44" font-size="28" font-family="-apple-system,Segoe UI" font-weight="700" fill="#0f172a">TS-01 도시 검색 중복/오탐 이슈</text>
+<rect x="28" y="76" width="360" height="300" rx="14" fill="#fff" stroke="#fecaca"/>
+<text x="48" y="112" font-size="20" font-weight="700" fill="#991b1b">문제</text>
+<text x="48" y="146" font-size="15" fill="#334155">- query 문자열 기반 저장</text>
+<text x="48" y="172" font-size="15" fill="#334155">- 오타/부분입력으로 중복 문서 생성</text>
+<text x="48" y="198" font-size="15" fill="#334155">- 품질 낮은 도시 후보 노출</text>
+<rect x="420" y="76" width="360" height="300" rx="14" fill="#fff" stroke="#bfdbfe"/>
+<text x="440" y="112" font-size="20" font-weight="700" fill="#1d4ed8">해결</text>
+<text x="440" y="146" font-size="15" fill="#334155">- Firestore prefix cache-first</text>
+<text x="440" y="172" font-size="15" fill="#334155">- miss 시 Functions searchCity fallback</text>
+<text x="440" y="198" font-size="15" fill="#334155">- place_id를 문서 키로 고정</text>
+<text x="440" y="224" font-size="15" fill="#334155">- 도시 타입/국가 필터링</text>
+<rect x="812" y="76" width="360" height="300" rx="14" fill="#fff" stroke="#bbf7d0"/>
+<text x="832" y="112" font-size="20" font-weight="700" fill="#166534">결과</text>
+<text x="832" y="146" font-size="15" fill="#334155">- 중복/오탐 데이터 감소</text>
+<text x="832" y="172" font-size="15" fill="#334155">- cache hit 구간 응답 속도 개선</text>
+<text x="832" y="198" font-size="15" fill="#334155">- 원격 호출은 miss 구간만 수행</text>
+</svg>
