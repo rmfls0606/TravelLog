@@ -9,40 +9,29 @@
 `여행의 순간을 텍스트·링크·사진·음성으로 기록하고, 타임라인으로 다시 돌아보는 여행 기록 앱`
 
 ## 2. 주요 기능
-<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>🧭 여행 카드 생성</b><br>
-    <span style="color:#111111;">교통수단·일정·출발/도착지 입력</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>🔎 도시 검색 최적화</b><br>
-    <span style="color:#111111;">Firestore 캐시 우선 + Functions 보강</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>📝 블록형 여행 기록</b><br>
-    <span style="color:#111111;">텍스트·링크·사진·음성 블록 구성</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>📅 타임라인 조회</b><br>
-    <span style="color:#111111;">날짜 기준 여행 기록 그룹화</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>🔗 링크 미리보기</b><br>
-    <span style="color:#111111;">URL 정규화 + 메타데이터 자동 추출</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>🖼️ 커스텀 사진 선택기</b><br>
-    <span style="color:#111111;">저화질 → 고화질 2단계 로딩 + 페이지네이션 + 다중 선택 최적화</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>🎙️ 음성 메모</b><br>
-    <span style="color:#111111;">단일 오디오 세션 관리 + 인터럽션/라우트 변경 대응</span>
-  </div>
-  <div style="background:#f1f3f6;border:1px solid #d7dce3;border-radius:10px;padding:14px;color:#111111;">
-    <b>📴 오프라인 대응</b><br>
-    <span style="color:#111111;">로컬 저장 + 네트워크 복구 시 자동 보정</span>
-  </div>
-</div>
+**🧭 여행 카드 생성**  
+  교통수단·일정·출발/도착지 입력
+
+**🔎 도시 검색 최적화**  
+  Firestore 캐시 우선 + Functions 보강
+
+**📝 블록형 여행 기록**  
+  텍스트·링크·사진·음성 블록 구성
+
+**📅 타임라인 조회**  
+  날짜 기준 여행 기록 그룹화
+
+**🔗 링크 미리보기**  
+  URL 정규화 + 메타데이터 자동 추출
+
+**🖼️ 커스텀 사진 선택기**  
+  저화질 → 고화질 2단계 로딩 + 페이지네이션 + 다중 선택 최적화
+
+**🎙️ 음성 메모**  
+  단일 오디오 세션 관리 + 인터럽션/라우트 변경 대응
+
+**📴 오프라인 대응**  
+  로컬 저장 + 네트워크 복구 시 자동 보정
 
 ## 3. 스크린샷
 <table>
@@ -85,130 +74,31 @@
 
 ## 6. 핵심 기술 포인트
 ### 1) 도시 검색 하이브리드 구조 (Cache-First + Fallback)
-- 문제: 도시 자동완성에서 정확도/응답속도/외부 API 비용을 동시에 관리해야 했습니다.
-- 해결 방식:
-- Firestore prefix 검색(`nameLower`, `countryLower`)을 1차로 수행
-- 결과 부족/미존재 시 Firebase Functions `searchCity`로 fallback
-- `place_id` 기준 저장으로 중복 데이터 방지
-- 효과: 캐시 hit 구간은 빠르게 응답하고, miss 구간만 원격 보강하여 비용과 품질을 균형화했습니다.
+- 기술 목표: 검색 속도/정확도/비용의 균형 확보
+- 설계/구현: Firestore prefix 1차 검색, miss 시 Functions fallback, `place_id` 기준 저장
+- 핵심 포인트: cache-first 파이프라인으로 원격 호출을 최소화하면서 검색 품질을 유지
+- 상세 규칙은 `7. 성능 개선`, `8. 트러블슈팅`에 정리
 
 ### 2) 링크 미리보기 파이프라인
-- 문제: 사용자가 입력한 URL 형식이 다양하고, 오프라인/실패 상황에서 미리보기 누락이 발생했습니다.
-- 해결 방식:
-- `URLNormalizer`로 URL 정규화(스키마 보정 포함)
-- `LPMetadataProvider`로 제목/설명/이미지 추출
-- 이미지를 문서 디렉토리에 저장하고 Realm에 메타데이터 기록
-- 효과: 링크 블록이 단순 URL 텍스트가 아닌, 재진입 시에도 유지되는 미리보기 카드로 동작합니다.
+- 기술 목표: 링크를 구조화된 미리보기 데이터로 저장/재사용
+- 설계/구현: URL 정규화 -> 메타데이터 추출 -> 이미지/메타데이터 로컬 저장
+- 핵심 포인트: 입력 URL 변동성을 정규화 단계에서 흡수하고 렌더링 데이터를 영속화
+- 정책 포인트: TTL 기반 갱신 + 실패 재시도 제한 + 오프라인 복구 경로를 함께 설계해 안정성을 확보
 
 ### 3) 도시 이미지 백필(Backfill) + 로컬 우선 렌더링
-- 문제: 과거 데이터에는 `imageURL`, `localImageFilename`이 비어 있는 경우가 있어 화면 일관성이 떨어졌습니다.
-- 해결 방식:
-- 백필 서비스에서 Firestore 조회 -> miss 시 Functions 호출
-- 획득한 URL 이미지를 로컬 파일로 저장 후 Realm 갱신
-- UI는 `localImageFilename` 우선, 없을 때만 URL fallback
-- 효과: 네트워크 상태와 무관하게 재방문 시 이미지 안정성이 높아졌습니다.
+- 기술 목표: 과거 데이터와 오프라인 환경에서도 도시 이미지 일관성 유지
+- 설계/구현: 백필 서비스가 원격 보강 후 로컬 파일 저장 및 Realm 갱신
+- 핵심 포인트: `localImageFilename` 우선 렌더링으로 네트워크 의존도 축소
 
 ### 4) 커스텀 사진 선택기 (대용량 대응)
-- 문제: 대량 이미지 환경에서 `reloadData()` 중심 갱신은 성능 저하/깜빡임/크래시 위험이 있었습니다.
-- 해결 방식:
-- 페이지네이션 + `insertItems` 기반 증분 렌더링
-- `AsyncStream`으로 저화질 -> 고화질 2단계 로딩
-- iCloud nil 콜백 분기 처리 + `NSCache` 썸네일 캐싱
-- 효과: 초기 체감 속도와 스크롤 안정성을 함께 확보했습니다.
+- 기술 목표: 대량 사진 환경에서 초기 체감 속도와 스크롤 안정성 확보
+- 설계/구현: 페이지네이션, 증분 렌더링, 저화질->고화질 2단계 로딩, 썸네일 캐싱
+- 핵심 포인트: 비동기 로딩과 화면 갱신 분리로 UI 부하를 완화
 
 ### 5) 음성 메모 안정화 (단일 세션 관리)
-- 문제: 다중 블록 재생/녹음, 라우트 변경, 인터럽션 상황에서 오디오 세션 충돌이 발생할 수 있었습니다.
-- 해결 방식:
-- `AudioCoordinator`로 단일 녹음/재생 세션 보장
-- 인터럽션/라우트 변경/백그라운드 진입 시 `stopAll()` 처리
-- 실제 재생/녹음 시점에만 세션 활성화
-- 효과: 예외 상황에서도 재생/녹음 상태가 꼬이지 않도록 안정성을 높였습니다.
-
-## 7. 성능 개선
-> 아래 수치는 코드에 반영된 운영 수치입니다.
-
-- 검색 입력 제어
-- debounce: `400ms`
-- skeleton 셀: `5개`
-- Firestore page limit: `20`
-- Functions 결과 limit: 기본 `10`, 최대 `20`
-- 1글자 입력은 원격 호출 제한(캐시 우선)
-
-- 링크 메타데이터 캐시 정책
-- TTL: `30일`
-- 실패 재시도 상한: `3회` (`fetchFailCount < 3`)
-- Trip별 TTL 갱신: `하루 1회`
-
-- 이미지 캐시/저장 전략
-- Kingfisher 메모리 캐시: `50MB`, 만료 `300초`
-- Kingfisher 디스크 캐시: `200MB`, 만료 `7일`
-- 장기 보존은 FileManager(`CityImages`) + Realm filename 참조
-
-- 사진 선택기 최적화
-- 페이지네이션 배치: `300개`
-- `reloadData` 중심 갱신에서 `insertItems` 기반 증분 갱신으로 전환
-- `AsyncStream` 저화질 -> 고화질 스트리밍 + iCloud nil 콜백 분기 처리
-
-- 음성 처리 안정화
-- 녹음 최소 길이: `1초`
-- 재생 건너뛰기: `±15초`
-- 타이머 업데이트 주기: `0.05초`
-- 세션 충돌 시 `stopAll()`로 단일 오디오 세션 유지
-
-## 8. 트러블슈팅
-- 도시 검색 시 이상 데이터/중복 데이터 유입
-- 원인: query 문자열 기반 저장, 불완전한 정규화
-- 해결: `place_id` 문서 키 사용 + 도시 타입 필터링 + prefix 캐시 우선 구조
-
-- 링크 메타데이터가 오프라인에서 누락되는 문제
-- 원인: 최초 요청 실패 후 갱신 타이밍 부재
-- 해결: `metadataUpdatedAt` + `fetchFailCount` + 네트워크 복구 시 재시도 경로 추가
-
-- 과거 여행 카드/타임라인의 도시 이미지 누락
-- 원인: 이전 스키마 데이터의 `imageURL/localImageFilename` 빈 값
-- 해결: 백필 서비스 도입(원격 조회 -> 로컬 저장 -> Realm 갱신), Realm 변경 감지로 UI 즉시 반영
-
-- 사진 페이지네이션 중 크래시
-- 원인: 대량 로딩 시 `reloadData()` 남용
-- 해결: `performBatchUpdates + insertItems`로 변경해 증분 렌더링
-
-- 오디오 재생 시 외부 오디오와 세션 충돌
-- 원인: 세션 활성/비활성 경계 불명확
-- 해결: 실제 녹음/재생 시점에만 세션 활성화, 인터럽션/라우트 변경 시 안전 중지
-
-
-
-
-
-
-
-
-
-
-
-## 9. 폴더 구조
-```text
-TripRoad
-├─ TravelLog
-│  ├─ App
-│  ├─ Presentation
-│  │  ├─ Base
-│  │  ├─ Common
-│  │  ├─ Trip
-│  │  ├─ Travel
-│  │  └─ Journal
-│  ├─ Domain
-│  │  ├─ Entity
-│  │  ├─ Repository
-│  │  └─ UseCase
-│  └─ Data
-│     ├─ DataSource
-│     ├─ Repository
-│     └─ Realm
-├─ functions
-│  └─ src/index.ts
-└─ Firebase
-```
+- 기술 목표: 시스템 이벤트 상황에서도 안정적인 녹음/재생 상태 유지
+- 설계/구현: `AudioCoordinator` 기반 단일 세션 제어 + 인터럽션/라우트 변경 처리
+- 핵심 포인트: 오디오 세션 생명주기 명시적 제어로 블록 간 충돌 방지
 
 고려사항
 트러블 슈팅
