@@ -5,6 +5,19 @@
 
 ![Version](https://img.shields.io/badge/Version-1.5.0-0A84FF) [![App Store](https://img.shields.io/badge/App%20Store-Download-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/kr/app/triproad-%EC%97%AC%ED%96%89%EC%9D%98-%EC%88%9C%EA%B0%84%EC%9D%84-%EA%B8%B0%EB%A1%9D%ED%95%98%EB%8B%A4/id6753877753)
 
+## 개발 기간
+`YYYY.MM.DD ~ YYYY.MM.DD` (링크/날짜 입력 예정)
+
+## 목차
+[1. 한 줄 소개](#1-한-줄-소개)  
+[2. 주요 기능](#2-주요-기능)  
+[3. 스크린샷](#3-스크린샷)  
+[4. 기술 스택](#4-기술-스택)  
+[5. 아키텍처 설명](#5-아키텍처-설명)  
+[6. 핵심 기술 포인트](#6-핵심-기술-포인트)  
+[7. 고민한 점 (설계 의사결정)](#7-고민한-점-설계-의사결정)  
+[8. 트러블슈팅](#8-트러블슈팅)  
+
 ## 1. 한 줄 소개
 `여행의 순간을 텍스트·링크·사진·음성으로 기록하고, 타임라인으로 다시 돌아보는 여행 기록 앱`
 
@@ -37,6 +50,8 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 로컬 저장 + 네트워크 복구 시 자동 보정
 
 ## 3. 스크린샷
+[![Figma](https://img.shields.io/badge/Figma-화면%20설계%20보기-F24E1E?logo=figma&logoColor=white)](https://www.figma.com/design/VHvp2tvYlxKmvOAORLpNIs/TripRoad?node-id=0-1&t=43wVawkOv7NGf23r-1)
+
 <table>
   <tr>
     <td align="center" width="16.6%">여행 목록 화면</td>
