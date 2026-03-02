@@ -6,7 +6,7 @@
 ![Version](https://img.shields.io/badge/Version-1.5.0-0A84FF) [![App Store](https://img.shields.io/badge/App%20Store-Download-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/kr/app/triproad-%EC%97%AC%ED%96%89%EC%9D%98-%EC%88%9C%EA%B0%84%EC%9D%84-%EA%B8%B0%EB%A1%9D%ED%95%98%EB%8B%A4/id6753877753)
 
 ## 개발 기간
-`YYYY.MM.DD ~ YYYY.MM.DD` (링크/날짜 입력 예정)
+`2025.09.29 ~ 2026.03.03(지속 배포 중)`
 
 ## 목차
 [1. 한 줄 소개](#1-한-줄-소개)  
