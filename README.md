@@ -25,7 +25,10 @@ Firestore 캐시 우선 + Functions 보강
 URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 
 **🖼️ 커스텀 사진 선택기**  
-저화질→고화질 2단계 로딩 + 페이지네이션 + 다중 선택 최적화
+저화질→고화질 2단계 로딩 + 페이지네이션 + 다중 선택 최적화 + 사진 미리보기
+
+**📷 사진 촬영/앨범 반영**  
+카메라 촬영 후 앨범 저장 + `PHPhotoLibraryChangeObserver` 기반 목록 즉시 반영
 
 **🎙️ 음성 메모**  
 녹음/재생 + 단일 오디오 세션 관리 + 인터럽션/라우트 변경 대응
@@ -36,16 +39,20 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 ## 3. 스크린샷
 <table>
   <tr>
-    <td align="center" width="25%">여행 목록 화면</td>
-    <td align="center" width="25%">여행지 설정 화면</td>
-    <td align="center" width="25%">여행 기록 목록 화면</td>
-    <td align="center" width="25%">여행 기록 작성 화면</td>
+    <td align="center" width="16.6%">여행 목록 화면</td>
+    <td align="center" width="16.6%">여행지 설정 화면</td>
+    <td align="center" width="16.6%">도시 선택 화면</td>
+    <td align="center" width="16.6%">여행 기록 목록 화면</td>
+    <td align="center" width="16.6%">여행 기록 작성 화면</td>
+    <td align="center" width="16.6%">사진 선택 화면</td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/TripMock.png" width="210" /></td>
-    <td align="center"><img src="docs/screenshots/TravelMock.png" width="210" /></td>
-    <td align="center"><img src="docs/screenshots/JournalListMock.png" width="210" /></td>
-    <td align="center"><img src="docs/screenshots/JournalAddMock.png" width="210" /></td>
+    <td align="center"><img src="docs/screenshots/TripMock.png" width="160" /></td>
+    <td align="center"><img src="docs/screenshots/TravelMock.png" width="160" /></td>
+    <td align="center"><img src="docs/screenshots/City.png" width="160" /></td>
+    <td align="center"><img src="docs/screenshots/JournalListMock.png" width="160" /></td>
+    <td align="center"><img src="docs/screenshots/JournalAddMock.png" width="160" /></td>
+    <td align="center"><img src="docs/screenshots/photo.png" width="160" /></td>
   </tr>
 </table>
 
@@ -126,10 +133,80 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 - 기준: 실제 녹음/재생 시점에만 세션 활성화, 1초 미만 저장 차단
 
 ### 5) 사진 선택기 로딩 전략 (AsyncStream)
-![Photo Loading Flow](docs/troubleshooting/ts-04-photo-loading-flow.svg)
+![Photo Loading Flow](docs/troubleshooting/photo-loading-flow.svg)
 - 설계 목표: 초기 체감 속도와 최종 화질 동시 확보
 - 선택: `AsyncStream` 저화질 -> 고화질 2단계 전달
 - 선택 이유: 고화질 단건 로딩은 첫 화면 공백/지연이 커서, 저화질 즉시 표시 후 고화질 치환 방식으로 체감 성능과 최종 품질을 함께 확보
 - 정책: iCloud 지연 콜백(nil) 대기 처리, 페이지네이션 + 증분 렌더링
 - iCloud 처리 기준: `image == nil && isInCloud == true`는 실패가 아니라 다운로드 진행 상태로 보고 스트림을 종료하지 않음
 - 기준: 대량 로딩 구간 `reloadData` 최소화, `insertItems` 중심 갱신, 셀 재사용 구간은 `NSCache` hit 우선 사용
+
+## 8. 트러블슈팅
+### 1) 도시 검색 중복/오탐 데이터 유입
+- 문제: query 기반 저장으로 Firestore에 중복/오탐 데이터가 누적됨
+- 원인: 도시 식별 키와 필터 기준이 느슨해 동일 도시가 여러 문서로 저장됨
+- 해결: `place_id`를 문서 키로 고정하고, 입력 정규화 + 도시 타입/국가 필터로 정상 도시만 저장
+- 결과: 중복 문서 생성이 줄고 검색 결과 일관성이 개선됨
+
+### 2) 링크 메타데이터 누락/반복 요청
+- 문제: 오프라인/일시 오류 상황에서 링크 미리보기가 누락되거나 재요청이 반복됨
+- 원인: 실패 상태 추적 필드가 없어 재시도 타이밍을 제어하기 어려웠음
+- 해결: `metadataUpdatedAt`, `fetchFailCount` 도입 + TTL 30일 + 재시도 3회 정책 적용
+- 결과: 불필요 호출이 줄고, 네트워크 복구 시 누락 데이터가 점진적으로 복원됨
+
+### 3) 과거 데이터 도시 이미지 누락
+- 문제: 기존 데이터의 `imageURL/localImageFilename` 누락으로 화면별 이미지 일관성이 깨짐
+- 원인: 스키마 확장 이전 데이터가 신규 이미지 정책을 만족하지 못함
+- 해결: `CityImageBackfillService`에서 Firestore/Functions 보강 후 로컬 파일 저장 + Realm 재기록
+- 결과: 과거 여행 데이터도 동일한 도시 이미지 표시 정책으로 수렴
+
+### 4) 사진 선택기 대량 로딩 크래시/깜빡임
+- 문제: 대량 에셋 구간에서 `reloadData()` 중심 갱신으로 스크롤 중 끊김/깜빡임 발생
+- 원인: 전체 리로드와 중복 요청이 겹치며 메인 스레드 부하가 급증
+- 해결: `performBatchUpdates + insertItems`, AsyncStream 2단계 로딩, `NSCache` 썸네일 캐싱, 스크롤 delegate 기반 중복 호출 제어
+- iCloud 예외 처리: `image == nil && isInCloud == true`는 실패로 종료하지 않고 다음 콜백 대기
+- 결과: 초기 응답성과 최종 화질을 동시에 유지하고, 대량 스크롤 안정성이 개선됨
+
+```swift
+// Before: iCloud 지연(nil) 콜백도 바로 종료되어 이미지 누락 가능
+guard let image = image else { continuation.finish(); return }
+continuation.yield(image)
+```
+
+```swift
+// After: iCloud 지연 상태는 대기, 최종 콜백에서만 finish
+let isInCloud = (info?[PHImageResultIsInCloudKey] as? Bool) ?? false
+if image == nil && isInCloud { return }
+if let image = image { continuation.yield(image) }
+let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+if !isDegraded { continuation.finish() }
+```
+
+### 5) 음성 녹음/재생 세션 충돌
+- 문제: 다중 음성 블록 및 인터럽션 상황에서 녹음/재생 상태 충돌
+- 원인: 세션 활성/비활성 타이밍이 분산되어 이벤트 순서에 따라 상태가 꼬임
+- 해결: `AudioCoordinator` 단일 세션 제어 + 인터럽션/라우트 변경 시 `stopAll()` 규칙화
+- 결과: 예외 상황에서도 재현성 있는 동작으로 녹음/재생 안정성이 향상됨
+
+```swift
+// 핵심: 재생/녹음 시작 시점에만 세션 활성화
+func activateAudioSession() -> Bool {
+    let session = AVAudioSession.sharedInstance()
+    do {
+        try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+        try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker])
+        try session.setActive(true)
+        isAudioSessionActive = true
+        return true
+    } catch {
+        return false
+    }
+}
+```
+
+```swift
+// 핵심: 인터럽션/라우트 변경 시 안전 중지
+@objc private func handleRouteChange(_ noti: Notification) {
+    stopAll()
+}
+```
