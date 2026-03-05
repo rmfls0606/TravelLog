@@ -105,7 +105,7 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 
 ### 3) 도시 이미지 백필 + 로컬 우선 렌더링
 - 기술 목표: 과거 데이터/오프라인에서도 이미지 표시 일관성 유지
-- 설계/구현: BackfillService로 원격 보강 후 로컬 파일 저장 및 Realm 갱신
+- 설계/구현: BackfillService에서 `Kingfisher cache/retrieveImage` 우선 시도 후, 실패 시 `Data` 직접 다운로드 fallback으로 로컬 파일 저장 및 Realm 갱신
 - 핵심 포인트: `localImageFilename` 우선 렌더링으로 네트워크 의존도 축소
 
 ### 4) 커스텀 사진 선택기
