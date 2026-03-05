@@ -421,6 +421,16 @@ final class CityImageBackfillService {
             }
         }
 
+        // Kingfisher 경로가 실패한 경우 마지막으로 원본 Data 직접 다운로드 시도
+        if let directData = fetchImageDataDirectly(from: remoteURL), !directData.isEmpty {
+            do {
+                try directData.write(to: targetURL, options: .atomic)
+                return filename
+            } catch {
+                return nil
+            }
+        }
+
         return nil
     }
 
@@ -496,6 +506,24 @@ final class CityImageBackfillService {
         _ = semaphore.wait(timeout: .now() + 10.0)
         _ = failureMessage
         return image
+    }
+
+    private func fetchImageDataDirectly(from url: URL) -> Data? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var resultData: Data?
+
+        let task = URLSession.shared.dataTask(with: url) { data, response, error in
+            defer { semaphore.signal() }
+            guard error == nil else { return }
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return }
+            guard let data, !data.isEmpty else { return }
+            resultData = data
+        }
+
+        task.resume()
+        _ = semaphore.wait(timeout: .now() + 10.0)
+        task.cancel()
+        return resultData
     }
 
     private func imageFromKingfisherCache(rawKey: String, normalizedURL: URL) -> UIImage? {
