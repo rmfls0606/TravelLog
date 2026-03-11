@@ -15,6 +15,8 @@ final class DestinationSelectorViewController: BaseViewController {
     private let viewModel = DestinationViewModel()
     
     let selectedCity = PublishRelay<City>()
+
+    private var currentQuery: String = ""
     
     private let searchField: UITextField = {
         let field = UITextField()
@@ -54,6 +56,35 @@ final class DestinationSelectorViewController: BaseViewController {
         table.rowHeight = 100
         return table
     }()
+
+    private let sectionHeaderView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .clear
+        return view
+    }()
+
+    private let sectionBadgeView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        view.layer.cornerRadius = 8
+        return view
+    }()
+
+    private let sectionBadgeLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 10, weight: .bold)
+        label.textColor = .systemBlue
+        label.text = "POPULAR"
+        return label
+    }()
+
+    private let sectionTitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        label.textColor = .black
+        label.text = "인기 도시"
+        return label
+    }()
     
     private lazy var emptyView = EmptyView(
         iconName: "magnifyingglass",
@@ -66,6 +97,10 @@ final class DestinationSelectorViewController: BaseViewController {
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(searchField)
+        view.addSubview(sectionHeaderView)
+        sectionHeaderView.addSubview(sectionBadgeView)
+        sectionBadgeView.addSubview(sectionBadgeLabel)
+        sectionHeaderView.addSubview(sectionTitleLabel)
         view.addSubview(tableView)
         view.addGestureRecognizer(tapGesture)
     }
@@ -78,8 +113,30 @@ final class DestinationSelectorViewController: BaseViewController {
             make.height.equalTo(44)
         }
         
-        tableView.snp.makeConstraints { make in
+        sectionHeaderView.snp.makeConstraints { make in
             make.top.equalTo(searchField.snp.bottom).offset(16)
+            make.horizontalEdges.equalToSuperview().inset(16)
+        }
+
+        sectionBadgeView.snp.makeConstraints { make in
+            make.top.bottom.equalToSuperview()
+            make.leading.equalTo(sectionTitleLabel.snp.trailing).offset(8)
+            make.trailing.lessThanOrEqualToSuperview()
+            make.height.equalTo(18)
+        }
+
+        sectionBadgeLabel.snp.makeConstraints { make in
+            make.verticalEdges.equalToSuperview().inset(3)
+            make.horizontalEdges.equalToSuperview().inset(7)
+        }
+
+        sectionTitleLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview()
+            make.centerY.equalTo(sectionBadgeView)
+        }
+
+        tableView.snp.makeConstraints { make in
+            make.top.equalTo(sectionHeaderView.snp.bottom).offset(8)
             make.horizontalEdges.equalToSuperview()
             make.bottom.equalToSuperview()
         }
@@ -90,6 +147,7 @@ final class DestinationSelectorViewController: BaseViewController {
         navigationItem.title = "여행 도시 선택"
         view.backgroundColor = .systemGray6
         tapGesture.cancelsTouchesInView = false
+        sectionHeaderView.isHidden = true
         tableView.register(CityTableViewCell.self, forCellReuseIdentifier: CityTableViewCell.identifier)
         tableView.register(CityShimmerTableViewCell.self,
                            forCellReuseIdentifier: CityShimmerTableViewCell.identifier)
@@ -123,9 +181,18 @@ final class DestinationSelectorViewController: BaseViewController {
                 }
             }
             .disposed(by: disposeBag)
+
+        searchField.rx.text.orEmpty
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .distinctUntilChanged()
+            .bind(with: self) { owner, query in
+                owner.currentQuery = query
+            }
+            .disposed(by: disposeBag)
         
         output.state
             .drive(with: self) { owner, state in
+                owner.updateSectionHeader(for: state)
                 switch state {
                 case .idle:
                     owner.emptyView.configure(
@@ -172,5 +239,27 @@ final class DestinationSelectorViewController: BaseViewController {
                 owner.view.endEditing(true)
             }
             .disposed(by: disposeBag)
+    }
+
+    private func updateSectionHeader(for state: SearchState) {
+        let isSearching = !currentQuery.isEmpty
+
+        switch state {
+        case .loading, .result:
+            sectionHeaderView.isHidden = false
+            if isSearching {
+                sectionBadgeLabel.text = "RESULT"
+                sectionBadgeView.backgroundColor = UIColor.systemTeal.withAlphaComponent(0.1)
+                sectionBadgeLabel.textColor = .systemTeal
+                sectionTitleLabel.text = "검색 결과"
+            } else {
+                sectionBadgeLabel.text = "POPULAR"
+                sectionBadgeView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+                sectionBadgeLabel.textColor = .systemBlue
+                sectionTitleLabel.text = "인기 도시"
+            }
+        case .idle, .empty, .offline:
+            sectionHeaderView.isHidden = true
+        }
     }
 }
