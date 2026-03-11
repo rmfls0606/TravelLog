@@ -55,6 +55,16 @@ final class DestinationViewModel {
                 guard let self else { return .just(.idle) }
 
                 if query.isEmpty {
+                    let hasExistingPopularCities = !itemsRelay.value.isEmpty &&
+                    itemsRelay.value.contains {
+                        if case .city = $0 { return true }
+                        return false
+                    }
+
+                    if !hasExistingPopularCities && SimpleNetworkState.shared.isConnected {
+                        itemsRelay.accept(Array(repeating: .skeleton, count: 5))
+                    }
+
                     return Observable.just(.loading)
                         .concat(
                             self.fetchCitiesUseCase.fetchPopularCities(limit: 6)
