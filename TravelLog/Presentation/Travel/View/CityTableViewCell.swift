@@ -24,6 +24,8 @@ final class CityTableViewCell: BaseTableViewCell {
         view.contentMode = .scaleAspectFill
         view.backgroundColor = .lightGray
         view.clipsToBounds = true
+        view.layer.borderWidth = 1.0
+        view.layer.borderColor = UIColor.systemGray6.cgColor
         return view
     }()
     
