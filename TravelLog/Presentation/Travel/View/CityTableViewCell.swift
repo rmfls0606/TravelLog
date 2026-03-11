@@ -15,7 +15,6 @@ final class CityTableViewCell: BaseTableViewCell {
     private let cityContentView: UIView = {
         let view = UIView()
         view.backgroundColor = .white
-        view.layer.cornerRadius = 12
         view.clipsToBounds = true
         return view
     }()
@@ -23,7 +22,6 @@ final class CityTableViewCell: BaseTableViewCell {
     private let cityThumbnailView: UIImageView = {
         let view = UIImageView()
         view.contentMode = .scaleAspectFill
-        view.layer.cornerRadius = 12
         view.backgroundColor = .lightGray
         view.clipsToBounds = true
         return view
@@ -31,14 +29,14 @@ final class CityTableViewCell: BaseTableViewCell {
     
     private let cityLabel: UILabel = {
         let label = UILabel()
-        label.font = .boldSystemFont(ofSize: 16)
+        label.font = .boldSystemFont(ofSize: 14)
         label.textColor = .black
         return label
     }()
     
     private let countryLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 14)
+        label.font = .systemFont(ofSize: 12)
         label.textColor = .gray
         return label
     }()
@@ -74,6 +72,15 @@ final class CityTableViewCell: BaseTableViewCell {
         contentView.addSubview(cityContentView)
     }
     
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        contentView.layoutIfNeeded()
+        cityContentView.layoutIfNeeded()
+        
+        cityThumbnailView.layer.cornerRadius = cityThumbnailView.bounds.height / 2
+    }
+    
     override func configureLayout() {
         cityContentView.snp.makeConstraints { make in
             make.horizontalEdges.equalToSuperview().inset(16)
@@ -81,15 +88,16 @@ final class CityTableViewCell: BaseTableViewCell {
         }
         
         cityThumbnailView.snp.makeConstraints { make in
-            make.leading.verticalEdges.equalToSuperview().inset(16)
+            make.leading.verticalEdges.equalToSuperview()/*.inset(16)*/
             make.width.equalTo(cityThumbnailView.snp.height)
         }
         
         stackView.snp.makeConstraints {
-            $0.leading.equalTo(cityThumbnailView.snp.trailing).offset(16)
-            $0.trailing.equalToSuperview().inset(16)
+            $0.leading.equalTo(cityThumbnailView.snp.trailing).offset(8)
+            $0.trailing.lessThanOrEqualTo(chevronIcon.snp.leading).offset(-12)
             $0.centerY.equalToSuperview()
         }
+        
         chevronIcon.snp.makeConstraints {
             $0.centerY.equalToSuperview()
             $0.trailing.equalToSuperview().inset(16)
@@ -98,7 +106,7 @@ final class CityTableViewCell: BaseTableViewCell {
     }
     
     override func configureView() {
-        backgroundColor = .systemGray6
+        backgroundColor = .white
         selectionStyle = .none
     }
     
@@ -122,7 +130,7 @@ final class CityTableViewCell: BaseTableViewCell {
         
         cityLabel.text = formattedCity
         countryLabel.text = "\(city.country)"
-    
+        
         if let imageUrl = city.imageUrl,
            let url = URL(string: imageUrl){
             cityThumbnailView.kf.setImage(with: url)
