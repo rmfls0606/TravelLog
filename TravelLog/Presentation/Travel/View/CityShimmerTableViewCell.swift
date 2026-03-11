@@ -12,14 +12,12 @@ final class CityShimmerTableViewCell: BaseTableViewCell {
     private let cityContentView: UIView = {
         let view = UIView()
         view.backgroundColor = .white
-        view.layer.cornerRadius = 12
         view.clipsToBounds = true
         return view
     }()
 
     private let thumbnailShimmer: ShimmerView = {
         let view = ShimmerView()
-        view.layer.cornerRadius = 12
         view.clipsToBounds = true
         return view
     }()
@@ -54,6 +52,15 @@ final class CityShimmerTableViewCell: BaseTableViewCell {
     }()
 
     // MARK: - Lifecycle
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        contentView.layoutIfNeeded()
+        cityContentView.layoutIfNeeded()
+        
+        thumbnailShimmer.layer.cornerRadius = thumbnailShimmer.frame.height / 2
+    }
+
     override func configureHierarchy() {
 
         stackView.addArrangedSubview(titleShimmer)
@@ -74,7 +81,7 @@ final class CityShimmerTableViewCell: BaseTableViewCell {
         }
 
         thumbnailShimmer.snp.makeConstraints { make in
-            make.leading.verticalEdges.equalToSuperview().inset(16)
+            make.leading.verticalEdges.equalToSuperview()
             make.width.equalTo(thumbnailShimmer.snp.height)
         }
 
@@ -102,7 +109,7 @@ final class CityShimmerTableViewCell: BaseTableViewCell {
     }
 
     override func configureView() {
-        backgroundColor = .systemGray6
+        backgroundColor = .white
         selectionStyle = .none
     }
     
