@@ -269,41 +269,50 @@ final class FirebaseCityDataSource: CityDataSource {
 
     func fetchPopularCities(limit: Int) -> Single<[City]> {
         Single.create { single in
+            var cancelled = false
             let query = self.db.collection(self.collection)
                 .order(by: "popularityCount", descending: true)
                 .limit(to: limit)
 
             query.getDocuments(source: .cache) { snapshot, cacheError in
+                if cancelled { return }
                 let cached = self.decode(snapshot?.documents ?? [])
                     .filter { ($0.popularityCount ?? 0) > 0 }
 
-                if !cached.isEmpty {
-                    single(.success(cached))
-                    return
-                }
-
                 if !SimpleNetworkState.shared.isConnected {
-                    if let cacheError {
+                    if let cacheError, cached.isEmpty {
                         single(.failure(cacheError))
                     } else {
-                        single(.success([]))
+                        single(.success(cached))
                     }
                     return
                 }
 
+                if cached.count >= limit {
+                    single(.success(cached))
+                    return
+                }
+
                 query.getDocuments(source: .default) { snapshot, error in
+                    if cancelled { return }
                     if let error {
-                        single(.failure(error))
+                        if !cached.isEmpty {
+                            single(.success(cached))
+                        } else {
+                            single(.failure(error))
+                        }
                         return
                     }
 
                     let cities = self.decode(snapshot?.documents ?? [])
                         .filter { ($0.popularityCount ?? 0) > 0 }
-                    single(.success(cities))
+                    single(.success(cities.isEmpty ? cached : cities))
                 }
             }
 
-            return Disposables.create()
+            return Disposables.create {
+                cancelled = true
+            }
         }
     }
 
