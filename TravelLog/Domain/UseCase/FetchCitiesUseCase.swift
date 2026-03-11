@@ -10,4 +10,5 @@ import RxSwift
 
 protocol FetchCitiesUseCase {
     func execute(query: String) -> Single<[City]>
+    func fetchPopularCities(limit: Int) -> Single<[City]>
 }

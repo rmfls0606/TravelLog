@@ -26,7 +26,6 @@ enum SearchState {
 final class DestinationViewModel {
     private let disposeBag = DisposeBag()
     private let fetchCitiesUseCase: FetchCitiesUseCaseImpl
-    private let increasePopularityUseCase: IncreaseCityPopularityUseCase
     
     init() {
         let local = FirebaseCityDataSource()
@@ -34,7 +33,6 @@ final class DestinationViewModel {
         let repo = CityRepositoryImpl(local: local, remote: remote)
         
         self.fetchCitiesUseCase = FetchCitiesUseCaseImpl(repository: repo)
-        self.increasePopularityUseCase = IncreaseCityPopularityUseCaseImpl(repository: repo)
     }
     
     struct Input {
@@ -57,8 +55,23 @@ final class DestinationViewModel {
                 guard let self else { return .just(.idle) }
 
                 if query.isEmpty {
-                    itemsRelay.accept([])
-                    return .just(.idle)
+                    return Observable.just(.loading)
+                        .concat(
+                            self.fetchCitiesUseCase.fetchPopularCities(limit: 6)
+                                .asObservable()
+                                .map { cities -> SearchState in
+                                    itemsRelay.accept(cities.map { .city($0) })
+                                    return cities.isEmpty ? .idle : .result
+                                }
+                                .catch { error in
+                                    if case CitySearchError.offline = error {
+                                        itemsRelay.accept([])
+                                        return .just(.offline)
+                                    }
+                                    itemsRelay.accept([])
+                                    return .just(.idle)
+                                }
+                        )
                 }
 
                 let hasExistingResults = !itemsRelay.value.isEmpty &&

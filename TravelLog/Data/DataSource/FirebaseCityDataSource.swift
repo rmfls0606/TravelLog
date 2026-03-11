@@ -27,6 +27,39 @@ final class FirebaseCityDataSource: CityDataSource {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
+    private func asDouble(_ value: Any?) -> Double? {
+        if let number = value as? NSNumber { return number.doubleValue }
+        if let double = value as? Double { return double }
+        if let int = value as? Int { return Double(int) }
+        if let string = value as? String { return Double(string) }
+        return nil
+    }
+
+    private func decode(_ docs: [QueryDocumentSnapshot]) -> [City] {
+        docs.compactMap { doc in
+            let data = doc.data()
+            let lat = asDouble(data["lat"])
+            let lng = asDouble(data["lng"])
+            guard
+                let name = data["name"] as? String,
+                let country = data["country"] as? String,
+                let lat,
+                let lng
+            else { return nil }
+
+            var city = City(
+                cityId: doc.documentID,
+                name: name,
+                country: country,
+                lat: lat,
+                lng: lng,
+                imageUrl: (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
+            )
+            city.popularityCount = data["popularityCount"] as? Int
+            return city
+        }
+    }
+
     private func rank(city: City, queryLower: String) -> Int {
         let name = normalized(city.name)
         let country = normalized(city.country)
@@ -59,39 +92,6 @@ final class FirebaseCityDataSource: CityDataSource {
 
         let end = lower + "\u{f8ff}"
 
-        func asDouble(_ value: Any?) -> Double? {
-            if let number = value as? NSNumber { return number.doubleValue }
-            if let double = value as? Double { return double }
-            if let int = value as? Int { return Double(int) }
-            if let string = value as? String { return Double(string) }
-            return nil
-        }
-
-        func decode(_ docs: [QueryDocumentSnapshot]) -> [City] {
-            docs.compactMap { doc in
-                let data = doc.data()
-                let lat = asDouble(data["lat"])
-                let lng = asDouble(data["lng"])
-                guard
-                    let name = data["name"] as? String,
-                    let country = data["country"] as? String,
-                    let lat,
-                    let lng
-                else { return nil }
-
-                var city = City(
-                    cityId: doc.documentID,
-                    name: name,
-                    country: country,
-                    lat: lat,
-                    lng: lng,
-                    imageUrl: (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
-                )
-                city.popularityCount = data["popularityCount"] as? Int
-                return city
-            }
-        }
-
         func mergeUnique(_ a: [City], _ b: [City]) -> [City] {
             var map: [String: City] = [:]
             a.forEach { map[$0.cityId] = $0 }
@@ -121,7 +121,7 @@ final class FirebaseCityDataSource: CityDataSource {
                         }
                         return
                     }
-                    byNameLower = decode(snap?.documents ?? [])
+                    byNameLower = self.decode(snap?.documents ?? [])
                 }
 
             group.enter()
@@ -138,7 +138,7 @@ final class FirebaseCityDataSource: CityDataSource {
                         }
                         return
                     }
-                    byCountryLower = decode(snap?.documents ?? [])
+                    byCountryLower = self.decode(snap?.documents ?? [])
                 }
 
             // 하위호환: 과거 문서(nameLower/countryLower 미존재)도 prefix 검색에 포함
@@ -156,7 +156,7 @@ final class FirebaseCityDataSource: CityDataSource {
                         }
                         return
                     }
-                    byNameLegacy = decode(snap?.documents ?? [])
+                    byNameLegacy = self.decode(snap?.documents ?? [])
                 }
 
             group.enter()
@@ -173,7 +173,7 @@ final class FirebaseCityDataSource: CityDataSource {
                         }
                         return
                     }
-                    byCountryLegacy = decode(snap?.documents ?? [])
+                    byCountryLegacy = self.decode(snap?.documents ?? [])
                 }
 
             group.notify(queue: workQueue) {
@@ -267,7 +267,66 @@ final class FirebaseCityDataSource: CityDataSource {
         }
     }
 
+    func fetchPopularCities(limit: Int) -> Single<[City]> {
+        Single.create { single in
+            let query = self.db.collection(self.collection)
+                .order(by: "popularityCount", descending: true)
+                .limit(to: limit)
+
+            query.getDocuments(source: .cache) { snapshot, cacheError in
+                let cached = self.decode(snapshot?.documents ?? [])
+                    .filter { ($0.popularityCount ?? 0) > 0 }
+
+                if !cached.isEmpty {
+                    single(.success(cached))
+                    return
+                }
+
+                if !SimpleNetworkState.shared.isConnected {
+                    if let cacheError {
+                        single(.failure(cacheError))
+                    } else {
+                        single(.success([]))
+                    }
+                    return
+                }
+
+                query.getDocuments(source: .default) { snapshot, error in
+                    if let error {
+                        single(.failure(error))
+                        return
+                    }
+
+                    let cities = self.decode(snapshot?.documents ?? [])
+                        .filter { ($0.popularityCount ?? 0) > 0 }
+                    single(.success(cities))
+                }
+            }
+
+            return Disposables.create()
+        }
+    }
+
     func fetchCity(by cityId: String) -> Single<City?> { fatalError() }
     func save(city: City) -> Single<Void> { fatalError() }
-    func incrementPopularity(cityId: String) -> Single<Void> { fatalError() }
+    func incrementPopularity(cityId: String) -> Single<Void> {
+        Single.create { single in
+            print("Attempting city popularity increment for cityId:", cityId)
+            self.db.collection(self.collection)
+                .document(cityId)
+                .updateData([
+                    "popularityCount": FieldValue.increment(Int64(1))
+                ]) { error in
+                    if let error {
+                        print("City popularity increment failed:", error.localizedDescription)
+                        single(.failure(error))
+                        return
+                    }
+                    print("City popularity increment succeeded for cityId:", cityId)
+                    single(.success(()))
+                }
+
+            return Disposables.create()
+        }
+    }
 }

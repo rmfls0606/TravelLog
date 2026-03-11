@@ -17,15 +17,23 @@ final class TravelAddViewModel: BaseViewModel {
     private let destinationRelay = PublishRelay<CityTable>()
     
     private let createTripUseCase: CreateTripUseCase
+    private let increaseCityPopularityUseCase: IncreaseCityPopularityUseCase
     
     private let disposeBag = DisposeBag()
     
     init(
         createTripUseCase: CreateTripUseCase = CreateTripUseCaseImpl(
             repository: TripRepositoryImpl()
+        ),
+        increaseCityPopularityUseCase: IncreaseCityPopularityUseCase = IncreaseCityPopularityUseCaseImpl(
+            repository: CityRepositoryImpl(
+                local: FirebaseCityDataSource(),
+                remote: FunctionsCityRemoteDataSource(region: "us-central1")
+            )
         )
     ) {
         self.createTripUseCase = createTripUseCase
+        self.increaseCityPopularityUseCase = increaseCityPopularityUseCase
     }
     
     struct Input{
@@ -82,6 +90,13 @@ final class TravelAddViewModel: BaseViewModel {
                     endDate: end,
                     transport: transport
                 )
+                .andThen(
+                    self.increasePopularityIfNeeded(for: dest)
+                        .catch { error in
+                            print("City popularity increase failed:", error.localizedDescription)
+                            return .empty()
+                        }
+                )
                 .andThen(Observable.just(.success(())))
                 .catch { error in
                     return Observable.just(.failure(.saveFailure))
@@ -127,5 +142,15 @@ final class TravelAddViewModel: BaseViewModel {
     func updateDestination(_ city: CityTable) {
         destinationRelay.accept(city)
     }
-}
 
+    private func increasePopularityIfNeeded(for city: CityTable) -> Completable {
+        guard let cityDocId = city.cityDocId, !cityDocId.isEmpty else {
+            print("City popularity increment skipped: missing cityDocId for city \(city.name)")
+            return .empty()
+        }
+
+        print("City popularity increment queued for city \(city.name), cityDocId: \(cityDocId)")
+        return increaseCityPopularityUseCase.execute(cityId: cityDocId)
+            .asCompletable()
+    }
+}

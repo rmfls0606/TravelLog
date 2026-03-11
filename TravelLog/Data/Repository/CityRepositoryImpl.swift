@@ -20,6 +20,10 @@ final class CityRepositoryImpl: CityRepository {
     func searchLocal(query: String) -> Single<[City]> {
             local.search(query: query)
         }
+
+        func fetchPopularCities(limit: Int) -> Single<[City]> {
+            local.fetchPopularCities(limit: limit)
+        }
         
         func searchRemote(query: String) -> Single<[City]> {
             remote.search(query: query)

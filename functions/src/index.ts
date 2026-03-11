@@ -171,6 +171,9 @@ async function getOrCreateCityByPlaceId(
   apiKey: string,
   query: string
 ): Promise<CityDoc | null> {
+  const existingSnap = await db.collection("cities").doc(placeId).get();
+  const existingData = existingSnap.data() as CityDoc | undefined;
+
   const detailsRes = await axios.get(
     "https://maps.googleapis.com/maps/api/place/details/json",
     {
@@ -273,7 +276,7 @@ async function getOrCreateCityByPlaceId(
     lng,
     imageUrl: imageUrl,
     updatedAt: Date.now(),
-    popularityCount: 0,
+    popularityCount: existingData?.popularityCount ?? 0,
   };
 
   await db.collection("cities").doc(placeId).set(doc, {merge: true});
