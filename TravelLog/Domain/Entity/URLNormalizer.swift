@@ -13,6 +13,16 @@ struct NormalizedURLResult {
 }
 
 enum URLNormalizer {
+    private static let genericTLDs: Set<String> = [
+        "com", "net", "org", "edu", "gov", "mil", "int",
+        "biz", "info", "name", "pro", "aero", "asia", "cat", "coop", "jobs", "mobi", "museum", "tel", "travel",
+        "app", "dev", "io", "ai", "me", "tv", "gg", "xyz", "site", "online", "store", "shop", "blog", "tech",
+        "cloud", "club", "agency", "media", "news", "live", "today", "world", "wiki", "services", "digital",
+        "company", "center", "email", "group", "network", "solutions", "systems", "software", "studio", "design"
+    ]
+
+    private static let countryCodeTLDs: Set<String> = Set(Locale.isoRegionCodes.map { $0.lowercased() })
+
     static func normalized(_ raw: String?) -> NormalizedURLResult? {
         guard var raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
               !raw.isEmpty else {
@@ -42,8 +52,16 @@ enum URLNormalizer {
 
     /// 도메인 패턴 유효성 검사
     private static func hasValidDomain(_ url: URL) -> Bool {
-        guard let host = url.host else { return false }
-        let domainPattern = #"[a-zA-Z0-9-]+\.[a-zA-Z]{2,}"#
-        return host.range(of: domainPattern, options: .regularExpression) != nil
+        guard let host = url.host?.lowercased() else { return false }
+        let labels = host.split(separator: ".")
+
+        guard labels.count >= 2 else { return false }
+        let domainPattern = #"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"#
+        guard host.range(of: domainPattern, options: .regularExpression) != nil else {
+            return false
+        }
+
+        guard let tld = labels.last.map(String.init) else { return false }
+        return genericTLDs.contains(tld) || countryCodeTLDs.contains(tld)
     }
 }
