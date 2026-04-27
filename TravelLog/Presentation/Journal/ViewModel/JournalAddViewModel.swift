@@ -99,6 +99,9 @@ final class JournalAddViewModel: BaseViewModel {
                 
                 let metadataFetches: [Single<JournalBlockData>] = validBlocks.map { block in
                     if block.type == .link, let urlString = block.linkURL {
+                        if block.linkTitle != nil || block.linkDescription != nil || block.linkImage != nil {
+                            return .just(block)
+                        }
                         return self.fetchLinkMetadata(for: urlString)
                             .map { title, desc, image in
                                 var newBlock = block
@@ -146,6 +149,11 @@ final class JournalAddViewModel: BaseViewModel {
         return Single.create { single in
             // URL 정규화
             guard let normalized = URLNormalizer.normalized(urlString) else {
+                single(.success((nil, nil, nil)))
+                return Disposables.create()
+            }
+
+            guard normalized.isValidDomain else {
                 single(.success((nil, nil, nil)))
                 return Disposables.create()
             }
