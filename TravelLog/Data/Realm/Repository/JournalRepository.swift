@@ -79,7 +79,7 @@ final class JournalRepository: JournalRepositoryType {
                     block.linkTitle = linkTitle
                     block.linkDescription = linkDescription
                     
-                    // TTL 관리
+                    // 정상 도메인만 네트워크 복구 후 메타데이터 재시도 대상에 포함
                     if let normalized = normalizedResult {
                         if normalized.isValidDomain {
                             block.metadataUpdatedAt = nil
