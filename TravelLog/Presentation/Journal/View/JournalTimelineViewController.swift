@@ -96,8 +96,6 @@ final class JournalTimelineViewController: BaseViewController {
         if let tripId = trip?.id {
             // 네트워크 복구 시: 최초 미시도만 복구(오늘 몇 번 와도 중복 호출 안 나게 NWPathMonitor가 보장)
             NetworkMonitor.shared.startMonitoring(for: tripId)
-            // TTL: 오늘은 한 번만, 30일 지난 데이터들만 갱신
-            AppLifecycleManager.shared.refreshExpiredLinkMetadataIfNeeded(for: tripId)
         }
     }
     
