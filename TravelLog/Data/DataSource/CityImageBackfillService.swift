@@ -113,6 +113,8 @@ final class CityImageBackfillService {
         var foundDocId: String? = item.cityDocId
         var resolvedImageURL: String? = item.imageURL
         var filename: String?
+        let previousImageURL = item.imageURL
+        let previousLocalFilename = item.localImageFilename
 
         // 1) imageURL가 이미 있으면 먼저 로컬 파일 백필 시도 (Kingfisher -> Data)
         if !forceRemote, let existingURL = resolvedImageURL, !existingURL.isEmpty {
@@ -151,8 +153,14 @@ final class CityImageBackfillService {
             _ = resolveURLOnce()
         }
 
-        guard var finalURL = resolvedImageURL else {
+        guard let finalURL = resolvedImageURL else {
             return
+        }
+
+        let didImageChange = previousImageURL != finalURL
+        if forceRemote && didImageChange, let previousLocalFilename {
+            removeLocalCityImageIfExists(filename: previousLocalFilename)
+            filename = nil
         }
 
         // 4) 아직 local 파일이 없으면 최종 URL로 다시 시도
@@ -174,6 +182,8 @@ final class CityImageBackfillService {
                 target.imageURL = finalURL
                 if let filename {
                     target.localImageFilename = filename
+                } else if forceRemote && didImageChange {
+                    target.localImageFilename = nil
                 }
                 target.lastUpdated = Date()
             }
@@ -451,6 +461,13 @@ final class CityImageBackfillService {
             try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: nil)
         }
         return directory
+    }
+
+    private func removeLocalCityImageIfExists(filename: String) {
+        guard let directory = cityImageDirectoryURL() else { return }
+        let fileURL = directory.appendingPathComponent(filename)
+        guard fileManager.fileExists(atPath: fileURL.path) else { return }
+        try? fileManager.removeItem(at: fileURL)
     }
 
     private func sanitizeFilename(_ value: String) -> String {
