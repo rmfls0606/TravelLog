@@ -11,8 +11,9 @@ import {setGlobalOptions} from "firebase-functions";
 // import {onRequest} from "firebase-functions/https";
 // import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import {onCall} from "firebase-functions/v2/https";
+import {onCall, onRequest} from "firebase-functions/v2/https";
 import axios from "axios";
+import {getDownloadURL, getStorage} from "firebase-admin/storage";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -83,6 +84,128 @@ function normalizeCityName(name: string): string {
     .replace(/군$/, "")
     .replace(/구$/, "")
     .trim();
+}
+
+function projectId(): string | null {
+  return process.env.GCLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    admin.app().options.projectId ||
+    null;
+}
+
+function storageBucketName(): string | null {
+  return process.env.FIREBASE_STORAGE_BUCKET ||
+    admin.app().options.storageBucket ||
+    (projectId() ? `${projectId()}.firebasestorage.app` : null);
+}
+
+function makePhotoProxyURL(photoReference: string): string | null {
+  const currentProjectId = projectId();
+  if (!currentProjectId || !photoReference) return null;
+  const encodedPhotoReference = encodeURIComponent(photoReference);
+  return `https://us-central1-${currentProjectId}.cloudfunctions.net/` +
+    `cityPhotoProxy?photoReference=${encodedPhotoReference}`;
+}
+
+function pickRepresentativePhotoReference(photos: any[] | undefined): string | null {
+  if (!Array.isArray(photos) || photos.length === 0) return null;
+
+  const firstPhoto = photos.find(
+    (photo) => typeof photo?.photo_reference === "string" && photo.photo_reference
+  );
+  return firstPhoto?.photo_reference ?? null;
+}
+
+function pickBestDetailsPhotoReference(photos: any[] | undefined): string | null {
+  if (!Array.isArray(photos) || photos.length === 0) return null;
+
+  const bestPhoto = [...photos]
+    .sort((a: any, b: any) => (b.width ?? 0) - (a.width ?? 0))[0];
+
+  return bestPhoto?.photo_reference ?? null;
+}
+
+async function searchFallbackPhotoReference(
+  cityName: string,
+  apiKey: string
+): Promise<string | null> {
+  const queries = [
+    `${cityName} 랜드마크`,
+  ];
+
+  for (const query of queries) {
+    const searchRes = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/textsearch/json",
+      {
+        params: {
+          query,
+          region: "kr",
+          language: "ko",
+          key: apiKey,
+        },
+      }
+    );
+
+    if (searchRes.data?.status !== "OK") {
+      continue;
+    }
+
+    const places = searchRes.data.results ?? [];
+    const candidate = places.find((place: any) =>
+      place?.types?.includes("tourist_attraction") &&
+      Array.isArray(place?.photos) &&
+      place.photos.length > 0
+    );
+
+    const photoRef = pickRepresentativePhotoReference(candidate?.photos);
+    if (photoRef) {
+      return photoRef;
+    }
+  }
+
+  return null;
+}
+
+async function persistCityPhotoToStorage(
+  placeId: string,
+  photoReference: string,
+  apiKey: string
+): Promise<string | null> {
+  const bucketName = storageBucketName();
+  if (!bucketName) return null;
+
+  const bucket = getStorage().bucket(bucketName);
+  const file = bucket.file(`city-images/${placeId}.jpg`);
+
+  try {
+    const photoResponse = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/photo",
+      {
+        params: {
+          maxwidth: 1600,
+          photo_reference: photoReference,
+          key: apiKey,
+        },
+        responseType: "arraybuffer",
+        validateStatus: (status) => status >= 200 && status < 400,
+      }
+    );
+
+    const buffer = Buffer.from(photoResponse.data);
+    if (buffer.length === 0) return null;
+
+    await file.save(buffer, {
+      resumable: false,
+      metadata: {
+        contentType: photoResponse.headers["content-type"] || "image/jpeg",
+        cacheControl: "public,max-age=31536000,immutable",
+      },
+    });
+
+    return await getDownloadURL(file);
+  } catch {
+    return null;
+  }
 }
 
 function isSubCitySuffixQuery(q: string): boolean {
@@ -228,42 +351,15 @@ async function getOrCreateCityByPlaceId(
 
   let imageUrl: string | null = null;
 
-  // 1️⃣ 도시 자체 photos 우선
-  if (details.photos?.length > 0) {
-    const bestPhoto = details.photos
-      .sort((a: any, b: any) => (b.width ?? 0) - (a.width ?? 0))[0];
-
-    const photoRef = bestPhoto.photo_reference;
-
-    imageUrl =
-      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${photoRef}&key=${apiKey}`;
+  let photoRef = pickBestDetailsPhotoReference(details.photos);
+  if (!photoRef) {
+    photoRef = await searchFallbackPhotoReference(name, apiKey);
   }
 
-  // 2️⃣ 도시 사진이 없으면 랜드마크 검색
-  if (!imageUrl) {
-    const landmarkRes = await axios.get(
-      "https://maps.googleapis.com/maps/api/place/textsearch/json",
-      {
-        params: {
-          query: `${name} 랜드마크`,
-          region: "kr",
-          language: "ko",
-          key: apiKey,
-        },
-      }
-    );
-
-    if (landmarkRes.data?.status === "OK") {
-      const landmark = landmarkRes.data.results?.find((r: any) =>
-        r.types?.includes("tourist_attraction")
-      );
-
-      if (landmark?.photos?.length > 0) {
-        const photoRef = landmark.photos[0].photo_reference;
-
-        imageUrl =
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photo_reference=${photoRef}&key=${apiKey}`;
-      }
+  if (photoRef) {
+    imageUrl = await persistCityPhotoToStorage(placeId, photoRef, apiKey);
+    if (!imageUrl) {
+      imageUrl = makePhotoProxyURL(photoRef);
     }
   }
   const doc: CityDoc = {
@@ -353,6 +449,49 @@ export const searchCity = onCall(async (request) => {
 // In the v1 API, each function can only serve one request per container, so
 // this will be the maximum concurrent request count.
 setGlobalOptions({maxInstances: 10});
+
+export const cityPhotoProxy = onRequest(async (request, response) => {
+  const photoReference = String(request.query.photoReference ?? "").trim();
+  const apiKey = process.env.GOOGLE_API_KEY;
+
+  if (!photoReference) {
+    response.status(400).send("Missing photoReference");
+    return;
+  }
+
+  if (!apiKey) {
+    response.status(500).send("GOOGLE_API_KEY is not set");
+    return;
+  }
+
+  try {
+    const photoResponse = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/photo",
+      {
+        params: {
+          maxwidth: 1200,
+          photo_reference: photoReference,
+          key: apiKey,
+        },
+        responseType: "stream",
+        validateStatus: (status) => status >= 200 && status < 400,
+      }
+    );
+
+    const contentType = photoResponse.headers["content-type"];
+    const cacheControl = photoResponse.headers["cache-control"] || "public, max-age=604800";
+
+    if (contentType) {
+      response.setHeader("Content-Type", contentType);
+    }
+    response.setHeader("Cache-Control", cacheControl);
+
+    photoResponse.data.pipe(response);
+  } catch (error: any) {
+    const status = error?.response?.status ?? 502;
+    response.status(status).send("Failed to fetch city image");
+  }
+});
 
 // export const helloWorld = onRequest((request, response) => {
 //   logger.info("Hello logs!", {structuredData: true});
