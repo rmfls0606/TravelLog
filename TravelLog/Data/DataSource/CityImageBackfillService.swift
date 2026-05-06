@@ -12,6 +12,14 @@ import FirebaseFirestore
 import FirebaseFunctions
 import Kingfisher
 
+private final class ConcurrentBox<Value>: @unchecked Sendable {
+    var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+}
+
 final class CityImageBackfillService {
     static let shared = CityImageBackfillService()
 
@@ -293,37 +301,37 @@ final class CityImageBackfillService {
 
     private func imageURLFromDocumentId(_ cityDocId: String, source: FirestoreSource) -> String? {
         let semaphore = DispatchSemaphore(value: 0)
-        var result: String?
-        var err: Error?
+        let result = ConcurrentBox<String?>(nil)
+        let err = ConcurrentBox<Error?>(nil)
 
         db.collection("cities").document(cityDocId).getDocument(source: source) { snapshot, error in
             defer { semaphore.signal() }
-            err = error
+            err.value = error
             guard let data = snapshot?.data() else { return }
-            result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
+            result.value = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
         }
 
         let timeout: TimeInterval = (source == .cache) ? 0.8 : 5.0
         _ = semaphore.wait(timeout: .now() + timeout)
-        _ = err
-        return result
+        _ = err.value
+        return result.value
     }
 
     private func documents(from query: FirebaseFirestore.Query, source: FirestoreSource) -> [QueryDocumentSnapshot] {
         let semaphore = DispatchSemaphore(value: 0)
-        var result: [QueryDocumentSnapshot] = []
-        var err: Error?
+        let result = ConcurrentBox<[QueryDocumentSnapshot]>([])
+        let err = ConcurrentBox<Error?>(nil)
 
         query.getDocuments(source: source) { snapshot, error in
             defer { semaphore.signal() }
-            err = error
-            result = snapshot?.documents ?? []
+            err.value = error
+            result.value = snapshot?.documents ?? []
         }
 
         let timeout: TimeInterval = (source == .cache) ? 0.8 : 5.0
         _ = semaphore.wait(timeout: .now() + timeout)
-        _ = err
-        return result
+        _ = err.value
+        return result.value
     }
 
     private func firstImageURLAndDocId(
@@ -368,7 +376,7 @@ final class CityImageBackfillService {
 
         for cityName in queries {
             let semaphore = DispatchSemaphore(value: 0)
-            var result: String?
+            let result = ConcurrentBox<String?>(nil)
 
             functions.httpsCallable("searchCity")
                 .call([
@@ -387,16 +395,16 @@ final class CityImageBackfillService {
                     if let exact = cities.first(where: {
                         (($0["name"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines) == cityName
                     }) {
-                        result = exact["imageUrl"] as? String
+                        result.value = exact["imageUrl"] as? String
                         return
                     }
 
-                    result = cities.first?["imageUrl"] as? String
+                    result.value = cities.first?["imageUrl"] as? String
                 }
 
             _ = semaphore.wait(timeout: .now() + timeout)
-            if let result, !result.isEmpty {
-                return result
+            if let value = result.value, !value.isEmpty {
+                return value
             }
         }
 
@@ -506,41 +514,41 @@ final class CityImageBackfillService {
         }
 
         let semaphore = DispatchSemaphore(value: 0)
-        var image: UIImage?
-        var failureMessage: String?
+        let image = ConcurrentBox<UIImage?>(nil)
+        let failureMessage = ConcurrentBox<String?>(nil)
 
         KingfisherManager.shared.retrieveImage(with: normalizedURL) { result in
             defer { semaphore.signal() }
             switch result {
             case .success(let value):
-                image = value.image
+                image.value = value.image
             case .failure:
-                image = nil
-                failureMessage = "\(result)"
+                image.value = nil
+                failureMessage.value = "\(result)"
             }
         }
 
         _ = semaphore.wait(timeout: .now() + 10.0)
-        _ = failureMessage
-        return image
+        _ = failureMessage.value
+        return image.value
     }
 
     private func fetchImageDataDirectly(from url: URL) -> Data? {
         let semaphore = DispatchSemaphore(value: 0)
-        var resultData: Data?
+        let resultData = ConcurrentBox<Data?>(nil)
 
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             defer { semaphore.signal() }
             guard error == nil else { return }
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return }
             guard let data, !data.isEmpty else { return }
-            resultData = data
+            resultData.value = data
         }
 
         task.resume()
         _ = semaphore.wait(timeout: .now() + 10.0)
         task.cancel()
-        return resultData
+        return resultData.value
     }
 
     private func imageFromKingfisherCache(rawKey: String, normalizedURL: URL) -> UIImage? {
@@ -548,19 +556,19 @@ final class CityImageBackfillService {
         let keys = Array(Set([rawKey, trimmed, normalizedURL.absoluteString]))
         for key in keys {
             let semaphore = DispatchSemaphore(value: 0)
-            var image: UIImage?
+            let image = ConcurrentBox<UIImage?>(nil)
 
             ImageCache.default.retrieveImage(forKey: key) { result in
                 defer { semaphore.signal() }
                 switch result {
                 case .success(let value):
-                    image = value.image
+                    image.value = value.image
                 case .failure:
                     break
                 }
             }
             _ = semaphore.wait(timeout: .now() + 1.0)
-            if let image { return image }
+            if let cached = image.value { return cached }
         }
         return nil
     }
