@@ -24,10 +24,17 @@ enum SearchState {
 }
 
 final class DestinationViewModel {
+    private enum Constants {
+        static let browsePageSize = 30
+        static let browseFetchLimit = 500
+    }
+
+    private let usesSectionHeader: Bool
     private let disposeBag = DisposeBag()
     private let fetchCitiesUseCase: FetchCitiesUseCaseImpl
     
-    init() {
+    init(usesSectionHeader: Bool = true) {
+        self.usesSectionHeader = usesSectionHeader
         let local = FirebaseCityDataSource()
         let remote = FunctionsCityRemoteDataSource(region: "us-central1")
         let repo = CityRepositoryImpl(local: local, remote: remote)
@@ -37,6 +44,7 @@ final class DestinationViewModel {
     
     struct Input {
         let searchCityText: ControlProperty<String>
+        let loadNextPage: Observable<Void>
     }
     
     struct Output {
@@ -46,6 +54,28 @@ final class DestinationViewModel {
     
     func transform(input: Input) -> Output {
         let itemsRelay = BehaviorRelay<[CityCellItem]>(value: [])
+        var browseCities: [City] = []
+        var displayedBrowseCount = 0
+
+        input.loadNextPage
+            .withLatestFrom(input.searchCityText)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { [usesSectionHeader] query in
+                !usesSectionHeader && query.isEmpty
+            }
+            .bind(with: self) { owner, _ in
+                guard !browseCities.isEmpty else { return }
+                guard displayedBrowseCount < browseCities.count else { return }
+
+                displayedBrowseCount = min(
+                    displayedBrowseCount + Constants.browsePageSize,
+                    browseCities.count
+                )
+                itemsRelay.accept(
+                    Array(browseCities.prefix(displayedBrowseCount)).map { .city($0) }
+                )
+            }
+            .disposed(by: disposeBag)
         
         let state = input.searchCityText
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -55,34 +85,57 @@ final class DestinationViewModel {
                 guard let self else { return .just(.idle) }
 
                 if query.isEmpty {
-                    let hasExistingPopularCities = !itemsRelay.value.isEmpty &&
+                    let hasExistingDefaultCities = !itemsRelay.value.isEmpty &&
                     itemsRelay.value.contains {
                         if case .city = $0 { return true }
                         return false
                     }
 
-                    if !hasExistingPopularCities && SimpleNetworkState.shared.isConnected {
+                    if !hasExistingDefaultCities && SimpleNetworkState.shared.isConnected {
                         itemsRelay.accept(Array(repeating: .skeleton, count: 5))
                     }
 
                     return Observable.just(.loading)
                         .concat(
-                            self.fetchCitiesUseCase.fetchPopularCities(limit: 6)
+                            (self.usesSectionHeader
+                             ? self.fetchCitiesUseCase.fetchPopularCities(limit: 6)
+                             : self.fetchCitiesUseCase.fetchCities(
+                                country: "대한민국",
+                                limit: Constants.browseFetchLimit
+                             ))
                                 .asObservable()
                                 .map { cities -> SearchState in
-                                    itemsRelay.accept(cities.map { .city($0) })
+                                    if self.usesSectionHeader {
+                                        itemsRelay.accept(cities.map { .city($0) })
+                                    } else {
+                                        browseCities = cities
+                                        displayedBrowseCount = min(
+                                            Constants.browsePageSize,
+                                            cities.count
+                                        )
+                                        itemsRelay.accept(
+                                            Array(cities.prefix(displayedBrowseCount)).map { .city($0) }
+                                        )
+                                    }
                                     return cities.isEmpty ? .idle : .result
                                 }
                                 .catch { error in
                                     if case CitySearchError.offline = error {
+                                        browseCities = []
+                                        displayedBrowseCount = 0
                                         itemsRelay.accept([])
                                         return .just(.offline)
                                     }
+                                    browseCities = []
+                                    displayedBrowseCount = 0
                                     itemsRelay.accept([])
                                     return .just(.idle)
                                 }
                         )
                 }
+
+                browseCities = []
+                displayedBrowseCount = 0
 
                 let hasExistingResults = !itemsRelay.value.isEmpty &&
                 itemsRelay.value.contains {

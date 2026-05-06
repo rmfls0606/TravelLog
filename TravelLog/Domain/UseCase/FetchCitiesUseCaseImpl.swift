@@ -56,6 +56,16 @@ final class FetchCitiesUseCaseImpl: FetchCitiesUseCase {
             }
     }
 
+    func fetchCities(country: String, limit: Int) -> Single<[City]> {
+        repository.fetchCities(country: country, limit: limit)
+            .catch { error in
+                if self.isConnectivityError(error) {
+                    return .error(CitySearchError.offline)
+                }
+                return .error(error)
+            }
+    }
+
     private func isConnectivityError(_ error: Error) -> Bool {
         let nsError = error as NSError
         guard nsError.domain == NSURLErrorDomain else { return false }

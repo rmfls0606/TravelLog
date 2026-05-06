@@ -11,6 +11,7 @@ import RxSwift
 protocol CityRepository {
     //로컬에서만 검색
     func searchLocal(query: String) -> Single<[City]>
+    func fetchCities(country: String, limit: Int) -> Single<[City]>
     func fetchPopularCities(limit: Int) -> Single<[City]>
     //로컬에 없으면 원격에서 후보 가져오기
     func searchRemote(query: String) -> Single<[City]>
