@@ -182,7 +182,7 @@ final class JournalAudioBlockViewModel {
         do {
             guard activateSession(category: .playAndRecord,
                                   mode: .default,
-                                  options: [.allowBluetooth, .defaultToSpeaker]) else {
+                                  options: [.allowBluetoothHFP, .defaultToSpeaker]) else {
                 alertRelay.accept("음성 녹음에 실패했습니다. 잠시 후 다시 시도해주세요.")
                 return
             }

@@ -21,7 +21,9 @@ enum URLNormalizer {
         "company", "center", "email", "group", "network", "solutions", "systems", "software", "studio", "design"
     ]
 
-    private static let countryCodeTLDs: Set<String> = Set(Locale.isoRegionCodes.map { $0.lowercased() })
+    private static let countryCodeTLDs: Set<String> = Set(
+        Locale.Region.isoRegions.map { $0.identifier.lowercased() }
+    )
 
     static func normalized(_ raw: String?) -> NormalizedURLResult? {
         guard var raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),

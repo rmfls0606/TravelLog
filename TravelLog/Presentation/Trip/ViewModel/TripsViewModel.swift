@@ -48,17 +48,7 @@ final class TripsViewModel: BaseViewModel {
     func transform(input: Input) -> Output {
         let tripsRelay = BehaviorRelay<[TripSummary]>(value: [])
         let toastRelay = PublishRelay<String>()
-        
-        let fetchStream = fetchTripUseCase.execute()
-            .do(onError: { error in
-                if let realmError = error as? RealmError{
-                    toastRelay.accept(realmError.errorDescription ?? "데이터를 불러올 수 없습니다.\n잠시 후 다시 시도해주세요.")
-                }
-                toastRelay.accept("데이터 처리 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.")
-            })
-            .catchAndReturn([])
-            .distinctUntilChanged{ $0 == $1}
-        
+
         input.viewWillAppear
             .flatMapLatest { [weak self] _ -> Observable<[TripSummary]> in
                 guard let self = self else { return .empty() }
@@ -72,6 +62,14 @@ final class TripsViewModel: BaseViewModel {
                         }
                         return Observable.combineLatest(countStreams)
                     }
+                    .do(onError: { error in
+                        if let realmError = error as? RealmError {
+                            toastRelay.accept(realmError.errorDescription ?? "데이터를 불러올 수 없습니다.\n잠시 후 다시 시도해주세요.")
+                        } else {
+                            toastRelay.accept("데이터 처리 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.")
+                        }
+                    })
+                    .catchAndReturn([])
             }
             .bind(to: tripsRelay)
             .disposed(by: disposeBag)

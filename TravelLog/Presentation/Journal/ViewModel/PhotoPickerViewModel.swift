@@ -137,7 +137,7 @@ final class PhotoPickerViewModel{
                 let newPathsWithOffset = newIndexPaths.map{
                     IndexPath(item: $0.item + 1, section: $0.section)
                 } //카마레 셀로 인해 인덱스가 1씩 밀리므로 +1 해서 전달
-                self.onAssetsChanged?(newIndexPaths)
+                self.onAssetsChanged?(newPathsWithOffset)
             }
         }
     }

@@ -569,48 +569,62 @@ extension JournalTimelineViewController: UITableViewDataSource, UITableViewDeleg
                     return cell
                 }
                 
-                do {
-                    // 세션 활성화 없이 길이만 계산 (외부 오디오 중단 방지)
+                let cachedDuration = playbackDurations[indexPath] ?? 0
+                let initialDuration = max(0, cachedDuration)
+                cell.setDuration(initialDuration)
+                let cached = playbackPositions[indexPath] ?? 0
+                let clamped = max(0, min(initialDuration, cached))
+                let progress = initialDuration > 0 ? clamped / initialDuration : 0
+                cell.updateCurrentTime(clamped, progress: progress)
+                cell.setPlaying(false)
+
+                cell.playTapped
+                    .bind(with: self) { owner, _ in
+                        let duration = owner.playbackDurations[indexPath] ?? 0
+                        owner.togglePlay(at: indexPath, url: resolvedURL, duration: duration, cell: cell)
+                    }
+                    .disposed(by: cell.reuseBag)
+
+                cell.skipBackwardTapped
+                    .bind(with: self) { owner, _ in owner.seek(by: -15, cell: cell, at: indexPath) }
+                    .disposed(by: cell.reuseBag)
+
+                cell.skipForwardTapped
+                    .bind(with: self) { owner, _ in owner.seek(by: 15, cell: cell, at: indexPath) }
+                    .disposed(by: cell.reuseBag)
+
+                cell.seekChanged
+                    .bind(with: self) { owner, progress in
+                        owner.seek(toProgress: Double(progress), cell: cell, at: indexPath)
+                    }
+                    .disposed(by: cell.reuseBag)
+
+                Task { [weak self, weak tableView] in
+                    guard let self else { return }
+
                     let asset = AVURLAsset(url: resolvedURL)
-                    var duration = CMTimeGetSeconds(asset.duration)
+                    let loadedDuration: CMTime
+
+                    do {
+                        loadedDuration = try await asset.load(.duration)
+                    } catch {
+                        return
+                    }
+
+                    var duration = CMTimeGetSeconds(loadedDuration)
                     if duration.isNaN || duration.isInfinite {
                         duration = 0
                     }
-                    playbackDurations[indexPath] = duration
-                    cell.setDuration(duration)
-                    // 이전 재생 위치가 있으면 표시 (다른 셀 재생으로 멈춘 경우)
-                    let cached = playbackPositions[indexPath] ?? 0
-                    let clamped = max(0, min(duration, cached))
-                    let progress = duration > 0 ? clamped / duration : 0
-                    cell.updateCurrentTime(clamped, progress: progress)
-                    cell.setPlaying(false)
-                    
-                    cell.playTapped
-                        .bind(with: self) { owner, _ in
-                            owner.togglePlay(at: indexPath, url: resolvedURL, duration: duration, cell: cell)
-                        }
-                        .disposed(by: cell.reuseBag)
-                    
-                    cell.skipBackwardTapped
-                        .bind(with: self) { owner, _ in owner.seek(by: -15, cell: cell, at: indexPath) }
-                        .disposed(by: cell.reuseBag)
-                    
-                    cell.skipForwardTapped
-                        .bind(with: self) { owner, _ in owner.seek(by: 15, cell: cell, at: indexPath) }
-                        .disposed(by: cell.reuseBag)
-                    
-                    cell.seekChanged
-                        .bind(with: self) { owner, progress in
-                            owner.seek(toProgress: Double(progress), cell: cell, at: indexPath)
-                        }
-                        .disposed(by: cell.reuseBag)
-                } catch {
-                    showToast("녹음 파일을 재생할 수 없습니다.")
-                    cell.setDuration(0)
-                    cell.updateCurrentTime(0, progress: 0)
-                    cell.setPlaying(false)
-                    playbackDurations[indexPath] = 0
-                    cell.isUserInteractionEnabled = false
+
+                    await MainActor.run {
+                        self.playbackDurations[indexPath] = duration
+                        guard let currentCell = tableView?.cellForRow(at: indexPath) as? JournalAudioCell else { return }
+                        currentCell.setDuration(duration)
+                        let currentCached = self.playbackPositions[indexPath] ?? 0
+                        let clamped = max(0, min(duration, currentCached))
+                        let progress = duration > 0 ? clamped / duration : 0
+                        currentCell.updateCurrentTime(clamped, progress: progress)
+                    }
                 }
                 
             } else {

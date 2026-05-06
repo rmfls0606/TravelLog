@@ -9,6 +9,14 @@ import FirebaseFirestore
 import RxSwift
 import Foundation
 
+private final class ConcurrentBox<Value>: @unchecked Sendable {
+    var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+}
+
 final class FirebaseCityDataSource: CityDataSource {
     private let db = Firestore.firestore()
     private let collection = "cities"
@@ -101,11 +109,12 @@ final class FirebaseCityDataSource: CityDataSource {
 
         func runPrefixQueries(source: FirestoreSource, completion: @escaping (Result<[City], Error>) -> Void) {
             let group = DispatchGroup()
-            var byNameLower: [City] = []
-            var byCountryLower: [City] = []
-            var byNameLegacy: [City] = []
-            var byCountryLegacy: [City] = []
-            var firstError: Error?
+            let stateLock = NSLock()
+            let byNameLower = ConcurrentBox<[City]>([])
+            let byCountryLower = ConcurrentBox<[City]>([])
+            let byNameLegacy = ConcurrentBox<[City]>([])
+            let byCountryLegacy = ConcurrentBox<[City]>([])
+            let firstError = ConcurrentBox<Error?>(nil)
 
             group.enter()
             db.collection(collection)
@@ -117,11 +126,18 @@ final class FirebaseCityDataSource: CityDataSource {
                     defer { group.leave() }
                     if let error = error {
                         if source != .cache {
-                            firstError = firstError ?? error
+                            stateLock.lock()
+                            if firstError.value == nil {
+                                firstError.value = error
+                            }
+                            stateLock.unlock()
                         }
                         return
                     }
-                    byNameLower = self.decode(snap?.documents ?? [])
+                    let decoded = self.decode(snap?.documents ?? [])
+                    stateLock.lock()
+                    byNameLower.value = decoded
+                    stateLock.unlock()
                 }
 
             group.enter()
@@ -134,11 +150,18 @@ final class FirebaseCityDataSource: CityDataSource {
                     defer { group.leave() }
                     if let error = error {
                         if source != .cache {
-                            firstError = firstError ?? error
+                            stateLock.lock()
+                            if firstError.value == nil {
+                                firstError.value = error
+                            }
+                            stateLock.unlock()
                         }
                         return
                     }
-                    byCountryLower = self.decode(snap?.documents ?? [])
+                    let decoded = self.decode(snap?.documents ?? [])
+                    stateLock.lock()
+                    byCountryLower.value = decoded
+                    stateLock.unlock()
                 }
 
             // 하위호환: 과거 문서(nameLower/countryLower 미존재)도 prefix 검색에 포함
@@ -152,11 +175,18 @@ final class FirebaseCityDataSource: CityDataSource {
                     defer { group.leave() }
                     if let error = error {
                         if source != .cache {
-                            firstError = firstError ?? error
+                            stateLock.lock()
+                            if firstError.value == nil {
+                                firstError.value = error
+                            }
+                            stateLock.unlock()
                         }
                         return
                     }
-                    byNameLegacy = self.decode(snap?.documents ?? [])
+                    let decoded = self.decode(snap?.documents ?? [])
+                    stateLock.lock()
+                    byNameLegacy.value = decoded
+                    stateLock.unlock()
                 }
 
             group.enter()
@@ -169,22 +199,29 @@ final class FirebaseCityDataSource: CityDataSource {
                     defer { group.leave() }
                     if let error = error {
                         if source != .cache {
-                            firstError = firstError ?? error
+                            stateLock.lock()
+                            if firstError.value == nil {
+                                firstError.value = error
+                            }
+                            stateLock.unlock()
                         }
                         return
                     }
-                    byCountryLegacy = self.decode(snap?.documents ?? [])
+                    let decoded = self.decode(snap?.documents ?? [])
+                    stateLock.lock()
+                    byCountryLegacy.value = decoded
+                    stateLock.unlock()
                 }
 
             group.notify(queue: workQueue) {
-                if let error = firstError {
+                if let error = firstError.value {
                     completion(.failure(error))
                     return
                 }
 
                 let merged = mergeUnique(
-                    mergeUnique(byNameLower, byCountryLower),
-                    mergeUnique(byNameLegacy, byCountryLegacy)
+                    mergeUnique(byNameLower.value, byCountryLower.value),
+                    mergeUnique(byNameLegacy.value, byCountryLegacy.value)
                 )
                 let sorted = merged.sorted { lhs, rhs in
                     let lhsRank = self.rank(city: lhs, queryLower: lower)
@@ -204,11 +241,18 @@ final class FirebaseCityDataSource: CityDataSource {
         }
 
         return Single.create { single in
-            var cancelled = false
+            let cancelLock = NSLock()
+            let cancelled = ConcurrentBox(false)
+
+            func isCancelled() -> Bool {
+                cancelLock.lock()
+                defer { cancelLock.unlock() }
+                return cancelled.value
+            }
 
             // 1) cache first
             runPrefixQueries(source: .cache) { cacheResult in
-                if cancelled { return }
+                if isCancelled() { return }
                 switch cacheResult {
                 case .success(let cached) where !cached.isEmpty:
                     // 캐시에 일부 결과만 있을 수 있어 서버 결과로 보강
@@ -226,7 +270,7 @@ final class FirebaseCityDataSource: CityDataSource {
                     }
 
                     runPrefixQueries(source: .default) { defaultResult in
-                        if cancelled { return }
+                        if isCancelled() { return }
                         switch defaultResult {
                         case .success(let fresh) where !fresh.isEmpty:
                             self.memoryCache[lower] = CacheEntry(cities: fresh, timestamp: Date())
@@ -249,7 +293,7 @@ final class FirebaseCityDataSource: CityDataSource {
                     }
 
                     runPrefixQueries(source: .default) { defaultResult in
-                        if cancelled { return }
+                        if isCancelled() { return }
                         switch defaultResult {
                         case .success(let cities):
                             self.memoryCache[lower] = CacheEntry(cities: cities, timestamp: Date())
@@ -262,20 +306,29 @@ final class FirebaseCityDataSource: CityDataSource {
             }
 
             return Disposables.create {
-                cancelled = true
+                cancelLock.lock()
+                cancelled.value = true
+                cancelLock.unlock()
             }
         }
     }
 
     func fetchPopularCities(limit: Int) -> Single<[City]> {
         Single.create { single in
-            var cancelled = false
+            let cancelLock = NSLock()
+            let cancelled = ConcurrentBox(false)
+
+            func isCancelled() -> Bool {
+                cancelLock.lock()
+                defer { cancelLock.unlock() }
+                return cancelled.value
+            }
             let query = self.db.collection(self.collection)
                 .order(by: "popularityCount", descending: true)
                 .limit(to: limit)
 
             query.getDocuments(source: .cache) { snapshot, cacheError in
-                if cancelled { return }
+                if isCancelled() { return }
                 let cached = self.decode(snapshot?.documents ?? [])
                     .filter { ($0.popularityCount ?? 0) > 0 }
 
@@ -294,7 +347,7 @@ final class FirebaseCityDataSource: CityDataSource {
                 }
 
                 query.getDocuments(source: .default) { snapshot, error in
-                    if cancelled { return }
+                    if isCancelled() { return }
                     if let error {
                         if !cached.isEmpty {
                             single(.success(cached))
@@ -311,14 +364,23 @@ final class FirebaseCityDataSource: CityDataSource {
             }
 
             return Disposables.create {
-                cancelled = true
+                cancelLock.lock()
+                cancelled.value = true
+                cancelLock.unlock()
             }
         }
     }
 
     func fetchCities(country: String, limit: Int) -> Single<[City]> {
         Single.create { single in
-            var cancelled = false
+            let cancelLock = NSLock()
+            let cancelled = ConcurrentBox(false)
+
+            func isCancelled() -> Bool {
+                cancelLock.lock()
+                defer { cancelLock.unlock() }
+                return cancelled.value
+            }
             let normalizedCountry = self.normalized(country)
 
             func sortCities(_ cities: [City]) -> [City] {
@@ -335,7 +397,7 @@ final class FirebaseCityDataSource: CityDataSource {
                 .limit(to: limit)
 
             query.getDocuments(source: .cache) { snapshot, cacheError in
-                if cancelled { return }
+                if isCancelled() { return }
                 let cached = sortCities(self.decode(snapshot?.documents ?? []))
 
                 if !SimpleNetworkState.shared.isConnected {
@@ -348,7 +410,7 @@ final class FirebaseCityDataSource: CityDataSource {
                 }
 
                 query.getDocuments(source: .default) { snapshot, error in
-                    if cancelled { return }
+                    if isCancelled() { return }
                     if let error {
                         if !cached.isEmpty {
                             single(.success(cached))
@@ -364,7 +426,9 @@ final class FirebaseCityDataSource: CityDataSource {
             }
 
             return Disposables.create {
-                cancelled = true
+                cancelLock.lock()
+                cancelled.value = true
+                cancelLock.unlock()
             }
         }
     }

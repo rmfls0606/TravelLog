@@ -13,6 +13,14 @@ import Kingfisher
 import FirebaseFirestore
 import FirebaseFunctions
 
+private final class ConcurrentBox<Value>: @unchecked Sendable {
+    var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+}
+
 final class TripRealmDataSource{
     private let fileManager = FileManager.default
     private lazy var db: Firestore = Firestore.firestore()
@@ -172,16 +180,16 @@ final class TripRealmDataSource{
 
     private func fetchImageURLByDocId(_ docId: String, timeout: TimeInterval) -> String? {
         let semaphore = DispatchSemaphore(value: 0)
-        var result: String?
+        let result = ConcurrentBox<String?>(nil)
 
         db.collection("cities").document(docId).getDocument(source: .default) { snapshot, _ in
             defer { semaphore.signal() }
             guard let data = snapshot?.data() else { return }
-            result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
+            result.value = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
         }
 
         _ = semaphore.wait(timeout: .now() + timeout)
-        return result
+        return result.value
     }
 
     private func firstImageURL(
@@ -190,17 +198,17 @@ final class TripRealmDataSource{
         timeout: TimeInterval
     ) -> String? {
         let semaphore = DispatchSemaphore(value: 0)
-        var result: String?
+        let result = ConcurrentBox<String?>(nil)
 
         query.getDocuments(source: source) { snapshot, _ in
             defer { semaphore.signal() }
             guard let doc = snapshot?.documents.first else { return }
             let data = doc.data()
-            result = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
+            result.value = (data["imageUrl"] as? String) ?? (data["imageURL"] as? String)
         }
 
         _ = semaphore.wait(timeout: .now() + timeout)
-        return result
+        return result.value
     }
 
     private func fetchImageURLFromFunction(names: [String], country: String, timeout: TimeInterval) -> String? {
@@ -213,7 +221,7 @@ final class TripRealmDataSource{
 
         for query in queries {
             let semaphore = DispatchSemaphore(value: 0)
-            var result: String?
+            let result = ConcurrentBox<String?>(nil)
 
             functions.httpsCallable("searchCity")
                 .call([
@@ -227,12 +235,12 @@ final class TripRealmDataSource{
                         let cities = root["cities"] as? [[String: Any]],
                         !cities.isEmpty
                     else { return }
-                    result = cities.first?["imageUrl"] as? String
+                    result.value = cities.first?["imageUrl"] as? String
                 }
 
             _ = semaphore.wait(timeout: .now() + timeout)
-            if let result, !result.isEmpty {
-                return result
+            if let value = result.value, !value.isEmpty {
+                return value
             }
         }
         return nil
@@ -322,23 +330,23 @@ final class TripRealmDataSource{
         }
 
         let semaphore = DispatchSemaphore(value: 0)
-        var image: UIImage?
-        var failureMessage: String?
+        let image = ConcurrentBox<UIImage?>(nil)
+        let failureMessage = ConcurrentBox<String?>(nil)
 
         KingfisherManager.shared.retrieveImage(with: normalizedURL) { result in
             defer { semaphore.signal() }
             switch result {
             case .success(let value):
-                image = value.image
+                image.value = value.image
             case .failure:
-                image = nil
-                failureMessage = "\(result)"
+                image.value = nil
+                failureMessage.value = "\(result)"
             }
         }
 
         _ = semaphore.wait(timeout: .now() + 10.0)
-        _ = failureMessage
-        return image
+        _ = failureMessage.value
+        return image.value
     }
 
     private func imageFromKingfisherCache(rawKey: String, normalizedURL: URL) -> UIImage? {
@@ -346,19 +354,19 @@ final class TripRealmDataSource{
         let keys = Array(Set([rawKey, trimmed, normalizedURL.absoluteString]))
         for key in keys {
             let semaphore = DispatchSemaphore(value: 0)
-            var image: UIImage?
+            let image = ConcurrentBox<UIImage?>(nil)
 
             ImageCache.default.retrieveImage(forKey: key) { result in
                 defer { semaphore.signal() }
                 switch result {
                 case .success(let value):
-                    image = value.image
+                    image.value = value.image
                 case .failure:
                     break
                 }
             }
             _ = semaphore.wait(timeout: .now() + 1.0)
-            if let image { return image }
+            if let cached = image.value { return cached }
         }
         return nil
     }
