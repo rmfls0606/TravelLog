@@ -11,12 +11,20 @@ import RxSwift
 import RxCocoa
 
 final class DestinationSelectorViewController: BaseViewController {
+    private enum UIFlags {
+        // false: 과거 UI처럼 헤더 없이 목록만 노출
+        // true: 현재 UI처럼 "인기 도시 / 검색 결과" 헤더 노출
+        static let usesSectionHeader = false
+    }
+
     private(set) var disposeBag = DisposeBag()
-    private let viewModel = DestinationViewModel()
+    private let viewModel = DestinationViewModel(usesSectionHeader: UIFlags.usesSectionHeader)
     
     let selectedCity = PublishRelay<City>()
+    private let loadNextPageRelay = PublishRelay<Void>()
 
     private var currentQuery: String = ""
+    private var currentItemCount = 0
     
     private let searchField: UITextField = {
         let field = UITextField()
@@ -97,10 +105,12 @@ final class DestinationSelectorViewController: BaseViewController {
     // MARK: - Hierarchy
     override func configureHierarchy() {
         view.addSubview(searchField)
-        view.addSubview(sectionHeaderView)
-        sectionHeaderView.addSubview(sectionBadgeView)
-        sectionBadgeView.addSubview(sectionBadgeLabel)
-        sectionHeaderView.addSubview(sectionTitleLabel)
+        if UIFlags.usesSectionHeader {
+            view.addSubview(sectionHeaderView)
+            sectionHeaderView.addSubview(sectionBadgeView)
+            sectionBadgeView.addSubview(sectionBadgeLabel)
+            sectionHeaderView.addSubview(sectionTitleLabel)
+        }
         view.addSubview(tableView)
         view.addGestureRecognizer(tapGesture)
     }
@@ -113,32 +123,40 @@ final class DestinationSelectorViewController: BaseViewController {
             make.height.equalTo(44)
         }
         
-        sectionHeaderView.snp.makeConstraints { make in
-            make.top.equalTo(searchField.snp.bottom).offset(16)
-            make.horizontalEdges.equalToSuperview().inset(16)
-        }
+        if UIFlags.usesSectionHeader {
+            sectionHeaderView.snp.makeConstraints { make in
+                make.top.equalTo(searchField.snp.bottom).offset(16)
+                make.horizontalEdges.equalToSuperview().inset(16)
+            }
 
-        sectionBadgeView.snp.makeConstraints { make in
-            make.top.bottom.equalToSuperview()
-            make.leading.equalTo(sectionTitleLabel.snp.trailing).offset(8)
-            make.trailing.lessThanOrEqualToSuperview()
-            make.height.equalTo(18)
-        }
+            sectionBadgeView.snp.makeConstraints { make in
+                make.top.bottom.equalToSuperview()
+                make.leading.equalTo(sectionTitleLabel.snp.trailing).offset(8)
+                make.trailing.lessThanOrEqualToSuperview()
+                make.height.equalTo(18)
+            }
 
-        sectionBadgeLabel.snp.makeConstraints { make in
-            make.verticalEdges.equalToSuperview().inset(3)
-            make.horizontalEdges.equalToSuperview().inset(7)
-        }
+            sectionBadgeLabel.snp.makeConstraints { make in
+                make.verticalEdges.equalToSuperview().inset(3)
+                make.horizontalEdges.equalToSuperview().inset(7)
+            }
 
-        sectionTitleLabel.snp.makeConstraints { make in
-            make.leading.equalToSuperview()
-            make.centerY.equalTo(sectionBadgeView)
-        }
+            sectionTitleLabel.snp.makeConstraints { make in
+                make.leading.equalToSuperview()
+                make.centerY.equalTo(sectionBadgeView)
+            }
 
-        tableView.snp.makeConstraints { make in
-            make.top.equalTo(sectionHeaderView.snp.bottom).offset(8)
-            make.horizontalEdges.equalToSuperview()
-            make.bottom.equalToSuperview()
+            tableView.snp.makeConstraints { make in
+                make.top.equalTo(sectionHeaderView.snp.bottom).offset(8)
+                make.horizontalEdges.equalToSuperview()
+                make.bottom.equalToSuperview()
+            }
+        } else {
+            tableView.snp.makeConstraints { make in
+                make.top.equalTo(searchField.snp.bottom).offset(12)
+                make.horizontalEdges.equalToSuperview()
+                make.bottom.equalToSuperview()
+            }
         }
     }
     
@@ -157,9 +175,16 @@ final class DestinationSelectorViewController: BaseViewController {
     override func configureBind() {
         let input = DestinationViewModel.Input(
             searchCityText: searchField.rx.text.orEmpty,
+            loadNextPage: loadNextPageRelay.asObservable()
         )
         let output = viewModel.transform(input: input)
-        
+
+        output.items
+            .drive(with: self) { owner, items in
+                owner.currentItemCount = items.count
+            }
+            .disposed(by: disposeBag)
+
         output.items
             .drive(tableView.rx.items) { tableView, row, item in
                 switch item {
@@ -187,6 +212,23 @@ final class DestinationSelectorViewController: BaseViewController {
             .distinctUntilChanged()
             .bind(with: self) { owner, query in
                 owner.currentQuery = query
+            }
+            .disposed(by: disposeBag)
+
+        tableView.rx.contentOffset
+            .bind(with: self) { owner, offset in
+                guard !UIFlags.usesSectionHeader else { return }
+                guard owner.currentQuery.isEmpty else { return }
+                guard owner.currentItemCount > 0 else { return }
+
+                let visibleHeight = owner.tableView.bounds.height
+                let contentHeight = owner.tableView.contentSize.height
+                guard visibleHeight > 0, contentHeight > 0 else { return }
+
+                let triggerOffset = max(contentHeight - visibleHeight * 1.5, 0)
+                if offset.y >= triggerOffset {
+                    owner.loadNextPageRelay.accept(())
+                }
             }
             .disposed(by: disposeBag)
         
@@ -242,6 +284,11 @@ final class DestinationSelectorViewController: BaseViewController {
     }
 
     private func updateSectionHeader(for state: SearchState) {
+        guard UIFlags.usesSectionHeader else {
+            sectionHeaderView.isHidden = true
+            return
+        }
+
         let isSearching = !currentQuery.isEmpty
 
         switch state {

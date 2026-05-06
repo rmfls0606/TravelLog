@@ -316,6 +316,59 @@ final class FirebaseCityDataSource: CityDataSource {
         }
     }
 
+    func fetchCities(country: String, limit: Int) -> Single<[City]> {
+        Single.create { single in
+            var cancelled = false
+            let normalizedCountry = self.normalized(country)
+
+            func sortCities(_ cities: [City]) -> [City] {
+                cities.sorted { lhs, rhs in
+                    let lhsPopularity = lhs.popularityCount ?? 0
+                    let rhsPopularity = rhs.popularityCount ?? 0
+                    if lhsPopularity != rhsPopularity { return lhsPopularity > rhsPopularity }
+                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                }
+            }
+
+            let query = self.db.collection(self.collection)
+                .whereField("countryLower", isEqualTo: normalizedCountry)
+                .limit(to: limit)
+
+            query.getDocuments(source: .cache) { snapshot, cacheError in
+                if cancelled { return }
+                let cached = sortCities(self.decode(snapshot?.documents ?? []))
+
+                if !SimpleNetworkState.shared.isConnected {
+                    if let cacheError, cached.isEmpty {
+                        single(.failure(cacheError))
+                    } else {
+                        single(.success(cached))
+                    }
+                    return
+                }
+
+                query.getDocuments(source: .default) { snapshot, error in
+                    if cancelled { return }
+                    if let error {
+                        if !cached.isEmpty {
+                            single(.success(cached))
+                        } else {
+                            single(.failure(error))
+                        }
+                        return
+                    }
+
+                    let cities = sortCities(self.decode(snapshot?.documents ?? []))
+                    single(.success(cities.isEmpty ? cached : cities))
+                }
+            }
+
+            return Disposables.create {
+                cancelled = true
+            }
+        }
+    }
+
     func fetchCity(by cityId: String) -> Single<City?> { fatalError() }
     func save(city: City) -> Single<Void> { fatalError() }
     func incrementPopularity(cityId: String) -> Single<Void> {
