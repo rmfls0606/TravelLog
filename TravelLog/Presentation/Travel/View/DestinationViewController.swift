@@ -61,7 +61,7 @@ final class DestinationSelectorViewController: BaseViewController {
         let table = UITableView()
         table.backgroundColor = .clear
         table.separatorStyle = .none
-        table.rowHeight = 60
+        table.rowHeight = UIFlags.usesSectionHeader ? 60 : 68
         return table
     }()
 

@@ -86,7 +86,7 @@ final class CityTableViewCell: BaseTableViewCell {
     override func configureLayout() {
         cityContentView.snp.makeConstraints { make in
             make.horizontalEdges.equalToSuperview().inset(16)
-            make.verticalEdges.equalToSuperview().inset(6)
+            make.verticalEdges.equalToSuperview().inset(10)
         }
         
         cityThumbnailView.snp.makeConstraints { make in
@@ -102,7 +102,7 @@ final class CityTableViewCell: BaseTableViewCell {
         
         chevronIcon.snp.makeConstraints {
             $0.centerY.equalToSuperview()
-            $0.trailing.equalToSuperview().inset(16)
+            $0.trailing.equalToSuperview()
             $0.size.equalTo(14)
         }
     }

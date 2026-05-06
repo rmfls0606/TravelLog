@@ -77,7 +77,7 @@ final class CityShimmerTableViewCell: BaseTableViewCell {
 
         cityContentView.snp.makeConstraints { make in
             make.horizontalEdges.equalToSuperview().inset(16)
-            make.verticalEdges.equalToSuperview().inset(6)
+            make.verticalEdges.equalToSuperview().inset(10)
         }
 
         thumbnailShimmer.snp.makeConstraints { make in
@@ -103,7 +103,7 @@ final class CityShimmerTableViewCell: BaseTableViewCell {
 
         chevronPlaceholder.snp.makeConstraints {
             $0.centerY.equalToSuperview()
-            $0.trailing.equalToSuperview().inset(16)
+            $0.trailing.equalToSuperview()
             $0.size.equalTo(CGSize(width: 12, height: 12))
         }
     }
