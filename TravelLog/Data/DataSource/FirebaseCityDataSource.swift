@@ -385,10 +385,12 @@ final class FirebaseCityDataSource: CityDataSource {
 
             func sortCities(_ cities: [City]) -> [City] {
                 cities.sorted { lhs, rhs in
-                    let lhsPopularity = lhs.popularityCount ?? 0
-                    let rhsPopularity = rhs.popularityCount ?? 0
-                    if lhsPopularity != rhsPopularity { return lhsPopularity > rhsPopularity }
-                    return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+                    let nameOrder = lhs.name.localizedStandardCompare(rhs.name)
+                    if nameOrder != .orderedSame {
+                        return nameOrder == .orderedAscending
+                    }
+
+                    return lhs.country.localizedStandardCompare(rhs.country) == .orderedAscending
                 }
             }
 
