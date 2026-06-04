@@ -21,6 +21,7 @@ final class PhotoPickerViewModel{
     private(set) var loadedAssets: [PHAsset] = [] //현재 로드된 페이지의 Asset
     private(set) var selectedAssets: Set<String> = [] //선택된 Asset Identifier 집합
     private(set) var selectionOrder: [String] = []
+    private(set) var isInitialLoading = true
     private var pageSize = 300 //한 번에 불러올 개수
     private var isFetching = false
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
@@ -78,11 +79,11 @@ final class PhotoPickerViewModel{
     init() {
         //포토라이브러리 변경 감시 - 사진 추가/삭제 시 자동 갱신
         observer.changeHandler = { [weak self] result in
-            self?.fetchResult = result
-            self?.loadedAssets.removeAll()
-//            self?.loadMoreAssetsIfNeeded()
-            self?.onAssetsChanged?(nil)
             DispatchQueue.main.async {
+                self?.fetchResult = result
+                self?.loadedAssets.removeAll()
+                self?.isInitialLoading = result.count > 0
+                self?.onAssetsChanged?(nil)
                 self?.onAssetsReloaded?() //데이터 리로드 완료 후 콜백 호출
             }
         }
@@ -111,6 +112,7 @@ final class PhotoPickerViewModel{
             observer.fetchAssets()
             onLimitedAccessDetected?()
         default:
+            isInitialLoading = false
             onPermissionDenied?()
         }
     }
@@ -118,7 +120,10 @@ final class PhotoPickerViewModel{
     //MARK: - 페이지네이션
     func loadMoreAssetsIfNeeded() {
         guard !isFetching, let result = fetchResult else { return }
-        guard loadedAssets.count < result.count else { return }
+        guard loadedAssets.count < result.count else {
+            isInitialLoading = false
+            return
+        }
         
         isFetching = true
         queue.async { [weak self] in
@@ -134,6 +139,7 @@ final class PhotoPickerViewModel{
             
             DispatchQueue.main.async {
                 self.loadedAssets.append(contentsOf: newAssets)
+                self.isInitialLoading = false
                 self.onAssetsChanged?(newIndexPaths)
             }
         }

@@ -44,6 +44,8 @@ final class PhotoPickerViewController: UIViewController {
     
     //사진 촬영 후 자동 선택을 위해 새로 저장된 에셋의 ID를 임시 저장합니다.
     private var newlySaveAssetIdentifier: String?
+    private var isShowingSkeleton = true
+    private let skeletonItemCount = 15
     
     private var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -65,6 +67,8 @@ final class PhotoPickerViewController: UIViewController {
                     .identifier)
         collectionView.register(PhotoThumbnailCell.self,
                                 forCellWithReuseIdentifier: PhotoThumbnailCell.identifier)
+        collectionView.register(PhotoSkeletonCell.self,
+                                forCellWithReuseIdentifier: PhotoSkeletonCell.identifier)
         collectionView.register(PhotoPickerHeaderView.self,
                                 forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
                                 withReuseIdentifier: PhotoPickerHeaderView.identifier)
@@ -167,6 +171,12 @@ final class PhotoPickerViewController: UIViewController {
             guard let self = self else { return }
             
             if let newIndexPaths = indexPaths{
+                if self.isShowingSkeleton {
+                    self.isShowingSkeleton = false
+                    self.collectionView.reloadData()
+                    self.viewModel.didFinishUpdatingUI()
+                    return
+                }
                 
                 // (NEW) 카메라 셀 오프셋 적용
                 let offsetPaths = newIndexPaths.map { IndexPath(item: $0.item + 1, section: $0.section) }
@@ -177,16 +187,15 @@ final class PhotoPickerViewController: UIViewController {
                     self.viewModel.didFinishUpdatingUI()
                 })
             }else{
-                
-                CATransaction.begin()
-                CATransaction.setCompletionBlock {
-                    self.viewModel.loadMoreAssetsIfNeeded()
-                }
                 self.viewModel.didFinishUpdatingUI()
-                
+                self.isShowingSkeleton = self.viewModel.isInitialLoading
                 self.collectionView.reloadData()
                 
-                CATransaction.commit()
+                if self.viewModel.isInitialLoading {
+                    DispatchQueue.main.async {
+                        self.viewModel.loadMoreAssetsIfNeeded()
+                    }
+                }
             }
         }
         
@@ -577,6 +586,10 @@ final class PhotoPickerViewController: UIViewController {
 // (NEW) 카메라 셀 로직 추가
 extension PhotoPickerViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if viewModel.isInitialLoading {
+            return skeletonItemCount + 1
+        }
+        
         // (NEW) 카메라 셀 1개 + 애셋 개수
         return viewModel.numberOfItems() + 1
     }
@@ -590,6 +603,16 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
                 for: indexPath
             ) as? CameraThumbnailCell else { return UICollectionViewCell() }
             
+            return cell
+        }
+        
+        if viewModel.isInitialLoading {
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: PhotoSkeletonCell.identifier,
+                for: indexPath
+            ) as? PhotoSkeletonCell else { return UICollectionViewCell() }
+            
+            cell.startShimmering()
             return cell
         }
         
