@@ -115,6 +115,12 @@ final class PhotoPickerViewController: UIViewController {
         viewModel.stopPreheatingAssets()
     }
     
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        viewModel.cacheManager.removeAll()
+        viewModel.stopPreheatingAssets()
+    }
+    
     private func configureHierarchy(){
         view.addSubview(collectionView)
     }
