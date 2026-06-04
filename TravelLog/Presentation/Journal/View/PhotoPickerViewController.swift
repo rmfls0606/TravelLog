@@ -105,6 +105,16 @@ final class PhotoPickerViewController: UIViewController {
         }
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updatePreheatedAssets()
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        viewModel.stopPreheatingAssets()
+    }
+    
     private func configureHierarchy(){
         view.addSubview(collectionView)
     }
@@ -185,11 +195,13 @@ final class PhotoPickerViewController: UIViewController {
                     self.collectionView.insertItems(at: offsetPaths)
                 }, completion: { _ in
                     self.viewModel.didFinishUpdatingUI()
+                    self.updatePreheatedAssets()
                 })
             }else{
                 self.viewModel.didFinishUpdatingUI()
                 self.isShowingSkeleton = self.viewModel.isInitialLoading
                 self.collectionView.reloadData()
+                self.updatePreheatedAssets()
                 
                 if self.viewModel.isInitialLoading {
                     DispatchQueue.main.async {
@@ -255,6 +267,22 @@ final class PhotoPickerViewController: UIViewController {
                 self.newlySaveAssetIdentifier = nil
             }
         }
+    }
+    
+    private func updatePreheatedAssets() {
+        guard !viewModel.isInitialLoading else { return }
+        
+        let visibleIndexes = collectionView.indexPathsForVisibleItems.compactMap { indexPath -> Int? in
+            guard indexPath.item > 0 else { return nil }
+            let index = indexPath.item - 1
+            return index < viewModel.numberOfItems() ? index : nil
+        }
+        guard !visibleIndexes.isEmpty else { return }
+        
+        let scale = UIScreen.main.scale
+        let itemSize = (collectionView.bounds.width - 4) / 3
+        let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
+        viewModel.updatePreheatedAssets(around: visibleIndexes, targetSize: targetSize)
     }
     
     @objc
@@ -789,6 +817,8 @@ extension PhotoPickerViewController: UIScrollViewDelegate{
         if maxIndex >= viewModel.numberOfItems() - 30 {
             viewModel.loadMoreAssetsIfNeeded()
         }
+        
+        updatePreheatedAssets()
     }
 }
 

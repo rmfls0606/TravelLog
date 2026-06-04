@@ -24,6 +24,9 @@ final class PhotoPickerViewModel{
     private(set) var isInitialLoading = true
     private var pageSize = 300 //한 번에 불러올 개수
     private var isFetching = false
+    private var preheatedIndexes: Set<Int> = []
+    private var preheatTargetSize: CGSize = .zero
+    private let preheatPadding = 90
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
     var totalAssetCount: Int {
         return fetchResult?.count ?? 0
@@ -162,6 +165,59 @@ final class PhotoPickerViewModel{
     
     func cancelPrefetch(for indexes: [Int], targetSize: CGSize) {
         guard let result = fetchResult else { return }
+        let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
+        imageManager.stopCachingImages(
+            for: assets,
+            targetSize: targetSize,
+            contentMode: .aspectFill,
+            options: imageOptions
+        )
+    }
+    
+    func updatePreheatedAssets(around visibleIndexes: [Int], targetSize: CGSize) {
+        guard let result = fetchResult else { return }
+        guard result.count > 0 else { return }
+        guard !visibleIndexes.isEmpty else { return }
+        
+        if preheatTargetSize != targetSize {
+            stopCaching(indexes: Array(preheatedIndexes), targetSize: preheatTargetSize)
+            preheatedIndexes.removeAll()
+            preheatTargetSize = targetSize
+        }
+        
+        let minIndex = max((visibleIndexes.min() ?? 0) - preheatPadding, 0)
+        let maxIndex = min((visibleIndexes.max() ?? 0) + preheatPadding, result.count - 1)
+        guard minIndex <= maxIndex else { return }
+        
+        let targetIndexes = Set(minIndex...maxIndex)
+        let indexesToStart = Array(targetIndexes.subtracting(preheatedIndexes))
+        let indexesToStop = Array(preheatedIndexes.subtracting(targetIndexes))
+        
+        startCaching(indexes: indexesToStart, targetSize: targetSize)
+        stopCaching(indexes: indexesToStop, targetSize: targetSize)
+        
+        preheatedIndexes = targetIndexes
+    }
+    
+    func stopPreheatingAssets() {
+        stopCaching(indexes: Array(preheatedIndexes), targetSize: preheatTargetSize)
+        preheatedIndexes.removeAll()
+        preheatTargetSize = .zero
+    }
+    
+    private func startCaching(indexes: [Int], targetSize: CGSize) {
+        guard let result = fetchResult, !indexes.isEmpty else { return }
+        let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
+        imageManager.startCachingImages(
+            for: assets,
+            targetSize: targetSize,
+            contentMode: .aspectFill,
+            options: imageOptions
+        )
+    }
+    
+    private func stopCaching(indexes: [Int], targetSize: CGSize) {
+        guard let result = fetchResult, !indexes.isEmpty, targetSize != .zero else { return }
         let assets = indexes.compactMap { $0 < result.count ? result.object(at: $0) : nil }
         imageManager.stopCachingImages(
             for: assets,
