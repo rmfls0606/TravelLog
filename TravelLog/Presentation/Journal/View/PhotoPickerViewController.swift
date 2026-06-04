@@ -89,8 +89,6 @@ final class PhotoPickerViewController: UIViewController {
     
     private let photoTitleView = PhotoNavigationTitleView()
     
-    private var dataSource: UICollectionViewDiffableDataSource<Int, PHAsset>!
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         configureHierarchy()
