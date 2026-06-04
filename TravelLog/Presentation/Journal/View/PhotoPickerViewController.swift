@@ -278,20 +278,23 @@ final class PhotoPickerViewController: UIViewController {
             
             let targetSize = CGSize(width: 1200, height: 1200)
             
-            let images: [UIImage] = await withTaskGroup(of: UIImage?.self) { group in
-                for asset in sortedAssets {
+            let images: [UIImage] = await withTaskGroup(of: (Int, UIImage?).self) { group in
+                for (index, asset) in sortedAssets.enumerated() {
                     group.addTask {
-                        await self.requestImageAsync(manager: manager, asset: asset, targetSize: targetSize, options: options)
+                        let image = await self.requestImageAsync(manager: manager, asset: asset, targetSize: targetSize, options: options)
+                        return (index, image)
                     }
                 }
                 
-                var results: [UIImage] = []
-                for await image in group {
+                var results: [(Int, UIImage)] = []
+                for await (index, image) in group {
                     if let image = image {
-                        results.append(image)
+                        results.append((index, image))
                     }
                 }
                 return results
+                    .sorted { $0.0 < $1.0 }
+                    .map { $0.1 }
             }
             
             await MainActor.run {
