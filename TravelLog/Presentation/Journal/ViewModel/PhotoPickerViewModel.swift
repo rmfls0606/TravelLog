@@ -26,7 +26,7 @@ final class PhotoPickerViewModel{
     private var isFetching = false
     private var preheatedIndexes: Set<Int> = []
     private var preheatTargetSize: CGSize = .zero
-    private let preheatPadding = 90
+    private let preheatPadding = 45
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
     var totalAssetCount: Int {
         return fetchResult?.count ?? 0
