@@ -11,9 +11,9 @@ final class ThumbnailCacheManager{
     static let shared = ThumbnailCacheManager()
     
     private let lock = NSLock()
-    private var cache: [String: UIImage] = [:]
-    private var costs: [String: Int] = [:]
-    private var keys: [String] = []
+    private var cache: [String: CacheNode] = [:]
+    private var head: CacheNode?
+    private var tail: CacheNode?
     private var totalCost = 0
     private let countLimit = 600
     private let totalCostLimit = 80 * 1024 * 1024
@@ -24,24 +24,30 @@ final class ThumbnailCacheManager{
         lock.lock()
         defer { lock.unlock() }
         
-        guard let image = cache[key] else { return nil }
-        moveKeyToRecent(key)
-        return image
+        guard let node = cache[key] else { return nil }
+        moveToHead(node)
+        return node.image
     }
     
     func set(_ image: UIImage, forKey key: String){
         lock.lock()
         defer { lock.unlock() }
         
-        if let oldCost = costs[key] {
-            totalCost -= oldCost
-            keys.removeAll { $0 == key }
+        let cost = image.memoryCost
+        
+        if let node = cache[key] {
+            totalCost -= node.cost
+            node.image = image
+            node.cost = cost
+            totalCost += cost
+            moveToHead(node)
+            trimIfNeeded()
+            return
         }
         
-        let cost = image.memoryCost
-        cache[key] = image
-        costs[key] = cost
-        keys.append(key)
+        let node = CacheNode(key: key, image: image, cost: cost)
+        cache[key] = node
+        insertAtHead(node)
         totalCost += cost
         
         trimIfNeeded()
@@ -52,23 +58,64 @@ final class ThumbnailCacheManager{
         defer { lock.unlock() }
         
         cache.removeAll()
-        costs.removeAll()
-        keys.removeAll()
+        head = nil
+        tail = nil
         totalCost = 0
     }
     
-    private func moveKeyToRecent(_ key: String) {
-        keys.removeAll { $0 == key }
-        keys.append(key)
+    private func insertAtHead(_ node: CacheNode) {
+        node.previous = nil
+        node.next = head
+        head?.previous = node
+        head = node
+        
+        if tail == nil {
+            tail = node
+        }
+    }
+    
+    private func remove(_ node: CacheNode) {
+        if node === head {
+            head = node.next
+        }
+        
+        if node === tail {
+            tail = node.previous
+        }
+        
+        node.previous?.next = node.next
+        node.next?.previous = node.previous
+        node.previous = nil
+        node.next = nil
+    }
+    
+    private func moveToHead(_ node: CacheNode) {
+        guard node !== head else { return }
+        remove(node)
+        insertAtHead(node)
     }
     
     private func trimIfNeeded() {
-        while keys.count > countLimit || totalCost > totalCostLimit {
-            guard let key = keys.first else { return }
-            keys.removeFirst()
-            cache.removeValue(forKey: key)
-            totalCost -= costs.removeValue(forKey: key) ?? 0
+        while cache.count > countLimit || totalCost > totalCostLimit {
+            guard let node = tail else { return }
+            remove(node)
+            cache.removeValue(forKey: node.key)
+            totalCost -= node.cost
         }
+    }
+}
+
+private final class CacheNode {
+    let key: String
+    var image: UIImage
+    var cost: Int
+    var previous: CacheNode?
+    var next: CacheNode?
+    
+    init(key: String, image: UIImage, cost: Int) {
+        self.key = key
+        self.image = image
+        self.cost = cost
     }
 }
 
