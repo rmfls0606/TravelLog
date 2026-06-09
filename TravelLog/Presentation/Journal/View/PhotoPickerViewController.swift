@@ -46,6 +46,7 @@ final class PhotoPickerViewController: UIViewController {
     private var newlySaveAssetIdentifier: String?
     private var isShowingSkeleton = true
     private let skeletonItemCount = 15
+    private var lastContentOffsetY: CGFloat = 0
     
     private var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -275,7 +276,7 @@ final class PhotoPickerViewController: UIViewController {
         }
     }
     
-    private func updatePreheatedAssets() {
+    private func updatePreheatedAssets(direction: PhotoPreheatDirection = .stationary) {
         guard !viewModel.isInitialLoading else { return }
         
         let visibleIndexes = collectionView.indexPathsForVisibleItems.compactMap { indexPath -> Int? in
@@ -288,7 +289,7 @@ final class PhotoPickerViewController: UIViewController {
         let scale = UIScreen.main.scale
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
-        viewModel.updatePreheatedAssets(around: visibleIndexes, targetSize: targetSize)
+        viewModel.updatePreheatedAssets(around: visibleIndexes, targetSize: targetSize, direction: direction)
     }
     
     @objc
@@ -818,13 +819,24 @@ extension PhotoPickerViewController: UIScrollViewDelegate{
         guard let maxVisibleUIItem = collectionView.indexPathsForVisibleItems.map(\.item).max() else { return }
         guard maxVisibleUIItem > 0 else { return }
         
+        let currentOffsetY = scrollView.contentOffset.y
+        let direction: PhotoPreheatDirection
+        if currentOffsetY > lastContentOffsetY {
+            direction = .down
+        } else if currentOffsetY < lastContentOffsetY {
+            direction = .up
+        } else {
+            direction = .stationary
+        }
+        lastContentOffsetY = currentOffsetY
+        
         let maxIndex = maxVisibleUIItem - 1
         
         if maxIndex >= viewModel.numberOfItems() - 30 {
             viewModel.loadMoreAssetsIfNeeded()
         }
         
-        updatePreheatedAssets()
+        updatePreheatedAssets(direction: direction)
     }
 }
 

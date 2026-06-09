@@ -9,6 +9,12 @@ import Foundation
 import PhotosUI
 import UIKit
 
+enum PhotoPreheatDirection {
+    case stationary
+    case up
+    case down
+}
+
 //사진 접근 권한, 페이징 로딩, 선택 상대 관리, 이미지 캐싱 등을 담당.
 final class PhotoPickerViewModel{
     
@@ -26,7 +32,8 @@ final class PhotoPickerViewModel{
     private var isFetching = false
     private var preheatedIndexes: Set<Int> = []
     private var preheatTargetSize: CGSize = .zero
-    private let preheatPadding = 45
+    private let primaryPreheatPadding = 45
+    private let secondaryPreheatPadding = 15
     private let queue = DispatchQueue(label: "photo.loader.queue", qos: .userInitiated)
     var totalAssetCount: Int {
         return fetchResult?.count ?? 0
@@ -174,7 +181,7 @@ final class PhotoPickerViewModel{
         )
     }
     
-    func updatePreheatedAssets(around visibleIndexes: [Int], targetSize: CGSize) {
+    func updatePreheatedAssets(around visibleIndexes: [Int], targetSize: CGSize, direction: PhotoPreheatDirection) {
         guard let result = fetchResult else { return }
         guard result.count > 0 else { return }
         guard !visibleIndexes.isEmpty else { return }
@@ -185,8 +192,25 @@ final class PhotoPickerViewModel{
             preheatTargetSize = targetSize
         }
         
-        let minIndex = max((visibleIndexes.min() ?? 0) - preheatPadding, 0)
-        let maxIndex = min((visibleIndexes.max() ?? 0) + preheatPadding, result.count - 1)
+        let minVisibleIndex = visibleIndexes.min() ?? 0
+        let maxVisibleIndex = visibleIndexes.max() ?? 0
+        let previousPadding: Int
+        let nextPadding: Int
+        
+        switch direction {
+        case .stationary:
+            previousPadding = secondaryPreheatPadding
+            nextPadding = secondaryPreheatPadding
+        case .up:
+            previousPadding = primaryPreheatPadding
+            nextPadding = secondaryPreheatPadding
+        case .down:
+            previousPadding = secondaryPreheatPadding
+            nextPadding = primaryPreheatPadding
+        }
+        
+        let minIndex = max(minVisibleIndex - previousPadding, 0)
+        let maxIndex = min(maxVisibleIndex + nextPadding, result.count - 1)
         guard minIndex <= maxIndex else { return }
         
         let targetIndexes = Set(minIndex...maxIndex)
