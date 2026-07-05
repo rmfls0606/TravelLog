@@ -33,7 +33,7 @@ final class LinkPreviewMemoryCache {
         lock.lock()
         defer { lock.unlock() }
 
-        let key = url.absoluteString
+        let key = cacheKey(for: url)
         guard let preview = storage[key] else { return nil }
         guard preview.hasUsableMetadata else {
             removeValue(forKey: key)
@@ -50,7 +50,7 @@ final class LinkPreviewMemoryCache {
 
         guard preview.hasUsableMetadata else { return }
 
-        let key = url.absoluteString
+        let key = cacheKey(for: url)
         storage[key] = preview
         moveKeyToRecent(key)
 
@@ -75,5 +75,17 @@ final class LinkPreviewMemoryCache {
     private func removeValue(forKey key: String) {
         storage.removeValue(forKey: key)
         keys.removeAll { $0 == key }
+    }
+
+    private func cacheKey(for url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url.absoluteString
+        }
+
+        if let host = components.host?.lowercased() {
+            components.host = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
+
+        return components.url?.absoluteString ?? url.absoluteString
     }
 }
