@@ -13,6 +13,11 @@ struct NormalizedURLResult {
 }
 
 enum URLNormalizer {
+    private static let trackingQueryNames: Set<String> = [
+        "fbclid", "gclid", "dclid", "msclkid", "igshid",
+        "mc_cid", "mc_eid"
+    ]
+
     private static let genericTLDs: Set<String> = [
         "com", "net", "org", "edu", "gov", "mil", "int",
         "biz", "info", "name", "pro", "aero", "asia", "cat", "coop", "jobs", "mobi", "museum", "tel", "travel",
@@ -31,29 +36,68 @@ enum URLNormalizer {
             return nil
         }
 
-        // 1. 공백이 있으면 제거 (혹은 "_"로 대체해도 됨)
         if raw.contains(" ") {
             raw = raw.replacingOccurrences(of: " ", with: "")
         }
 
-        // 2. 문자열 중 URL 패턴 추출
         let pattern = #"https?:\/\/[^\s]+"#
         if let range = raw.range(of: pattern, options: .regularExpression),
            let url = URL(string: String(raw[range])) {
-            let valid = hasValidDomain(url)
-            return NormalizedURLResult(url: url, isValidDomain: valid)
+            let normalizedURL = canonicalURL(from: url)
+            let valid = hasValidDomain(normalizedURL)
+            return NormalizedURLResult(url: normalizedURL, isValidDomain: valid)
         }
 
-        // 3. https 자동 붙이기
-        let candidate = raw.lowercased().hasPrefix("http") ? raw : "https://\(raw)"
+        let candidate = hasScheme(raw) ? raw : "https://\(raw)"
         guard let url = URL(string: candidate) else { return nil }
 
-        let valid = hasValidDomain(url)
-        return NormalizedURLResult(url: url, isValidDomain: valid)
+        let normalizedURL = canonicalURL(from: url)
+        let valid = hasValidDomain(normalizedURL)
+        return NormalizedURLResult(url: normalizedURL, isValidDomain: valid)
+    }
+
+    private static func canonicalURL(from url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
+        components.fragment = nil
+
+        if components.path == "/" {
+            components.path = ""
+        } else {
+            while components.path.count > 1 && components.path.hasSuffix("/") {
+                components.path.removeLast()
+            }
+        }
+
+        if let queryItems = components.queryItems {
+            let filteredItems = queryItems.filter { !isTrackingQuery($0.name) }
+            components.queryItems = filteredItems.isEmpty ? nil : filteredItems
+        }
+
+        return components.url ?? url
+    }
+
+    private static func isTrackingQuery(_ name: String) -> Bool {
+        let lowercasedName = name.lowercased()
+        return lowercasedName.hasPrefix("utm_") || trackingQueryNames.contains(lowercasedName)
+    }
+
+    private static func hasScheme(_ raw: String) -> Bool {
+        let pattern = #"^[a-zA-Z][a-zA-Z0-9+\-.]*://"#
+        return raw.range(of: pattern, options: .regularExpression) != nil
     }
 
     /// 도메인 패턴 유효성 검사
     private static func hasValidDomain(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return false
+        }
+
         guard let host = url.host?.lowercased() else { return false }
         let labels = host.split(separator: ".")
 
