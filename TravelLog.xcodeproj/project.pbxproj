@@ -1,0 +1,825 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		792526812EDF1DF9004C0A56 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = 792526802EDF1DF9004C0A56 /* Toast */; };
+		7949702A2F4B39D7008860C1 /* IQKeyboardManagerSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 794970292F4B39D7008860C1 /* IQKeyboardManagerSwift */; };
+		7958685D2F475A3C00663739 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7958685C2F475A3C00663739 /* Kingfisher */; };
+		795DB4642E8BB84A001EFB3B /* RxCocoa in Frameworks */ = {isa = PBXBuildFile; productRef = 795DB4632E8BB84A001EFB3B /* RxCocoa */; };
+		795DB4662E8BB84A001EFB3B /* RxSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 795DB4652E8BB84A001EFB3B /* RxSwift */; };
+		795DB63B2E8BF927001EFB3B /* FSCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 795DB63A2E8BF927001EFB3B /* FSCalendar */; };
+		79626D952E9B72CE0051FFF8 /* RealmSwift in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 7975EA7E2E97B3BB004969AE /* RealmSwift */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		7975EA7F2E97B3BB004969AE /* RealmSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 7975EA7E2E97B3BB004969AE /* RealmSwift */; };
+		79834F3E2EB988DB00A9F387 /* PhotosUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 79834F3D2EB988DB00A9F387 /* PhotosUI.framework */; };
+		79A76B3C2E8A9C97003437BE /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 79A76B3B2E8A9C97003437BE /* .gitignore */; };
+		79A76B3F2E8A9E51003437BE /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = 79A76B3E2E8A9E51003437BE /* SnapKit */; };
+		79FEA8942F44C6DA0060F424 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 79FEA8932F44C6DA0060F424 /* GoogleService-Info.plist */; };
+		79FEA8972F44C71C0060F424 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 79FEA8962F44C71C0060F424 /* FirebaseFirestore */; };
+		79FEA8992F44C71C0060F424 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 79FEA8982F44C71C0060F424 /* FirebaseFunctions */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		794A980A2EE9259C0091404A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 79A76AE22E8A9A96003437BE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 79A76AE92E8A9A96003437BE;
+			remoteInfo = TravelLog;
+		};
+		7994A4232EE91886000E7835 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 79A76AE22E8A9A96003437BE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 79A76AE92E8A9A96003437BE;
+			remoteInfo = TravelLog;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		79626D962E9B72CE0051FFF8 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				79626D952E9B72CE0051FFF8 /* RealmSwift in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		794A98042EE9259C0091404A /* TravelLogUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TravelLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		79834F3D2EB988DB00A9F387 /* PhotosUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = PhotosUI.framework; path = System/Library/Frameworks/PhotosUI.framework; sourceTree = SDKROOT; };
+		7994A41D2EE91886000E7835 /* TravelLogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TravelLogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		79A76AEA2E8A9A96003437BE /* TravelLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TravelLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		79A76B3B2E8A9C97003437BE /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		79FEA8932F44C6DA0060F424 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		79A76AFC2E8A9A97003437BE /* Exceptions for "TravelLog" folder in "TravelLog" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 79A76AE92E8A9A96003437BE /* TravelLog */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		794A98052EE9259C0091404A /* TravelLogUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TravelLogUITests;
+			sourceTree = "<group>";
+		};
+		7994A41E2EE91886000E7835 /* TravelLogTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TravelLogTests;
+			sourceTree = "<group>";
+		};
+		79A76AEC2E8A9A96003437BE /* TravelLog */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				79A76AFC2E8A9A97003437BE /* Exceptions for "TravelLog" folder in "TravelLog" target */,
+			);
+			path = TravelLog;
+			sourceTree = "<group>";
+		};
+		79FEA89C2F44DA210060F424 /* Firebase */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Firebase;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		794A98012EE9259C0091404A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7994A4202EE91886000E7835 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		79A76AE72E8A9A96003437BE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				795DB4662E8BB84A001EFB3B /* RxSwift in Frameworks */,
+				795DB63B2E8BF927001EFB3B /* FSCalendar in Frameworks */,
+				795DB4642E8BB84A001EFB3B /* RxCocoa in Frameworks */,
+				79FEA8992F44C71C0060F424 /* FirebaseFunctions in Frameworks */,
+				7958685D2F475A3C00663739 /* Kingfisher in Frameworks */,
+				7975EA7F2E97B3BB004969AE /* RealmSwift in Frameworks */,
+				79A76B3F2E8A9E51003437BE /* SnapKit in Frameworks */,
+				79FEA8972F44C71C0060F424 /* FirebaseFirestore in Frameworks */,
+				792526812EDF1DF9004C0A56 /* Toast in Frameworks */,
+				7949702A2F4B39D7008860C1 /* IQKeyboardManagerSwift in Frameworks */,
+				79834F3E2EB988DB00A9F387 /* PhotosUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		79834F3C2EB988DA00A9F387 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				79834F3D2EB988DB00A9F387 /* PhotosUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		79A76AE12E8A9A96003437BE = {
+			isa = PBXGroup;
+			children = (
+				79FEA89C2F44DA210060F424 /* Firebase */,
+				79A76B3B2E8A9C97003437BE /* .gitignore */,
+				79A76AEC2E8A9A96003437BE /* TravelLog */,
+				7994A41E2EE91886000E7835 /* TravelLogTests */,
+				794A98052EE9259C0091404A /* TravelLogUITests */,
+				79834F3C2EB988DA00A9F387 /* Frameworks */,
+				79A76AEB2E8A9A96003437BE /* Products */,
+				79FEA8932F44C6DA0060F424 /* GoogleService-Info.plist */,
+			);
+			sourceTree = "<group>";
+		};
+		79A76AEB2E8A9A96003437BE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				79A76AEA2E8A9A96003437BE /* TravelLog.app */,
+				7994A41D2EE91886000E7835 /* TravelLogTests.xctest */,
+				794A98042EE9259C0091404A /* TravelLogUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		794A98032EE9259C0091404A /* TravelLogUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 794A980C2EE9259C0091404A /* Build configuration list for PBXNativeTarget "TravelLogUITests" */;
+			buildPhases = (
+				794A98002EE9259C0091404A /* Sources */,
+				794A98012EE9259C0091404A /* Frameworks */,
+				794A98022EE9259C0091404A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				794A980B2EE9259C0091404A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				794A98052EE9259C0091404A /* TravelLogUITests */,
+			);
+			name = TravelLogUITests;
+			packageProductDependencies = (
+			);
+			productName = TravelLogUITests;
+			productReference = 794A98042EE9259C0091404A /* TravelLogUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		7994A41C2EE91886000E7835 /* TravelLogTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7994A4242EE91886000E7835 /* Build configuration list for PBXNativeTarget "TravelLogTests" */;
+			buildPhases = (
+				7994A41F2EE91886000E7835 /* Sources */,
+				7994A4202EE91886000E7835 /* Frameworks */,
+				7994A4212EE91886000E7835 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7994A4222EE91886000E7835 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7994A41E2EE91886000E7835 /* TravelLogTests */,
+			);
+			name = TravelLogTests;
+			packageProductDependencies = (
+			);
+			productName = TravelLogTests;
+			productReference = 7994A41D2EE91886000E7835 /* TravelLogTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		79A76AE92E8A9A96003437BE /* TravelLog */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 79A76AFD2E8A9A97003437BE /* Build configuration list for PBXNativeTarget "TravelLog" */;
+			buildPhases = (
+				79A76AE62E8A9A96003437BE /* Sources */,
+				79A76AE72E8A9A96003437BE /* Frameworks */,
+				79A76AE82E8A9A96003437BE /* Resources */,
+				79626D962E9B72CE0051FFF8 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				79A76AEC2E8A9A96003437BE /* TravelLog */,
+				79FEA89C2F44DA210060F424 /* Firebase */,
+			);
+			name = TravelLog;
+			packageProductDependencies = (
+				79A76B3E2E8A9E51003437BE /* SnapKit */,
+				795DB4632E8BB84A001EFB3B /* RxCocoa */,
+				795DB4652E8BB84A001EFB3B /* RxSwift */,
+				795DB63A2E8BF927001EFB3B /* FSCalendar */,
+				7975EA7E2E97B3BB004969AE /* RealmSwift */,
+				792526802EDF1DF9004C0A56 /* Toast */,
+				79FEA8962F44C71C0060F424 /* FirebaseFirestore */,
+				79FEA8982F44C71C0060F424 /* FirebaseFunctions */,
+				7958685C2F475A3C00663739 /* Kingfisher */,
+				794970292F4B39D7008860C1 /* IQKeyboardManagerSwift */,
+			);
+			productName = TravelLog;
+			productReference = 79A76AEA2E8A9A96003437BE /* TravelLog.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		79A76AE22E8A9A96003437BE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2610;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					794A98032EE9259C0091404A = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = 79A76AE92E8A9A96003437BE;
+					};
+					7994A41C2EE91886000E7835 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = 79A76AE92E8A9A96003437BE;
+					};
+					79A76AE92E8A9A96003437BE = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+				};
+			};
+			buildConfigurationList = 79A76AE52E8A9A96003437BE /* Build configuration list for PBXProject "TravelLog" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				ko,
+			);
+			mainGroup = 79A76AE12E8A9A96003437BE;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				79A76B3D2E8A9E51003437BE /* XCRemoteSwiftPackageReference "SnapKit" */,
+				795DB4622E8BB84A001EFB3B /* XCRemoteSwiftPackageReference "RxSwift" */,
+				795DB6392E8BF927001EFB3B /* XCRemoteSwiftPackageReference "FSCalendar" */,
+				7975EA7D2E97B3BA004969AE /* XCRemoteSwiftPackageReference "realm-swift" */,
+				7925267F2EDF1DF9004C0A56 /* XCRemoteSwiftPackageReference "Toast-Swift" */,
+				79FEA8952F44C71C0060F424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				7958685B2F475A3C00663739 /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				794970282F4B39D7008860C1 /* XCRemoteSwiftPackageReference "IQKeyboardManager" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 79A76AEB2E8A9A96003437BE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				79A76AE92E8A9A96003437BE /* TravelLog */,
+				7994A41C2EE91886000E7835 /* TravelLogTests */,
+				794A98032EE9259C0091404A /* TravelLogUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		794A98022EE9259C0091404A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7994A4212EE91886000E7835 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		79A76AE82E8A9A96003437BE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				79A76B3C2E8A9C97003437BE /* .gitignore in Resources */,
+				79FEA8942F44C6DA0060F424 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		794A98002EE9259C0091404A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7994A41F2EE91886000E7835 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		79A76AE62E8A9A96003437BE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		794A980B2EE9259C0091404A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 79A76AE92E8A9A96003437BE /* TravelLog */;
+			targetProxy = 794A980A2EE9259C0091404A /* PBXContainerItemProxy */;
+		};
+		7994A4222EE91886000E7835 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 79A76AE92E8A9A96003437BE /* TravelLog */;
+			targetProxy = 7994A4232EE91886000E7835 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		794A980D2EE9259C0091404A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 643M6R9A8T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TravelLogUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TravelLog;
+			};
+			name = Debug;
+		};
+		794A980E2EE9259C0091404A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 643M6R9A8T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TravelLogUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TravelLog;
+			};
+			name = Release;
+		};
+		7994A4252EE91886000E7835 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 643M6R9A8T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TravelLogTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TravelLog.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TravelLog";
+				TEST_TARGET_NAME = TravelLog;
+			};
+			name = Debug;
+		};
+		7994A4262EE91886000E7835 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 643M6R9A8T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TravelLogTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TravelLog.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TravelLog";
+				TEST_TARGET_NAME = TravelLog;
+			};
+			name = Release;
+		};
+		79A76AFE2E8A9A97003437BE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 643M6R9A8T;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TravelLog/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TripRoad;
+				INFOPLIST_KEY_NSCameraUsageDescription = "여행 기록에 올릴 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 메모를 녹음하여 여행 기록에 추가하기 위해 마이크 접근 권한이 필요합니다.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "여행 기록을 위해 촬영한 사진을 앨범에 저장하기 위해 사진 추가 권한이 필요합니다";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "여행 기록에 저장할 사진을 앨범에서 선택하기 위해 접근 권한이 필요합니다";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.5.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TripRoad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		79A76AFF2E8A9A97003437BE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 643M6R9A8T;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TravelLog/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TripRoad;
+				INFOPLIST_KEY_NSCameraUsageDescription = "여행 기록에 올릴 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 메모를 녹음하여 여행 기록에 추가하기 위해 마이크 접근 권한이 필요합니다.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "여행 기록을 위해 촬영한 사진을 앨범에 저장하기 위해 사진 추가 권한이 필요합니다";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "여행 기록에 저장할 사진을 앨범에서 선택하기 위해 접근 권한이 필요합니다";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.5.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TripRoad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		79A76B002E8A9A97003437BE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		79A76B012E8A9A97003437BE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		794A980C2EE9259C0091404A /* Build configuration list for PBXNativeTarget "TravelLogUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				794A980D2EE9259C0091404A /* Debug */,
+				794A980E2EE9259C0091404A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7994A4242EE91886000E7835 /* Build configuration list for PBXNativeTarget "TravelLogTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7994A4252EE91886000E7835 /* Debug */,
+				7994A4262EE91886000E7835 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		79A76AE52E8A9A96003437BE /* Build configuration list for PBXProject "TravelLog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79A76B002E8A9A97003437BE /* Debug */,
+				79A76B012E8A9A97003437BE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		79A76AFD2E8A9A97003437BE /* Build configuration list for PBXNativeTarget "TravelLog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79A76AFE2E8A9A97003437BE /* Debug */,
+				79A76AFF2E8A9A97003437BE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7925267F2EDF1DF9004C0A56 /* XCRemoteSwiftPackageReference "Toast-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scalessec/Toast-Swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.1;
+			};
+		};
+		794970282F4B39D7008860C1 /* XCRemoteSwiftPackageReference "IQKeyboardManager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hackiftekhar/IQKeyboardManager.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.2;
+			};
+		};
+		7958685B2F475A3C00663739 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.7.0;
+			};
+		};
+		795DB4622E8BB84A001EFB3B /* XCRemoteSwiftPackageReference "RxSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ReactiveX/RxSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.9.0;
+			};
+		};
+		795DB6392E8BF927001EFB3B /* XCRemoteSwiftPackageReference "FSCalendar" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/WenchaoD/FSCalendar.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.4;
+			};
+		};
+		7975EA7D2E97B3BA004969AE /* XCRemoteSwiftPackageReference "realm-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/realm/realm-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 20.0.4;
+			};
+		};
+		79A76B3D2E8A9E51003437BE /* XCRemoteSwiftPackageReference "SnapKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SnapKit/SnapKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.7.1;
+			};
+		};
+		79FEA8952F44C71C0060F424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		792526802EDF1DF9004C0A56 /* Toast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7925267F2EDF1DF9004C0A56 /* XCRemoteSwiftPackageReference "Toast-Swift" */;
+			productName = Toast;
+		};
+		794970292F4B39D7008860C1 /* IQKeyboardManagerSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 794970282F4B39D7008860C1 /* XCRemoteSwiftPackageReference "IQKeyboardManager" */;
+			productName = IQKeyboardManagerSwift;
+		};
+		7958685C2F475A3C00663739 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7958685B2F475A3C00663739 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+		795DB4632E8BB84A001EFB3B /* RxCocoa */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 795DB4622E8BB84A001EFB3B /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxCocoa;
+		};
+		795DB4652E8BB84A001EFB3B /* RxSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 795DB4622E8BB84A001EFB3B /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxSwift;
+		};
+		795DB63A2E8BF927001EFB3B /* FSCalendar */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 795DB6392E8BF927001EFB3B /* XCRemoteSwiftPackageReference "FSCalendar" */;
+			productName = FSCalendar;
+		};
+		7975EA7E2E97B3BB004969AE /* RealmSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7975EA7D2E97B3BA004969AE /* XCRemoteSwiftPackageReference "realm-swift" */;
+			productName = RealmSwift;
+		};
+		79A76B3E2E8A9E51003437BE /* SnapKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79A76B3D2E8A9E51003437BE /* XCRemoteSwiftPackageReference "SnapKit" */;
+			productName = SnapKit;
+		};
+		79FEA8962F44C71C0060F424 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79FEA8952F44C71C0060F424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		79FEA8982F44C71C0060F424 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79FEA8952F44C71C0060F424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 79A76AE22E8A9A96003437BE /* Project object */;
+}
