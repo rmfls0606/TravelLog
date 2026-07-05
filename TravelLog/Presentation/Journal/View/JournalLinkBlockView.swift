@@ -130,7 +130,8 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .systemGray
-        label.numberOfLines = 1
+        label.numberOfLines = 2
+        label.lineBreakMode = .byWordWrapping
         return label
     }()
     
@@ -313,6 +314,16 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
 
     private func fetchPreview(for url: URL) -> Single<PreviewState> {
         Single.create { single in
+            if let cached = LinkPreviewMemoryCache.shared.preview(for: url) {
+                let preview = PreviewData(
+                    title: cached.title,
+                    description: cached.description,
+                    image: cached.image
+                )
+                single(.success(.loaded(preview)))
+                return Disposables.create()
+            }
+
             let provider = LPMetadataProvider()
             provider.startFetchingMetadata(for: url) { metadata, _ in
                 guard let metadata else {
@@ -326,10 +337,22 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
                 if let imageProvider = metadata.imageProvider {
                     imageProvider.loadObject(ofClass: UIImage.self) { imageObj, _ in
                         let image = imageObj as? UIImage
+                        let cached = CachedLinkPreview(
+                            title: title,
+                            description: description,
+                            image: image
+                        )
+                        LinkPreviewMemoryCache.shared.store(cached, for: url)
                         let preview = PreviewData(title: title, description: description, image: image)
                         single(.success(.loaded(preview)))
                     }
                 } else {
+                    let cached = CachedLinkPreview(
+                        title: title,
+                        description: description,
+                        image: nil
+                    )
+                    LinkPreviewMemoryCache.shared.store(cached, for: url)
                     let preview = PreviewData(title: title, description: description, image: nil)
                     single(.success(.loaded(preview)))
                 }
@@ -399,7 +422,7 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
             validationLabel.isHidden = true
             validationLabel.text = nil
             previewTopConstraint?.update(offset: 10)
-            previewHeightConstraint?.update(offset: 112)
+            previewHeightConstraint?.update(offset: 124)
             previewData = nil
             previewContainer.isHidden = false
             previewTitleLabel.text = "미리보기를 가져오지 못했어요"

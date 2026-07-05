@@ -159,6 +159,10 @@ final class JournalAddViewModel: BaseViewModel {
             }
 
             let url = normalized.url   // 실제 URL 추출
+            if let cached = LinkPreviewMemoryCache.shared.preview(for: url) {
+                single(.success((cached.title, cached.description, cached.image)))
+                return Disposables.create()
+            }
 
             let provider = LPMetadataProvider()
             provider.startFetchingMetadata(for: url) { metadata, error in
@@ -181,9 +185,13 @@ final class JournalAddViewModel: BaseViewModel {
                 if let imageProvider = metadata.imageProvider {
                     imageProvider.loadObject(ofClass: UIImage.self) { imageObj, _ in
                         let image = imageObj as? UIImage
+                        let preview = CachedLinkPreview(title: title, description: desc, image: image)
+                        LinkPreviewMemoryCache.shared.store(preview, for: url)
                         single(.success((title, desc, image)))
                     }
                 } else {
+                    let preview = CachedLinkPreview(title: title, description: desc, image: nil)
+                    LinkPreviewMemoryCache.shared.store(preview, for: url)
                     single(.success((title, desc, nil)))
                 }
             }
