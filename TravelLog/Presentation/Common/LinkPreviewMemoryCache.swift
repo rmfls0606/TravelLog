@@ -11,6 +11,12 @@ struct CachedLinkPreview {
     let title: String?
     let description: String?
     let image: UIImage?
+
+    var hasUsableMetadata: Bool {
+        let hasTitle = !(title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let hasDescription = !(description?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        return hasTitle && hasDescription
+    }
 }
 
 final class LinkPreviewMemoryCache {
@@ -29,6 +35,10 @@ final class LinkPreviewMemoryCache {
 
         let key = url.absoluteString
         guard let preview = storage[key] else { return nil }
+        guard preview.hasUsableMetadata else {
+            removeValue(forKey: key)
+            return nil
+        }
 
         moveKeyToRecent(key)
         return preview
@@ -37,6 +47,8 @@ final class LinkPreviewMemoryCache {
     func store(_ preview: CachedLinkPreview, for url: URL) {
         lock.lock()
         defer { lock.unlock() }
+
+        guard preview.hasUsableMetadata else { return }
 
         let key = url.absoluteString
         storage[key] = preview

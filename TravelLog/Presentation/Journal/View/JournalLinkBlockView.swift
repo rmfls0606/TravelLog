@@ -325,7 +325,12 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
             }
 
             let provider = LPMetadataProvider()
-            provider.startFetchingMetadata(for: url) { metadata, _ in
+            provider.startFetchingMetadata(for: url) { metadata, error in
+                if error != nil {
+                    single(.success(.failed(url.absoluteString)))
+                    return
+                }
+
                 guard let metadata else {
                     single(.success(.failed(url.absoluteString)))
                     return
