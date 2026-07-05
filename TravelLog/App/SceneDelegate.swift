@@ -20,16 +20,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         window = UIWindow(windowScene: windowScene)
         
-        #if DEBUG
-        let vc: UIViewController
-        if ProcessInfo.processInfo.arguments.contains("-LinkPreviewVisualTest") {
-            vc = LinkPreviewVisualTestViewController()
-        } else {
-            vc = TripsViewController()
-        }
-        #else
         let vc = TripsViewController()
-        #endif
         let nav = UINavigationController(rootViewController: vc)
         
         window?.rootViewController = nav

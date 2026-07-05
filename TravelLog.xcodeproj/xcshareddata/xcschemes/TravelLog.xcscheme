@@ -76,10 +76,6 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "-LinkPreviewVisualTest"
-            isEnabled = "YES">
-         </CommandLineArgument>
-         <CommandLineArgument
             argument = "-PhotoPickerCacheMode"
             isEnabled = "YES">
          </CommandLineArgument>
