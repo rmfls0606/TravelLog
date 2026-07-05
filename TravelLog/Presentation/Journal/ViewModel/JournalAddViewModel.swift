@@ -181,18 +181,10 @@ final class JournalAddViewModel: BaseViewModel {
                 let title = metadata.title ?? url.host ?? "링크 미리보기"
                 let desc = metadata.value(forKey: "summary") as? String ?? url.absoluteString
 
-                // 이미지 로드
-                if let imageProvider = metadata.imageProvider {
-                    imageProvider.loadObject(ofClass: UIImage.self) { imageObj, _ in
-                        let image = imageObj as? UIImage
-                        let preview = CachedLinkPreview(title: title, description: desc, image: image)
-                        LinkPreviewMemoryCache.shared.store(preview, for: url)
-                        single(.success((title, desc, image)))
-                    }
-                } else {
-                    let preview = CachedLinkPreview(title: title, description: desc, image: nil)
+                LinkPreviewImageLoader.loadImage(from: metadata) { image in
+                    let preview = CachedLinkPreview(title: title, description: desc, image: image)
                     LinkPreviewMemoryCache.shared.store(preview, for: url)
-                    single(.success((title, desc, nil)))
+                    single(.success((title, desc, image)))
                 }
             }
 

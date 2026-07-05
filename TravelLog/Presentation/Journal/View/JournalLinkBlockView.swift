@@ -339,26 +339,14 @@ final class JournalLinkBlockView: BaseView, UITextFieldDelegate {
                 let title = metadata.title ?? url.host ?? "링크 미리보기"
                 let description = metadata.value(forKey: "summary") as? String ?? url.absoluteString
 
-                if let imageProvider = metadata.imageProvider {
-                    imageProvider.loadObject(ofClass: UIImage.self) { imageObj, _ in
-                        let image = imageObj as? UIImage
-                        let cached = CachedLinkPreview(
-                            title: title,
-                            description: description,
-                            image: image
-                        )
-                        LinkPreviewMemoryCache.shared.store(cached, for: url)
-                        let preview = PreviewData(title: title, description: description, image: image)
-                        single(.success(.loaded(preview)))
-                    }
-                } else {
+                LinkPreviewImageLoader.loadImage(from: metadata) { image in
                     let cached = CachedLinkPreview(
                         title: title,
                         description: description,
-                        image: nil
+                        image: image
                     )
                     LinkPreviewMemoryCache.shared.store(cached, for: url)
-                    let preview = PreviewData(title: title, description: description, image: nil)
+                    let preview = PreviewData(title: title, description: description, image: image)
                     single(.success(.loaded(preview)))
                 }
             }
