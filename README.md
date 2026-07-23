@@ -99,9 +99,9 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 - 핵심 포인트: cache-first 파이프라인으로 원격 호출 최소화
 
 ### 2) 링크 미리보기 파이프라인
-- 기술 목표: 사용자가 입력한 다양한 URL을 같은 링크 기준으로 정규화하고, 미리보기 실패가 작성 흐름을 막지 않도록 처리
-- 설계/구현: scheme 보정, host 소문자화, trailing slash/fragment/tracking query 제거, 문장 내 URL 추출 후 `LPMetadataProvider`로 title/description/imageProvider/iconProvider 순서 처리
-- 핵심 포인트: 정규화 URL 기반 메모리 캐시로 동일 링크 중복 요청을 줄이고, `www` 유무는 같은 캐시 키로 통합. title/description이 유효한 결과만 캐시해 오프라인/일시 실패 응답 재사용 방지
+- 기술 목표: 실시간 입력 기반 미리보기에서 동일 URL의 메타데이터 반복 요청을 줄이고, 다양한 입력 형태의 URL을 일관된 기준으로 판별
+- 설계/구현: scheme 보정, host 소문자화, trailing slash/fragment/tracking query 제거, 문장 내 URL 추출 후 정규화 URL 기준 메모리 캐시 조회. 캐시에 없을 때만 `LPMetadataProvider`로 title/description/image를 요청하고, 대표 이미지가 없거나 로드에 실패하면 `iconProvider`를 fallback으로 처리
+- 핵심 포인트: title/description이 유효한 결과만 캐시해 네트워크 오류나 불완전한 응답 재사용을 방지하고, 저장된 메타데이터와 이미지는 Realm/Documents에 보관해 기록 조회 화면에서 재사용
 
 ### 3) 도시 이미지 백필 + 로컬 우선 렌더링
 - 기술 목표: 과거 데이터/오프라인에서도 이미지 표시 일관성 유지
@@ -130,8 +130,8 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 ![Link Metadata Recovery Flow](docs/troubleshooting/link-metadata-recovery-flow.svg)
 - 설계 목표: 누락 없이 저장하고, 과도한 재요청 방지
 - 선택: 상태 필드(`metadataUpdatedAt`, `fetchFailCount`) 기반 복구 경로 분리
-- 정책: 네트워크 복구 시 nil 상태 우선 복구 + TTL 만료 갱신
-- 기준값: TTL 30일, 실패 재시도 3회, Trip별 하루 1회 갱신
+- 정책: 네트워크 복구 시 아직 메타데이터가 저장되지 않은 링크만 선별해 재시도
+- 기준값: 실패 재시도 3회
 
 ### 3) 과거 데이터 호환성
 ![Legacy Compatibility + Backfill](docs/troubleshooting/legacy-backfill-compatibility-flow.svg)
@@ -165,10 +165,10 @@ URL 정규화 + 메타데이터 자동 추출 + 링크 이동
 - 결과: 중복 문서 생성이 줄고 검색 결과 일관성이 개선됨
 
 ### 2) 링크 메타데이터 누락/반복 요청
-- 문제: 오프라인/일시 오류 상황에서 링크 미리보기가 누락되거나 재요청이 반복됨
-- 원인: 실패 상태 추적 필드가 없어 재시도 타이밍을 제어하기 어려웠음
-- 해결: `metadataUpdatedAt`, `fetchFailCount` 도입 + TTL 30일 + 재시도 3회 정책 적용
-- 결과: 불필요 호출이 줄고, 네트워크 복구 시 누락 데이터가 점진적으로 복원됨
+- 문제: 실시간 입력 기반 링크 미리보기에서 동일 URL의 메타데이터 요청이 반복되거나, 오프라인/일시 오류로 미리보기가 누락될 수 있었음
+- 원인: 입력 이벤트마다 LinkPresentation 요청 대상으로 다시 처리될 수 있고, 실패 상태를 구분하지 않으면 불완전한 응답 재사용 또는 과도한 재시도가 발생할 수 있었음
+- 해결: 정규화 URL 기준 메모리 캐시를 추가하고, title/description이 유효한 결과만 캐시. 저장 이후에는 `metadataUpdatedAt`, `fetchFailCount`로 누락 링크를 구분해 네트워크 복구 시 최대 3회만 재시도
+- 결과: 작성 화면의 중복 메타데이터 요청을 줄이고, 실패한 링크는 네트워크 복구 시 선별적으로 보완되도록 개선
 
 ### 3) 과거 데이터 도시 이미지 누락
 - 문제: 스키마 확장 이전 데이터에는 이미지 URL·로컬 파일명이 없어 화면별 fallback 로직이 분산될 수 있었음
