@@ -47,6 +47,10 @@ final class PhotoPickerViewController: UIViewController {
     private var isShowingSkeleton = true
     private let skeletonItemCount = 15
     private var lastContentOffsetY: CGFloat = 0
+    private var lastPreheatOffsetY: CGFloat = 0
+    private var lastPreheatUpdateTime: TimeInterval = 0
+    private let preheatUpdateMinInterval: TimeInterval = 0.12
+    private let preheatUpdateMinDistance: CGFloat = 120
     
     private var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -110,7 +114,7 @@ final class PhotoPickerViewController: UIViewController {
         super.viewDidLayoutSubviews()
         updatePreheatedAssets()
     }
-    
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         viewModel.stopPreheatingAssets()
@@ -198,12 +202,14 @@ final class PhotoPickerViewController: UIViewController {
                 // (NEW) 카메라 셀 오프셋 적용
                 let offsetPaths = newIndexPaths.map { IndexPath(item: $0.item + 1, section: $0.section) }
                 
-                self.collectionView.performBatchUpdates({
-                    self.collectionView.insertItems(at: offsetPaths)
-                }, completion: { _ in
-                    self.viewModel.didFinishUpdatingUI()
-                    self.updatePreheatedAssets()
-                })
+                UIView.performWithoutAnimation {
+                    self.collectionView.performBatchUpdates({
+                        self.collectionView.insertItems(at: offsetPaths)
+                    }, completion: { _ in
+                        self.viewModel.didFinishUpdatingUI()
+                        self.updatePreheatedAssets()
+                    })
+                }
             }else{
                 self.viewModel.didFinishUpdatingUI()
                 self.isShowingSkeleton = self.viewModel.isInitialLoading
@@ -290,6 +296,26 @@ final class PhotoPickerViewController: UIViewController {
         let itemSize = (collectionView.bounds.width - 4) / 3
         let targetSize = CGSize(width: itemSize * scale, height: itemSize * scale)
         viewModel.updatePreheatedAssets(around: visibleIndexes, targetSize: targetSize, direction: direction)
+    }
+    
+    private func shouldUpdatePreheating(for offsetY: CGFloat) -> Bool {
+        let now = Date().timeIntervalSinceReferenceDate
+        
+        guard lastPreheatUpdateTime > 0 else {
+            lastPreheatUpdateTime = now
+            lastPreheatOffsetY = offsetY
+            return true
+        }
+        
+        let elapsed = now - lastPreheatUpdateTime
+        let movedDistance = abs(offsetY - lastPreheatOffsetY)
+        guard elapsed >= preheatUpdateMinInterval, movedDistance >= preheatUpdateMinDistance else {
+            return false
+        }
+        
+        lastPreheatUpdateTime = now
+        lastPreheatOffsetY = offsetY
+        return true
     }
     
     @objc
@@ -703,7 +729,6 @@ extension PhotoPickerViewController: UICollectionViewDataSource {
 }
 
 extension PhotoPickerViewController: UICollectionViewDelegate {
-    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         
         // (FIX) '선택 드래그'가 시작되었다면 (panMode == .selecting), 탭 이벤트를 무시합니다.
@@ -836,7 +861,9 @@ extension PhotoPickerViewController: UIScrollViewDelegate{
             viewModel.loadMoreAssetsIfNeeded()
         }
         
-        updatePreheatedAssets(direction: direction)
+        if shouldUpdatePreheating(for: currentOffsetY) {
+            updatePreheatedAssets(direction: direction)
+        }
     }
 }
 
