@@ -11,12 +11,16 @@ import {setGlobalOptions} from "firebase-functions";
 // import {onRequest} from "firebase-functions/https";
 // import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import {onCall, onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
 import {getDownloadURL, getStorage} from "firebase-admin/storage";
+import Anthropic from "@anthropic-ai/sdk";
 
 admin.initializeApp();
 const db = admin.firestore();
+
+const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
 // API Key test
 // export const testEnv = functions.https.onRequest((req, res) => {
@@ -434,6 +438,260 @@ export const searchCity = onCall(async (request) => {
     cities: [city],
   };
 });
+
+// ---------------------------------------------------------------------------
+// Ticket OCR (parseTicketImage)
+// ---------------------------------------------------------------------------
+
+type TicketTransport = "airplane" | "bus" | "train";
+
+type TicketExtraction = {
+  isTicket: boolean;
+  transport: TicketTransport | null;
+  departureCity: string | null;
+  departureCityKorean: string | null;
+  departureCountry: string | null;
+  destinationCity: string | null;
+  destinationCityKorean: string | null;
+  destinationCountry: string | null;
+  startDate: string | null;
+  startTime: string | null;
+  endDate: string | null;
+  endTime: string | null;
+  confidence: number;
+  notes: string | null;
+};
+
+const TICKET_EXTRACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    isTicket: {
+      type: "boolean",
+      description:
+        "Whether the image is a readable transportation ticket or " +
+        "boarding pass (bus, train, or airplane) that shows route and " +
+        "date information. False for unrelated photos or unreadable " +
+        "images.",
+    },
+    transport: {
+      anyOf: [
+        {type: "string", enum: ["airplane", "bus", "train"]},
+        {type: "null"},
+      ],
+      description: "The mode of transport shown on the ticket.",
+    },
+    departureCity: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Departure city name, as its commonly-used English/international " +
+        "name (e.g. 'Incheon', 'Seoul', 'Paris', 'Phu Quoc') — this name " +
+        "is used as a search query against a worldwide place database, " +
+        "which matches English/international names far more reliably " +
+        "than a Korean transliteration for less-famous places. The " +
+        "app itself will localize the resolved city into Korean for " +
+        "display, so do not translate it yourself.",
+    },
+    departureCityKorean: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "The same departure city, but as the commonly-used Korean name/" +
+        "transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — used " +
+        "only as a display fallback for places Google's database has no " +
+        "Korean translation for. Use the well-known Korean " +
+        "transliteration, not a literal/character-by-character " +
+        "transcription.",
+    },
+    departureCountry: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Best-guess country of the departure city, in Korean (e.g. " +
+        "'대한민국', '프랑스', '베트남') — matching this app's data, " +
+        "which stores country names in Korean for every country.",
+    },
+    destinationCity: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Destination city name, as its commonly-used English/" +
+        "international name (e.g. 'Incheon', 'Seoul', 'Paris', 'Phu " +
+        "Quoc') — this name is used as a search query against a " +
+        "worldwide place database, which matches English/international " +
+        "names far more reliably than a Korean transliteration for " +
+        "less-famous places. The app itself will localize the resolved " +
+        "city into Korean for display, so do not translate it yourself.",
+    },
+    destinationCityKorean: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "The same destination city, but as the commonly-used Korean " +
+        "name/transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — " +
+        "used only as a display fallback for places Google's database " +
+        "has no Korean translation for. Use the well-known Korean " +
+        "transliteration, not a literal/character-by-character " +
+        "transcription.",
+    },
+    destinationCountry: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Best-guess country of the destination city, in Korean (e.g. " +
+        "'대한민국', '프랑스', '베트남') — matching this app's data, " +
+        "which stores country names in Korean for every country.",
+    },
+    startDate: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description: "Departure date in ISO 8601 (YYYY-MM-DD).",
+    },
+    startTime: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Departure time in 24-hour HH:mm, if shown on the ticket.",
+    },
+    endDate: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Arrival or return date in ISO 8601 (YYYY-MM-DD), if shown (e.g. " +
+        "a round-trip or multi-day ticket). Null if not shown.",
+    },
+    endTime: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description: "Arrival time in 24-hour HH:mm, if shown on the ticket.",
+    },
+    confidence: {
+      type: "number",
+      description:
+        "Overall confidence in this extraction, from 0 (no confidence) " +
+        "to 1 (fully confident).",
+    },
+    notes: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Any ambiguity or assumption worth flagging to the user, in " +
+        "English. Null if none.",
+    },
+  },
+  required: [
+    "isTicket", "transport", "departureCity", "departureCityKorean",
+    "departureCountry", "destinationCity", "destinationCityKorean",
+    "destinationCountry", "startDate", "startTime",
+    "endDate", "endTime", "confidence", "notes",
+  ],
+  additionalProperties: false,
+};
+
+const TICKET_EXTRACTION_SYSTEM_PROMPT =
+  "You extract structured trip data from a single photo of a public " +
+  "transportation ticket or boarding pass. Tickets may be for a bus, " +
+  "train, or airplane, from any country, in any language, and in any " +
+  "layout (printed, mobile screenshot, or handwritten). Read the whole " +
+  "image carefully, including small print, before answering. If the " +
+  "image is not a recognizable ticket, set isTicket to false and leave " +
+  "the other fields null except confidence (0) and notes (briefly why). " +
+  "Never guess a date or city you cannot actually read on the ticket — " +
+  "use null instead of fabricating a value.";
+
+const ALLOWED_TICKET_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+] as const;
+
+type TicketImageMediaType = typeof ALLOWED_TICKET_IMAGE_MEDIA_TYPES[number];
+
+// ~5MB of base64 (roughly 3.7MB original image) — comfortably under the
+// callable function's 10MB request-body limit while still allowing a
+// reasonably high-resolution photo.
+const MAX_TICKET_IMAGE_BASE64_LENGTH = 5 * 1024 * 1024;
+
+function isTicketImageMediaType(value: string): value is TicketImageMediaType {
+  return (ALLOWED_TICKET_IMAGE_MEDIA_TYPES as readonly string[]).includes(value);
+}
+
+export const parseTicketImage = onCall(
+  {secrets: [anthropicApiKey]},
+  async (request): Promise<{ result: TicketExtraction }> => {
+    const imageBase64 = (request.data?.imageBase64 ?? "") as string;
+    const mimeType = (request.data?.mimeType ?? "") as string;
+
+    if (!imageBase64) {
+      throw new HttpsError("invalid-argument", "imageBase64 is required");
+    }
+    if (!isTicketImageMediaType(mimeType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        `mimeType must be one of: ${ALLOWED_TICKET_IMAGE_MEDIA_TYPES.join(", ")}`
+      );
+    }
+    if (imageBase64.length > MAX_TICKET_IMAGE_BASE64_LENGTH) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Image is too large; please resize before uploading"
+      );
+    }
+
+    const client = new Anthropic({apiKey: anthropicApiKey.value()});
+
+    let response;
+    try {
+      response = await client.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 2048,
+        // 정해진 스키마로 이미지 한 장을 읽어 채우는, 다단계 추론이 필요 없는 작업이라
+        // thinking을 끄고 effort를 낮춰 토큰 사용량을 줄인다. (특정 티켓 형식에서
+        // 정확도가 떨어지면 가장 먼저 되돌려볼 지점이기도 하다.)
+        thinking: {type: "disabled"},
+        system: TICKET_EXTRACTION_SYSTEM_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mimeType,
+                data: imageBase64,
+              },
+            },
+            {
+              type: "text",
+              text: "Extract the trip data from this ticket photo.",
+            },
+          ],
+        }],
+        output_config: {
+          format: {type: "json_schema", schema: TICKET_EXTRACTION_SCHEMA},
+          effort: "low",
+        },
+      });
+    } catch (error) {
+      console.error("parseTicketImage: Claude request failed", error);
+      throw new HttpsError("internal", "Failed to reach the extraction model");
+    }
+
+    if (response.stop_reason === "refusal") {
+      throw new HttpsError(
+        "failed-precondition",
+        "The model declined to process this image"
+      );
+    }
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      throw new HttpsError("internal", "No structured result returned");
+    }
+
+    let result: TicketExtraction;
+    try {
+      result = JSON.parse(textBlock.text) as TicketExtraction;
+    } catch (error) {
+      console.error("parseTicketImage: failed to parse model output", error);
+      throw new HttpsError("internal", "Failed to parse extraction result");
+    }
+
+    console.log("parseTicketImage: extraction result", result);
+
+    return {result};
+  }
+);
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
