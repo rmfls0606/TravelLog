@@ -360,18 +360,29 @@ final class DateRangeCardView: BaseCardView {
     }
     
     func updateRange(start: Date?, end: Date?){
-        guard let start, let end else { return }
-        
+        // 도착일 없이 출발일만 아는 경우(티켓 스캔 등)에도 아무것도 안 보여주지 않고,
+        // 아는 만큼(출발일)은 반영하고 도착일 자리에는 안내 문구를 띄운다.
+        guard let start else {
+            placeholderStack.isHidden = false
+            dateStack.isHidden = true
+            return
+        }
+
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "M월 d일"
-        
+
         departDateLabel.text = formatter.string(from: start)
-        arriveDateLabel.text = formatter.string(from: end)
-        
-        let days = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 0
-        durationLabel.text = "\(days + 1)일 여행"
-        
+
+        if let end {
+            arriveDateLabel.text = formatter.string(from: end)
+            let days = Calendar.current.dateComponents([.day], from: start, to: end).day ?? 0
+            durationLabel.text = "\(days + 1)일 여행"
+        } else {
+            arriveDateLabel.text = "도착일 미정"
+            durationLabel.text = "도착일을 선택해주세요"
+        }
+
         placeholderStack.isHidden = true
         dateStack.isHidden = false
         
