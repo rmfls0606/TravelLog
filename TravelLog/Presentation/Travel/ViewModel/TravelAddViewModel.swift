@@ -225,11 +225,13 @@ final class TravelAddViewModel: BaseViewModel {
                 return Single.zip(
                     self.resolveScannedCityUseCase.execute(
                         cityName: result.departureCity,
-                        countryHint: result.departureCountry
+                        countryHint: result.departureCountry,
+                        displayNameHint: result.departureCityKorean
                     ),
                     self.resolveScannedCityUseCase.execute(
                         cityName: result.destinationCity,
-                        countryHint: result.destinationCountry
+                        countryHint: result.destinationCountry,
+                        displayNameHint: result.destinationCityKorean
                     )
                 )
                 .map { departureCity, destinationCity in

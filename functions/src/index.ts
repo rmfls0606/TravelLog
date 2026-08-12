@@ -77,19 +77,6 @@ function sortCitiesByQuery(cities: CityDoc[], queryLower: string): CityDoc[] {
   });
 }
 
-function normalizeCityName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/^city of /, "")
-    .replace(/ city$/, "")
-    .replace(/-si$/, "")
-    .replace(/^시티 오브 /, "")
-    .replace(/시$/, "")
-    .replace(/군$/, "")
-    .replace(/구$/, "")
-    .trim();
-}
-
 function projectId(): string | null {
   return process.env.GCLOUD_PROJECT ||
     process.env.GCP_PROJECT ||
@@ -310,10 +297,13 @@ async function findPlaceSmart(
   return scored[0]?.prediction?.place_id ?? null;
 }
 
+const HANGUL_PATTERN = /[가-힣]/;
+
 async function getOrCreateCityByPlaceId(
   placeId: string,
   apiKey: string,
-  query: string
+  query: string,
+  displayNameHint: string | null
 ): Promise<CityDoc | null> {
   const existingSnap = await db.collection("cities").doc(placeId).get();
   const existingData = existingSnap.data() as CityDoc | undefined;
@@ -372,16 +362,13 @@ async function getOrCreateCityByPlaceId(
     return null;
   }
 
-  // 🔥 이름 비교 (시/군/구 제거 후 비교)
-  const input = normalizeCityName(query);
-  const result = normalizeCityName(name);
-
-  if (result !== input && !result.startsWith(input)) {
-    console.log("getOrCreateCityByPlaceId: rejected — name mismatch", {
-      placeId, query, name, normalizedInput: input, normalizedResult: result,
-    });
-    return null;
-  }
+  // 이름 비교는 하지 않는다: details를 항상 language: "ko"로 요청하므로 name은
+  // 한국어로 로컬라이즈되지만, query는 findPlaceSmart에 넘긴 원문(외국 도시는 영어/
+  // 현지어일 수 있음) 그대로다. 서로 다른 언어를 문자열로 비교하면 해외 도시는
+  // 거의 항상 불일치로 잘못 걸러진다. 실제 검증은 findPlaceSmart가 이미 같은 언어의
+  // 예측 텍스트(mainText/description)로 유사도 순위를 매겨 최적 후보를 고르는 단계에서
+  // 끝났으므로, 여기서는 국가/행정구역 타입 검증만으로 충분하다.
+  console.log("getOrCreateCityByPlaceId: accepted", {placeId, query, name, country});
 
   const lat = details.geometry?.location?.lat;
   const lng = details.geometry?.location?.lng;
@@ -401,11 +388,19 @@ async function getOrCreateCityByPlaceId(
     }
   }
 
+  // Google이 이 place에 대해 한국어 번역을 갖고 있지 않으면 language: "ko"를
+  // 요청해도 name이 영어/현지어 그대로 온다 (예: "Phu Quoc"). 이미 한글로 온
+  // 경우는 손대지 않고, 한글이 아닐 때만 티켓 스캔이 함께 보낸 한글 이름
+  // 힌트로 대체한다 — 기존에 이미 정상적으로 한글화된 도시(예: 인천, 서울)의
+  // 이름을 실수로 덮어쓰지 않기 위함이다.
+  const trimmedHint = displayNameHint?.trim();
+  const resolvedName = (!HANGUL_PATTERN.test(name) && trimmedHint) ? trimmedHint : name;
+
   const doc: CityDoc = {
     cityId: placeId,
-    name,
+    name: resolvedName,
     country,
-    nameLower: normalize(name),
+    nameLower: normalize(resolvedName),
     countryLower: normalize(country),
     lat,
     lng,
@@ -423,6 +418,11 @@ export const searchCity = onCall(async (request) => {
   const queryRaw = (request.data?.query ?? "") as string;
   // const language = ((request.data?.language ?? "ko") as string) || "ko";
   const limit = Math.min(Math.max(Number(request.data?.limit ?? 10), 1), 20);
+  const displayNameHintRaw = request.data?.displayName;
+  const displayNameHint =
+    typeof displayNameHintRaw === "string" && displayNameHintRaw.trim() ?
+      displayNameHintRaw.trim() :
+      null;
 
   const query = queryRaw.trim();
   if (!query) {
@@ -463,7 +463,8 @@ export const searchCity = onCall(async (request) => {
   const city = await getOrCreateCityByPlaceId(
     placeId,
     apiKey,
-    query // 🔥 language 대신 query 넘긴다
+    query, // 🔥 language 대신 query 넘긴다
+    displayNameHint
   );
 
   if (!city) {
@@ -488,8 +489,10 @@ type TicketExtraction = {
   isTicket: boolean;
   transport: TicketTransport | null;
   departureCity: string | null;
+  departureCityKorean: string | null;
   departureCountry: string | null;
   destinationCity: string | null;
+  destinationCityKorean: string | null;
   destinationCountry: string | null;
   startDate: string | null;
   startTime: string | null;
@@ -520,12 +523,23 @@ const TICKET_EXTRACTION_SCHEMA = {
     departureCity: {
       anyOf: [{type: "string"}, {type: "null"}],
       description:
-        "Departure city name, in the commonly-used Korean name/" +
-        "transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — this " +
-        "app's city database is indexed in Korean regardless of the " +
-        "city's country, so an English or other-language name will " +
-        "fail to match. Use the well-known Korean transliteration for " +
-        "the city, not a literal/character-by-character transcription.",
+        "Departure city name, as its commonly-used English/international " +
+        "name (e.g. 'Incheon', 'Seoul', 'Paris', 'Phu Quoc') — this name " +
+        "is used as a search query against a worldwide place database, " +
+        "which matches English/international names far more reliably " +
+        "than a Korean transliteration for less-famous places. The " +
+        "app itself will localize the resolved city into Korean for " +
+        "display, so do not translate it yourself.",
+    },
+    departureCityKorean: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "The same departure city, but as the commonly-used Korean name/" +
+        "transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — used " +
+        "only as a display fallback for places Google's database has no " +
+        "Korean translation for. Use the well-known Korean " +
+        "transliteration, not a literal/character-by-character " +
+        "transcription.",
     },
     departureCountry: {
       anyOf: [{type: "string"}, {type: "null"}],
@@ -537,12 +551,23 @@ const TICKET_EXTRACTION_SCHEMA = {
     destinationCity: {
       anyOf: [{type: "string"}, {type: "null"}],
       description:
-        "Destination city name, in the commonly-used Korean name/" +
-        "transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — this " +
-        "app's city database is indexed in Korean regardless of the " +
-        "city's country, so an English or other-language name will " +
-        "fail to match. Use the well-known Korean transliteration for " +
-        "the city, not a literal/character-by-character transcription.",
+        "Destination city name, as its commonly-used English/" +
+        "international name (e.g. 'Incheon', 'Seoul', 'Paris', 'Phu " +
+        "Quoc') — this name is used as a search query against a " +
+        "worldwide place database, which matches English/international " +
+        "names far more reliably than a Korean transliteration for " +
+        "less-famous places. The app itself will localize the resolved " +
+        "city into Korean for display, so do not translate it yourself.",
+    },
+    destinationCityKorean: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "The same destination city, but as the commonly-used Korean " +
+        "name/transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — " +
+        "used only as a display fallback for places Google's database " +
+        "has no Korean translation for. Use the well-known Korean " +
+        "transliteration, not a literal/character-by-character " +
+        "transcription.",
     },
     destinationCountry: {
       anyOf: [{type: "string"}, {type: "null"}],
@@ -584,8 +609,9 @@ const TICKET_EXTRACTION_SCHEMA = {
     },
   },
   required: [
-    "isTicket", "transport", "departureCity", "departureCountry",
-    "destinationCity", "destinationCountry", "startDate", "startTime",
+    "isTicket", "transport", "departureCity", "departureCityKorean",
+    "departureCountry", "destinationCity", "destinationCityKorean",
+    "destinationCountry", "startDate", "startTime",
     "endDate", "endTime", "confidence", "notes",
   ],
   additionalProperties: false,

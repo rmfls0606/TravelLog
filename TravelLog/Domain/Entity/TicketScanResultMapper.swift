@@ -25,8 +25,10 @@ enum TicketScanResultMapper {
             isTicket: isTicket,
             transport: mapTransport(dictionary["transport"] as? String),
             departureCity: dictionary["departureCity"] as? String,
+            departureCityKorean: dictionary["departureCityKorean"] as? String,
             departureCountry: dictionary["departureCountry"] as? String,
             destinationCity: dictionary["destinationCity"] as? String,
+            destinationCityKorean: dictionary["destinationCityKorean"] as? String,
             destinationCountry: dictionary["destinationCountry"] as? String,
             startDate: parseDate(
                 dateString: dictionary["startDate"] as? String,

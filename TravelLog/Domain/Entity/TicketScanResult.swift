@@ -12,8 +12,10 @@ struct TicketScanResult: Equatable {
     let transport: Transport?
 
     let departureCity: String?
+    let departureCityKorean: String?
     let departureCountry: String?
     let destinationCity: String?
+    let destinationCityKorean: String?
     let destinationCountry: String?
 
     let startDate: Date?

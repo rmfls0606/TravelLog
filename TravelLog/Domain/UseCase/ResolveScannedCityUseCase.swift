@@ -9,7 +9,7 @@ import Foundation
 import RxSwift
 
 protocol ResolveScannedCityUseCase {
-    func execute(cityName: String?, countryHint: String?) -> Single<City?>
+    func execute(cityName: String?, countryHint: String?, displayNameHint: String?) -> Single<City?>
 }
 
 //MARK: - 스캔된 도시 이름(+국가 힌트) 문자열을 기존 도시 검색 파이프라인을 통해 실제 City로 변환
@@ -21,13 +21,13 @@ final class ResolveScannedCityUseCaseImpl: ResolveScannedCityUseCase {
         self.fetchCitiesUseCase = fetchCitiesUseCase
     }
 
-    func execute(cityName: String?, countryHint: String?) -> Single<City?> {
+    func execute(cityName: String?, countryHint: String?, displayNameHint: String?) -> Single<City?> {
         guard let cityName else { return .just(nil) }
 
         let trimmed = cityName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .just(nil) }
 
-        return fetchCitiesUseCase.execute(query: trimmed)
+        return fetchCitiesUseCase.execute(query: trimmed, displayNameHint: displayNameHint)
             .map { candidates in
                 ScannedCityMatcher.bestMatch(from: candidates, countryHint: countryHint)
             }
