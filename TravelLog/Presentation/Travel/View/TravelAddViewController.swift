@@ -9,6 +9,7 @@ import UIKit
 import SnapKit
 import RxSwift
 import RxCocoa
+import Toast
 
 final class TravelAddViewController: BaseViewController {
     
@@ -101,6 +102,10 @@ final class TravelAddViewController: BaseViewController {
     
     private var transportButtons: [UIButton] = []
     
+    // Ticket Scan
+    let ticketScanCard = TicketScanCardView()
+    let ticketImageRelay = PublishRelay<(imageData: Data, mimeType: String)>()
+
     private let dateRangeCard = DateRangeCardView()
     
     // FormCards
@@ -148,7 +153,10 @@ final class TravelAddViewController: BaseViewController {
         headerIconContainer.addSubview(headerIcon)
         headerView.addArrangedSubview(headerTitle)
         headerView.addArrangedSubview(headerSubtitle)
-        
+
+        // Ticket Scan Section
+        contentView.addArrangedSubview(ticketScanCard)
+
         // Transport Section
         contentView.addArrangedSubview(transportCard)
         transportCard.addSubview(transportHeader)
@@ -232,6 +240,7 @@ final class TravelAddViewController: BaseViewController {
         departureCard.accessibilityIdentifier = "travel_departCard_view"
         destinationCard.accessibilityIdentifier = "travel_destCard_view"
         createButton.accessibilityIdentifier = "travel_create_btn"
+        ticketScanCard.accessibilityIdentifier = "travel_ticketScan_card"
     }
     
     override func configureBind() {
@@ -256,7 +265,8 @@ final class TravelAddViewController: BaseViewController {
             transportSelected: transportSelected,
             dateSelected: dateSelected,
             calendarTapped: dateRangeCard.tapGesture.rx.event.map{ _ in },
-            createButtonTapped: createButton.rx.tap
+            createButtonTapped: createButton.rx.tap,
+            ticketImageSelected: ticketImageRelay.asObservable()
         )
         
         let output = viewModel.transform(input: input)
@@ -322,6 +332,53 @@ final class TravelAddViewController: BaseViewController {
             }
             .disposed(by: disposeBag)
         
+        ticketScanCard.tapGesture.rx.event
+            .bind(with: self) { owner, _ in
+                owner.presentTicketCaptureOptions()
+            }
+            .disposed(by: disposeBag)
+
+        output.isScanningTicket
+            .drive(with: self) { owner, isScanning in
+                owner.ticketScanCard.setLoading(isScanning)
+            }
+            .disposed(by: disposeBag)
+
+        output.ticketScanApplied
+            .emit(with: self) { owner, summary in
+                if let name = summary.departureCityName {
+                    owner.departureCard.updateValue(name)
+                }
+                if let name = summary.destinationCityName {
+                    owner.destinationCard.updateValue(name)
+                }
+
+                // 신뢰도가 낮으면 그냥 채워 넣기만 하지 않고, 다시 한번 확인이 필요하다는 걸 명확히 알림
+                if summary.confidence < TicketScanCardView.lowConfidenceThreshold {
+                    var style = ToastStyle()
+                    style.backgroundColor = .systemOrange
+                    style.messageColor = .white
+                    owner.view.makeToast(
+                        "티켓을 읽긴 했지만 확신이 낮아요. 채워진 내용을 꼭 확인해주세요.",
+                        duration: 3.0,
+                        position: .top,
+                        style: style
+                    )
+                } else {
+                    owner.view.makeToast("티켓 내용을 채워 넣었어요. 내용을 확인해주세요.", duration: 2.0, position: .top)
+                }
+            }
+            .disposed(by: disposeBag)
+
+        output.ticketScanFailed
+            .emit(with: self) { owner, message in
+                var style = ToastStyle()
+                style.backgroundColor = .systemRed
+                style.messageColor = .white
+                owner.view.makeToast(message, duration: 2.5, position: .top, style: style)
+            }
+            .disposed(by: disposeBag)
+
         output.toastMessage
             .distinctUntilChanged()
             .emit(with: self) { owner, message in
