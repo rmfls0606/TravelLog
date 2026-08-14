@@ -15,27 +15,9 @@ import Toast
 
 extension TravelAddViewController {
 
-    //MARK: - 촬영/앨범 선택 액션시트
+    //MARK: - 촬영/앨범 선택 진입점
 
-    func presentTicketCaptureOptions() {
-        let sheet = UIAlertController(title: "티켓 사진 추가", message: nil, preferredStyle: .actionSheet)
-
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            sheet.addAction(UIAlertAction(title: "사진 촬영", style: .default) { [weak self] _ in
-                self?.presentTicketCamera()
-            })
-        }
-
-        sheet.addAction(UIAlertAction(title: "앨범에서 선택", style: .default) { [weak self] _ in
-            self?.presentTicketPhotoPicker()
-        })
-
-        sheet.addAction(UIAlertAction(title: "취소", style: .cancel))
-
-        present(sheet, animated: true)
-    }
-
-    private func presentTicketCamera() {
+    func presentTicketCamera() {
         let camera = TicketCameraViewController()
         camera.delegate = self
         // present(_:) 이후(viewDidLoad 시점)에 설정하면 이미 전환 스타일이
@@ -144,5 +126,11 @@ extension TravelAddViewController: TicketCameraViewControllerDelegate {
 
     func ticketCameraDidCancel(_ controller: TicketCameraViewController) {
         controller.dismiss(animated: true)
+    }
+
+    func ticketCameraDidTapPhotoLibrary(_ controller: TicketCameraViewController) {
+        controller.dismiss(animated: true) { [weak self] in
+            self?.presentTicketPhotoPicker()
+        }
     }
 }

@@ -334,7 +334,7 @@ final class TravelAddViewController: BaseViewController {
         
         ticketScanCard.tapGesture.rx.event
             .bind(with: self) { owner, _ in
-                owner.presentTicketCaptureOptions()
+                owner.presentTicketCamera()
             }
             .disposed(by: disposeBag)
 
