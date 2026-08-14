@@ -373,11 +373,15 @@ async function getOrCreateCityByPlaceId(
     return null;
   }
 
-  // 도시/행정구역급 결과만 허용 (개별 장소/주소 제외) — 국가에 관계없이 적용되는 일반 필터
+  // 도시/행정구역급 결과만 허용 (개별 장소/주소 제외) — 국가에 관계없이 적용되는 일반 필터.
+  // 괌은 자체 ISO 국가 코드를 가진 자치령이라 Google이 country 타입으로 분류하지만,
+  // 실질적으로는 하나의 도시/여행지 단위로 쓰이므로 예외로 허용한다.
+  const isGuam = country === "괌" && types.includes("country");
   const isAllowedAdmin =
     types.includes("locality") ||
     types.includes("administrative_area_level_1") ||
-    types.includes("administrative_area_level_2");
+    types.includes("administrative_area_level_2") ||
+    isGuam;
 
   if (!isAllowedAdmin) {
     console.log("getOrCreateCityByPlaceId: rejected — type not allowed", {placeId, name, types});
