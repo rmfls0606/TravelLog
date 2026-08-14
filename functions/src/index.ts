@@ -208,6 +208,13 @@ function isSubCitySuffixQuery(q: string): boolean {
   return /(읍|면|동)$/.test(s);
 }
 
+// 완성형 한글 음절(자모가 결합된 글자, 예: "괌")인지 판별한다. 미완성 자모
+// (ㄱ, ㅏ 등)나 영문/숫자 1글자와 달리, 완성형 한글 음절 1개는 "괌", "산"처럼
+// 그 자체로 의미 있는 지명일 수 있어 1글자 Google 호출 금지 예외로 둔다.
+function isSingleCompleteHangulSyllable(q: string): boolean {
+  return /^[가-힣]$/.test(q.trim());
+}
+
 // Firestore prefix range query helper
 async function prefixSearchCities(prefix: string, limit: number): Promise<CityDoc[]> {
   if (!prefix) return [];
@@ -458,8 +465,9 @@ export const searchCity = onCall(async (request) => {
   // 1) Firestore prefix cache first (always)
   const cached = await prefixSearchCities(lower, limit);
 
-  // 1글자 입력은 Google 호출 금지 (비용/오염 방어)
-  if (lower.length < 2) {
+  // 1글자 입력은 Google 호출 금지 (비용/오염 방어) — 단, "괌"처럼 그 자체로
+  // 지명이 될 수 있는 완성형 한글 음절 1개는 예외로 허용한다.
+  if (lower.length < 2 && !isSingleCompleteHangulSyllable(query)) {
     return {cities: cached, source: "cache-only"};
   }
 
