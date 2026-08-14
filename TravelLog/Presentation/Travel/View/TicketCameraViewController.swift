@@ -10,11 +10,14 @@
 //  (인식이 잘 안 될 때를 대비해 셔터 버튼으로 수동 트리거도 항상 가능 — 이 역시 사진을
 //  새로 찍는 게 아니라 같은 방식으로 "지금 화면"을 잘라서 쓴다.)
 //
-//  인식 판정은 두 단계로 이루어진다:
+//  인식 판정은 세 단계로 이루어진다:
 //   1) 문서 인식(VNDetectDocumentSegmentationRequest) — 사각형 문서 형태인지 확인
-//   2) 텍스트 인식(VNRecognizeTextRequest) — 그 사각형 안에 읽을 수 있는 글자가
+//   2) 가이드 포함 여부 — 감지된 문서 경계가 화면의 가이드 사각형(+크롭 여백) 안에
+//      완전히 들어와 있는지 확인 (티켓이 가이드보다 커서 일부가 밖으로 삐져나온 채로
+//      캡처되면, 크롭 시 그 부분이 잘려나가 정보 누락으로 이어지기 때문)
+//   3) 텍스트 인식(VNRecognizeTextRequest) — 그 사각형 안에 읽을 수 있는 글자가
 //      충분히 있는지 확인 (책, 카드, 상자 등 "모양만 비슷한" 물체를 걸러내기 위함)
-//  두 조건을 모두 만족해야 "티켓처럼 보인다"고 판단한다.
+//  세 조건을 모두 만족해야 "티켓처럼 보인다"고 판단한다.
 //
 
 import UIKit
@@ -308,13 +311,54 @@ final class TicketCameraViewController: BaseViewController {
     /// 이만큼(가이드 크기 대비 비율) 더 넉넉하게 잘라낸다.
     private static let cropPaddingFraction: CGFloat = 0.12
 
+    /// 가이드 사각형을, 실제 픽셀 버퍼(bufferWidth × bufferHeight) 기준 정규화 좌표계
+    /// (0...1, 좌상단 원점)로 변환한다. 크롭(픽셀 좌표 계산)과 실시간 가이드 포함 여부
+    /// 판정이 이 좌표를 함께 사용한다.
+    ///
+    /// `AVCaptureVideoPreviewLayer.metadataOutputRectConverted(fromLayerRect:)`를 쓰면 될
+    /// 것 같지만, 그 API는 previewLayer 자신의 connection(videoDataOutput의 connection과는
+    /// 별개)의 videoOrientation 상태에 의존한다. 실측 결과 그 connection이 안정적으로
+    /// portrait로 맞춰지지 않아(강제로 재설정해도 결과가 그대로) 가이드 사각형이 90도
+    /// 돌아간 채로 계산되는 문제가 있었다. 그래서 그 API를 쓰지 않고, previewLayer의
+    /// videoGravity(.resizeAspectFill)가 하는 크롭을 직접 재현한다 — 뷰 크기와 실제 버퍼
+    /// 크기만 있으면 계산할 수 있어 connection 상태와 무관하게 항상 정확하다.
+    private func normalizedGuideRect(bufferWidth: Int, bufferHeight: Int) -> CGRect? {
+        guard bufferWidth > 0, bufferHeight > 0 else { return nil }
+
+        let viewSize = previewContainerView.bounds.size
+        guard viewSize.width > 0, viewSize.height > 0 else { return nil }
+
+        let guideRectInPreview = guideOverlay.convert(guideOverlay.guideRect, to: previewContainerView)
+        let bufferSize = CGSize(width: bufferWidth, height: bufferHeight)
+
+        // resizeAspectFill: 버퍼를 뷰 전체가 덮이도록 확대하고, 넘치는 부분을 가운데
+        // 기준으로 잘라낸다. scale은 그 확대 배율, offset은 잘려나간 여백(뷰 좌표계 기준).
+        let scale = max(viewSize.width / bufferSize.width, viewSize.height / bufferSize.height)
+        let offsetX = (bufferSize.width * scale - viewSize.width) / 2
+        let offsetY = (bufferSize.height * scale - viewSize.height) / 2
+
+        let bufferPointRect = CGRect(
+            x: (guideRectInPreview.origin.x + offsetX) / scale,
+            y: (guideRectInPreview.origin.y + offsetY) / scale,
+            width: guideRectInPreview.width / scale,
+            height: guideRectInPreview.height / scale
+        )
+
+        return CGRect(
+            x: bufferPointRect.origin.x / bufferSize.width,
+            y: bufferPointRect.origin.y / bufferSize.height,
+            width: bufferPointRect.width / bufferSize.width,
+            height: bufferPointRect.height / bufferSize.height
+        )
+    }
+
     private func croppedToGuide(_ rawImage: UIImage) -> UIImage {
         let image = Self.normalizedUpOrientation(rawImage)
 
-        guard let previewLayer, let cgImage = image.cgImage else { return image }
-
-        let guideRectInPreview = guideOverlay.convert(guideOverlay.guideRect, to: previewContainerView)
-        let normalizedRect = previewLayer.metadataOutputRectConverted(fromLayerRect: guideRectInPreview)
+        guard
+            let cgImage = image.cgImage,
+            let normalizedRect = normalizedGuideRect(bufferWidth: cgImage.width, bufferHeight: cgImage.height)
+        else { return image }
 
         let imageBounds = CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height)
         let tightRect = CGRect(
@@ -366,6 +410,9 @@ extension TicketCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
         guard now.timeIntervalSince(lastAnalysisDate) >= Self.analysisMinInterval else { return }
         lastAnalysisDate = now
 
+        let bufferWidth = CVPixelBufferGetWidth(pixelBuffer)
+        let bufferHeight = CVPixelBufferGetHeight(pixelBuffer)
+
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
 
         // 1단계: 사각형(문서) 형태인지 확인. 일반 도형 인식(VNDetectRectanglesRequest)은
@@ -374,10 +421,17 @@ extension TicketCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
         let documentRequest = VNDetectDocumentSegmentationRequest()
         try? handler.perform([documentRequest])
 
-        let hasDocumentShape = (documentRequest.results ?? []).contains { $0.confidence >= 0.6 }
+        let documentBoundingBoxes = (documentRequest.results ?? [])
+            .filter { $0.confidence >= 0.6 }
+            .map(\.boundingBox)
 
-        guard hasDocumentShape else {
-            handleAlignmentResult(false)
+        guard !documentBoundingBoxes.isEmpty else {
+            handleAlignmentResult(
+                hasEnoughText: false,
+                documentBoundingBoxes: [],
+                bufferWidth: bufferWidth,
+                bufferHeight: bufferHeight
+            )
             return
         }
 
@@ -392,13 +446,34 @@ extension TicketCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
         let recognizedCharacterCount = (textRequest.results ?? [])
             .compactMap { $0.topCandidates(1).first?.string }
             .reduce(0) { $0 + $1.count }
+        let hasEnoughText = recognizedCharacterCount >= Self.minimumRecognizedCharacterCount
 
-        handleAlignmentResult(recognizedCharacterCount >= Self.minimumRecognizedCharacterCount)
+        handleAlignmentResult(
+            hasEnoughText: hasEnoughText,
+            documentBoundingBoxes: documentBoundingBoxes,
+            bufferWidth: bufferWidth,
+            bufferHeight: bufferHeight
+        )
     }
 
-    private func handleAlignmentResult(_ isAligned: Bool) {
+    /// 문서 인식/텍스트 인식은 백그라운드 큐에서 끝나지만, 가이드 사각형 포함 여부는
+    /// previewContainerView/guideOverlay 같은 UIKit 값을 읽어야 해서 메인 스레드에서만
+    /// 계산한다.
+    private func handleAlignmentResult(
+        hasEnoughText: Bool,
+        documentBoundingBoxes: [CGRect],
+        bufferWidth: Int,
+        bufferHeight: Int
+    ) {
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.isCapturing else { return }
+
+            let isDocumentFullyInGuide = self.isDocumentFullyInsideGuide(
+                among: documentBoundingBoxes,
+                bufferWidth: bufferWidth,
+                bufferHeight: bufferHeight
+            )
+            let isAligned = hasEnoughText && isDocumentFullyInGuide
 
             self.guideOverlay.setAligned(isAligned)
 
@@ -411,5 +486,36 @@ extension TicketCameraViewController: AVCaptureVideoDataOutputSampleBufferDelega
                 self.alignedStreak = 0
             }
         }
+    }
+
+    /// 감지된 문서 사각형 중 하나라도 "실제로 크롭될 영역(가이드 + 크롭 여백)" 안에
+    /// 완전히 들어와 있으면 true. 티켓이 가이드보다 크거나 밖으로 삐져나온 채로는
+    /// 통과하지 못하게 막아, 크롭 시 정보가 잘려나가는 것을 방지한다.
+    private func isDocumentFullyInsideGuide(
+        among documentBoundingBoxes: [CGRect],
+        bufferWidth: Int,
+        bufferHeight: Int
+    ) -> Bool {
+        guard
+            !documentBoundingBoxes.isEmpty,
+            let normalizedGuideRect = normalizedGuideRect(bufferWidth: bufferWidth, bufferHeight: bufferHeight)
+        else { return false }
+
+        let paddedGuideRect = normalizedGuideRect.insetBy(
+            dx: -normalizedGuideRect.width * Self.cropPaddingFraction,
+            dy: -normalizedGuideRect.height * Self.cropPaddingFraction
+        )
+
+        // normalizedGuideRect()는 CGImage 픽셀 좌표계와 맞춘 좌상단 원점(y 아래로 증가)
+        // 기준이지만, Vision이 반환하는 boundingBox는 좌하단 원점(y 위로 증가)이라 같은
+        // 사각형을 가리키려면 y축을 뒤집어야 한다.
+        let paddedGuideRectInVisionSpace = CGRect(
+            x: paddedGuideRect.origin.x,
+            y: 1 - paddedGuideRect.origin.y - paddedGuideRect.height,
+            width: paddedGuideRect.width,
+            height: paddedGuideRect.height
+        )
+
+        return documentBoundingBoxes.contains { paddedGuideRectInVisionSpace.contains($0) }
     }
 }
