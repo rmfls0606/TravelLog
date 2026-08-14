@@ -653,7 +653,15 @@ const TICKET_EXTRACTION_SYSTEM_PROMPT =
   "image is not a recognizable ticket, set isTicket to false and leave " +
   "the other fields null except confidence (0) and notes (briefly why). " +
   "Never guess a date or city you cannot actually read on the ticket — " +
-  "use null instead of fabricating a value.";
+  "use null instead of fabricating a value. If the ticket shows a " +
+  "3-letter IATA airport code (e.g. ICN, GMP, NRT, HND, CDG), report " +
+  "the city where THAT SPECIFIC airport is physically located, not a " +
+  "broader metro-area label that may be printed next to it for " +
+  "marketing purposes — e.g. report 'Incheon' for ICN even if the " +
+  "ticket prints 'Seoul' next to it (Gimpo/GMP is the airport actually " +
+  "in Seoul), and 'Narita' for NRT rather than 'Tokyo' (Haneda/HND is " +
+  "the airport actually in Tokyo). If no airport code is shown, use " +
+  "the city name as printed.";
 
 const ALLOWED_TICKET_IMAGE_MEDIA_TYPES = [
   "image/jpeg",
