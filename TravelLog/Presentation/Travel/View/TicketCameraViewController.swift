@@ -7,8 +7,8 @@
 //  티켓 스캔 전용 커스텀 카메라 화면. 별도의 "사진 촬영" 단계 없이, 화면 중앙의
 //  직사각형(티켓/카드 비율) 가이드 안에 티켓이 들어오면 실시간으로 인식해 테두리가
 //  초록색으로 바뀌고, 그 순간의 화면(라이브 프레임)을 그대로 잘라서 결과로 전달한다.
-//  (인식이 잘 안 될 때를 대비해 셔터 버튼으로 수동 트리거도 항상 가능 — 이 역시 사진을
-//  새로 찍는 게 아니라 같은 방식으로 "지금 화면"을 잘라서 쓴다.)
+//  (인식이 잘 안 되는 티켓(구겨짐, 저조도 등)을 대비해 하단의 "앨범에서 가져오기"
+//  버튼으로 언제든 앨범 선택으로 전환할 수 있다.)
 //
 //  인식 판정은 세 단계로 이루어진다:
 //   1) 문서 인식(VNDetectDocumentSegmentationRequest) — 사각형 문서 형태인지 확인
@@ -28,6 +28,7 @@ import SnapKit
 protocol TicketCameraViewControllerDelegate: AnyObject {
     func ticketCamera(_ controller: TicketCameraViewController, didCapture image: UIImage)
     func ticketCameraDidCancel(_ controller: TicketCameraViewController)
+    func ticketCameraDidTapPhotoLibrary(_ controller: TicketCameraViewController)
 }
 
 final class TicketCameraViewController: BaseViewController {
@@ -85,10 +86,14 @@ final class TicketCameraViewController: BaseViewController {
         return label
     }()
 
-    private let shutterButton: UIButton = {
+    private let photoLibraryButton: UIButton = {
         let button = UIButton(type: .system)
+        button.setTitle("앨범에서 가져오기", for: .normal)
+        button.setTitleColor(.black, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
         button.backgroundColor = .white
-        button.layer.cornerRadius = 36
+        button.layer.cornerRadius = 15
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         return button
     }()
 
@@ -97,7 +102,7 @@ final class TicketCameraViewController: BaseViewController {
         view.addSubview(guideOverlay)
         view.addSubview(closeButton)
         view.addSubview(hintLabel)
-        view.addSubview(shutterButton)
+        view.addSubview(photoLibraryButton)
     }
 
     override func configureLayout() {
@@ -116,14 +121,13 @@ final class TicketCameraViewController: BaseViewController {
             make.horizontalEdges.equalToSuperview().inset(32)
         }
 
-        shutterButton.snp.makeConstraints { make in
+        photoLibraryButton.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.bottom.equalTo(view.safeAreaLayoutGuide).inset(24)
-            make.size.equalTo(72)
         }
 
         // 어두운 배경이 화면 일부에만 걸리지 않도록, 가이드 오버레이는 항상 화면 전체를 덮는다.
-        // 안내 문구/셔터 버튼과 사각형 구멍이 겹치지 않게 하는 여백은 viewDidLayoutSubviews에서
+        // 안내 문구/앨범 버튼과 사각형 구멍이 겹치지 않게 하는 여백은 viewDidLayoutSubviews에서
         // topContentInset/bottomContentInset으로 별도 지정한다.
         guideOverlay.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -139,16 +143,16 @@ final class TicketCameraViewController: BaseViewController {
 
     override func configureBind() {
         closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
-        shutterButton.addTarget(self, action: #selector(didTapShutter), for: .touchUpInside)
+        photoLibraryButton.addTarget(self, action: #selector(didTapPhotoLibrary), for: .touchUpInside)
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = previewContainerView.bounds
 
-        // 사각형 구멍이 안내 문구/셔터 버튼과 겹치지 않도록, 실제 배치된 프레임 기준으로 여백을 갱신한다.
+        // 사각형 구멍이 안내 문구/앨범 버튼과 겹치지 않도록, 실제 배치된 프레임 기준으로 여백을 갱신한다.
         guideOverlay.topContentInset = hintLabel.frame.maxY + 20
-        guideOverlay.bottomContentInset = view.bounds.height - shutterButton.frame.minY + 24
+        guideOverlay.bottomContentInset = view.bounds.height - photoLibraryButton.frame.minY + 24
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -171,12 +175,12 @@ final class TicketCameraViewController: BaseViewController {
         delegate?.ticketCameraDidCancel(self)
     }
 
-    @objc private func didTapShutter() {
-        triggerCapture()
+    @objc private func didTapPhotoLibrary() {
+        delegate?.ticketCameraDidTapPhotoLibrary(self)
     }
 
-    /// 수동 셔터 탭과 자동 인식이 공유하는 진입점. "사진을 찍는" 게 아니라, 그 순간의
-    /// 라이브 프레임을 그대로 잘라 쓴다 — 촬영 사운드/지연 없이 즉시 결과로 이어진다.
+    /// 자동 인식(5프레임 연속 정렬) 시 호출되는 캡처 진입점. "사진을 찍는" 게 아니라,
+    /// 그 순간의 라이브 프레임을 그대로 잘라 쓴다 — 촬영 사운드/지연 없이 즉시 결과로 이어진다.
     private func triggerCapture() {
         latestPixelBufferLock.lock()
         let pixelBuffer = latestPixelBuffer
