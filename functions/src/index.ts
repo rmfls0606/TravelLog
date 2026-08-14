@@ -16,6 +16,7 @@ import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
 import {getDownloadURL, getStorage} from "firebase-admin/storage";
 import Anthropic from "@anthropic-ai/sdk";
+import {isAllowedCountry} from "./allowedCountries";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -232,7 +233,12 @@ async function prefixSearchCities(prefix: string, limit: number): Promise<CityDo
   byNameSnap.docs.forEach((d) => map.set(d.id, d.data() as CityDoc));
   byCountrySnap.docs.forEach((d) => map.set(d.id, d.data() as CityDoc));
 
-  const merged = Array.from(map.values());
+  // 과거(국가 제한 도입 이전)에 캐시된 문서 중 허용되지 않은 지역의 도시는
+  // 걸러낸다 — 새로 만드는 문서뿐 아니라 이미 Firestore에 있는 캐시에도
+  // 동일한 허용 목록을 적용해야 검색 결과가 일관된다.
+  const merged = Array.from(map.values())
+    .filter((city) => isAllowedCountry(city.country));
+
   return sortCitiesByQuery(merged, prefix).slice(0, limit);
 }
 
@@ -333,7 +339,7 @@ async function getOrCreateCityByPlaceId(
 
   console.log("getOrCreateCityByPlaceId: details fetched", {placeId, query, name, types});
 
-  // 국가 정보가 없는 결과는 도시로 취급하지 않는다 (국가 제한은 두지 않음 — 해외 도시 허용).
+  // 국가 정보가 없는 결과는 도시로 취급하지 않는다.
   const countryComponent = (details.address_components || []).find((c: any) =>
     (c.types || []).includes("country")
   );
@@ -344,6 +350,15 @@ async function getOrCreateCityByPlaceId(
   }
 
   const country = countryComponent.long_name as string;
+
+  // 허용된 지역군(한국/일본/동남아시아/중화권/남태평양/유럽/미주/중앙아시아/
+  // 서아시아/중남미)에 속한 국가만 신규 캐시로 만든다.
+  if (!isAllowedCountry(country)) {
+    console.log("getOrCreateCityByPlaceId: rejected — country not in allowed regions", {
+      placeId, name, country,
+    });
+    return null;
+  }
 
   // 🔥 읍/면/동/리 차단 (한국 행정구역 접미사 — 해외 지명에는 매칭되지 않으므로 그대로 둔다)
   if (/(읍|면|동|리)$/.test(name)) {
