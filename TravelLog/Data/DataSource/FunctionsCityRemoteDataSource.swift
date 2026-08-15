@@ -7,6 +7,7 @@
 
 import RxSwift
 import FirebaseFunctions
+import Foundation
 
 final class FunctionsCityRemoteDataSource: CityRemoteDataSource {
 
@@ -16,16 +17,23 @@ final class FunctionsCityRemoteDataSource: CityRemoteDataSource {
         self.functions = Functions.functions(region: region)
     }
 
-    func search(query: String) -> Single<[City]> {
+    func search(query: String, displayNameHint: String?) -> Single<[City]> {
 
         Single.create { single in
 
+            var payload: [String: Any] = [
+                "query": query,
+                "language": "ko",
+                "limit": 10
+            ]
+
+            let trimmedHint = displayNameHint?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let trimmedHint, !trimmedHint.isEmpty {
+                payload["displayName"] = trimmedHint
+            }
+
             self.functions.httpsCallable("searchCity")
-                .call([
-                    "query": query,
-                    "language": "ko",
-                    "limit": 10
-                ]) { result, error in
+                .call(payload) { result, error in
 
                     if let error = error {
                         single(.failure(error))

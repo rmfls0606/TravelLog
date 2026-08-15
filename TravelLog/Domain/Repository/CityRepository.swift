@@ -13,8 +13,14 @@ protocol CityRepository {
     func searchLocal(query: String) -> Single<[City]>
     func fetchCities(country: String, limit: Int) -> Single<[City]>
     func fetchPopularCities(limit: Int) -> Single<[City]>
-    //로컬에 없으면 원격에서 후보 가져오기
-    func searchRemote(query: String) -> Single<[City]>
+    //로컬에 없으면 원격에서 후보 가져오기 (displayNameHint: 검색어와 별개로 저장/표시에 쓸 한글 이름 힌트)
+    func searchRemote(query: String, displayNameHint: String?) -> Single<[City]>
     //사용자가 선택했을 때만: 인기 카운트 증가
     func increasePopularity(cityId: String) -> Single<Void>
+}
+
+extension CityRepository {
+    func searchRemote(query: String) -> Single<[City]> {
+        searchRemote(query: query, displayNameHint: nil)
+    }
 }
