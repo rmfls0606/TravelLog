@@ -11,12 +11,17 @@ import {setGlobalOptions} from "firebase-functions";
 // import {onRequest} from "firebase-functions/https";
 // import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import {onCall, onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
 import {getDownloadURL, getStorage} from "firebase-admin/storage";
+import Anthropic from "@anthropic-ai/sdk";
+import {isAllowedCountry} from "./allowedCountries";
 
 admin.initializeApp();
 const db = admin.firestore();
+
+const anthropicApiKey = defineSecret("ANTHROPIC_API_KEY");
 
 // API Key test
 // export const testEnv = functions.https.onRequest((req, res) => {
@@ -73,19 +78,6 @@ function sortCitiesByQuery(cities: CityDoc[], queryLower: string): CityDoc[] {
   });
 }
 
-function normalizeCityName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/^city of /, "")
-    .replace(/ city$/, "")
-    .replace(/-si$/, "")
-    .replace(/^시티 오브 /, "")
-    .replace(/시$/, "")
-    .replace(/군$/, "")
-    .replace(/구$/, "")
-    .trim();
-}
-
 function projectId(): string | null {
   return process.env.GCLOUD_PROJECT ||
     process.env.GCP_PROJECT ||
@@ -139,7 +131,9 @@ async function searchFallbackPhotoReference(
       {
         params: {
           query,
-          region: "kr",
+          // region: "kr" 편향을 주면 해외 도시를 검색할 때도 결과가 한국 쪽으로
+          // 쏠려 엉뚱한 사진이 나온다. 쿼리 텍스트 자체(도시명 + 랜드마크)만으로
+          // 검색하도록 지역 편향을 제거한다.
           language: "ko",
           key: apiKey,
         },
@@ -214,6 +208,13 @@ function isSubCitySuffixQuery(q: string): boolean {
   return /(읍|면|동)$/.test(s);
 }
 
+// 완성형 한글 음절(자모가 결합된 글자, 예: "괌")인지 판별한다. 미완성 자모
+// (ㄱ, ㅏ 등)나 영문/숫자 1글자와 달리, 완성형 한글 음절 1개는 "괌", "산"처럼
+// 그 자체로 의미 있는 지명일 수 있어 1글자 Google 호출 금지 예외로 둔다.
+function isSingleCompleteHangulSyllable(q: string): boolean {
+  return /^[가-힣]$/.test(q.trim());
+}
+
 // Firestore prefix range query helper
 async function prefixSearchCities(prefix: string, limit: number): Promise<CityDoc[]> {
   if (!prefix) return [];
@@ -239,7 +240,12 @@ async function prefixSearchCities(prefix: string, limit: number): Promise<CityDo
   byNameSnap.docs.forEach((d) => map.set(d.id, d.data() as CityDoc));
   byCountrySnap.docs.forEach((d) => map.set(d.id, d.data() as CityDoc));
 
-  const merged = Array.from(map.values());
+  // 과거(국가 제한 도입 이전)에 캐시된 문서 중 허용되지 않은 지역의 도시는
+  // 걸러낸다 — 새로 만드는 문서뿐 아니라 이미 Firestore에 있는 캐시에도
+  // 동일한 허용 목록을 적용해야 검색 결과가 일관된다.
+  const merged = Array.from(map.values())
+    .filter((city) => isAllowedCountry(city.country));
+
   return sortCitiesByQuery(merged, prefix).slice(0, limit);
 }
 
@@ -253,16 +259,24 @@ async function findPlaceSmart(
       params: {
         input: query,
         types: "(regions)",
-        components: "country:kr",
+        // components: "country:kr"였던 제한을 제거해 해외 도시도 검색되게 한다.
         key: apiKey,
       },
     }
   );
 
-  if (res.data?.status !== "OK") return null;
+  if (res.data?.status !== "OK") {
+    console.log("findPlaceSmart: autocomplete status not OK", {
+      query, status: res.data?.status, errorMessage: res.data?.error_message,
+    });
+    return null;
+  }
 
   const predictions = res.data?.predictions ?? [];
-  if (predictions.length === 0) return null;
+  if (predictions.length === 0) {
+    console.log("findPlaceSmart: no predictions", {query});
+    return null;
+  }
 
   const queryLower = normalize(query);
 
@@ -286,13 +300,23 @@ async function findPlaceSmart(
       return a.descLength - b.descLength;
     });
 
+  console.log("findPlaceSmart: chosen prediction", {
+    query,
+    predictionCount: predictions.length,
+    chosen: scored[0]?.prediction?.description,
+    placeId: scored[0]?.prediction?.place_id ?? null,
+  });
+
   return scored[0]?.prediction?.place_id ?? null;
 }
+
+const HANGUL_PATTERN = /[가-힣]/;
 
 async function getOrCreateCityByPlaceId(
   placeId: string,
   apiKey: string,
-  query: string
+  query: string,
+  displayNameHint: string | null
 ): Promise<CityDoc | null> {
   const existingSnap = await db.collection("cities").doc(placeId).get();
   const existingData = existingSnap.data() as CityDoc | undefined;
@@ -309,41 +333,68 @@ async function getOrCreateCityByPlaceId(
     }
   );
 
-  if (detailsRes.data?.status !== "OK") return null;
+  if (detailsRes.data?.status !== "OK") {
+    console.log("getOrCreateCityByPlaceId: details status not OK", {
+      placeId, query, status: detailsRes.data?.status,
+    });
+    return null;
+  }
 
   const details = detailsRes.data.result;
   const name = details.name ?? "";
   const types: string[] = details.types || [];
 
-  // 🔥 대한민국만 허용
+  console.log("getOrCreateCityByPlaceId: details fetched", {placeId, query, name, types});
+
+  // 국가 정보가 없는 결과는 도시로 취급하지 않는다.
   const countryComponent = (details.address_components || []).find((c: any) =>
     (c.types || []).includes("country")
   );
 
-  if (!countryComponent || countryComponent.long_name !== "대한민국") {
+  if (!countryComponent) {
+    console.log("getOrCreateCityByPlaceId: rejected — no country component", {placeId, name});
     return null;
   }
 
-  // 🔥 읍/면/동/리 차단
+  const country = countryComponent.long_name as string;
+
+  // 허용된 지역군(한국/일본/동남아시아/중화권/남태평양/유럽/미주/중앙아시아/
+  // 서아시아/중남미)에 속한 국가만 신규 캐시로 만든다.
+  if (!isAllowedCountry(country)) {
+    console.log("getOrCreateCityByPlaceId: rejected — country not in allowed regions", {
+      placeId, name, country,
+    });
+    return null;
+  }
+
+  // 🔥 읍/면/동/리 차단 (한국 행정구역 접미사 — 해외 지명에는 매칭되지 않으므로 그대로 둔다)
   if (/(읍|면|동|리)$/.test(name)) {
+    console.log("getOrCreateCityByPlaceId: rejected — sub-district suffix", {placeId, name});
     return null;
   }
 
-  // 🔥 한국 행정 단위 허용 범위
+  // 도시/행정구역급 결과만 허용 (개별 장소/주소 제외) — 국가에 관계없이 적용되는 일반 필터.
+  // 괌은 자체 ISO 국가 코드를 가진 자치령이라 Google이 country 타입으로 분류하지만,
+  // 실질적으로는 하나의 도시/여행지 단위로 쓰이므로 예외로 허용한다.
+  const isGuam = country === "괌" && types.includes("country");
   const isAllowedAdmin =
     types.includes("locality") ||
-    types.includes("administrative_area_level_1") || // 도
-    types.includes("administrative_area_level_2"); // 시/군/구
+    types.includes("administrative_area_level_1") ||
+    types.includes("administrative_area_level_2") ||
+    isGuam;
 
-  if (!isAllowedAdmin) return null;
-
-  // 🔥 이름 비교 (시/군/구 제거 후 비교)
-  const input = normalizeCityName(query);
-  const result = normalizeCityName(name);
-
-  if (result !== input && !result.startsWith(input)) {
+  if (!isAllowedAdmin) {
+    console.log("getOrCreateCityByPlaceId: rejected — type not allowed", {placeId, name, types});
     return null;
   }
+
+  // 이름 비교는 하지 않는다: details를 항상 language: "ko"로 요청하므로 name은
+  // 한국어로 로컬라이즈되지만, query는 findPlaceSmart에 넘긴 원문(외국 도시는 영어/
+  // 현지어일 수 있음) 그대로다. 서로 다른 언어를 문자열로 비교하면 해외 도시는
+  // 거의 항상 불일치로 잘못 걸러진다. 실제 검증은 findPlaceSmart가 이미 같은 언어의
+  // 예측 텍스트(mainText/description)로 유사도 순위를 매겨 최적 후보를 고르는 단계에서
+  // 끝났으므로, 여기서는 국가/행정구역 타입 검증만으로 충분하다.
+  console.log("getOrCreateCityByPlaceId: accepted", {placeId, query, name, country});
 
   const lat = details.geometry?.location?.lat;
   const lng = details.geometry?.location?.lng;
@@ -362,12 +413,21 @@ async function getOrCreateCityByPlaceId(
       imageUrl = makePhotoProxyURL(photoRef);
     }
   }
+
+  // Google이 이 place에 대해 한국어 번역을 갖고 있지 않으면 language: "ko"를
+  // 요청해도 name이 영어/현지어 그대로 온다 (예: "Phu Quoc"). 이미 한글로 온
+  // 경우는 손대지 않고, 한글이 아닐 때만 티켓 스캔이 함께 보낸 한글 이름
+  // 힌트로 대체한다 — 기존에 이미 정상적으로 한글화된 도시(예: 인천, 서울)의
+  // 이름을 실수로 덮어쓰지 않기 위함이다.
+  const trimmedHint = displayNameHint?.trim();
+  const resolvedName = (!HANGUL_PATTERN.test(name) && trimmedHint) ? trimmedHint : name;
+
   const doc: CityDoc = {
     cityId: placeId,
-    name,
-    country: "대한민국",
-    nameLower: normalize(name),
-    countryLower: "대한민국",
+    name: resolvedName,
+    country,
+    nameLower: normalize(resolvedName),
+    countryLower: normalize(country),
     lat,
     lng,
     imageUrl: imageUrl,
@@ -384,6 +444,11 @@ export const searchCity = onCall(async (request) => {
   const queryRaw = (request.data?.query ?? "") as string;
   // const language = ((request.data?.language ?? "ko") as string) || "ko";
   const limit = Math.min(Math.max(Number(request.data?.limit ?? 10), 1), 20);
+  const displayNameHintRaw = request.data?.displayName;
+  const displayNameHint =
+    typeof displayNameHintRaw === "string" && displayNameHintRaw.trim() ?
+      displayNameHintRaw.trim() :
+      null;
 
   const query = queryRaw.trim();
   if (!query) {
@@ -404,8 +469,9 @@ export const searchCity = onCall(async (request) => {
   // 1) Firestore prefix cache first (always)
   const cached = await prefixSearchCities(lower, limit);
 
-  // 1글자 입력은 Google 호출 금지 (비용/오염 방어)
-  if (lower.length < 2) {
+  // 1글자 입력은 Google 호출 금지 (비용/오염 방어) — 단, "괌"처럼 그 자체로
+  // 지명이 될 수 있는 완성형 한글 음절 1개는 예외로 허용한다.
+  if (lower.length < 2 && !isSingleCompleteHangulSyllable(query)) {
     return {cities: cached, source: "cache-only"};
   }
 
@@ -417,23 +483,290 @@ export const searchCity = onCall(async (request) => {
   const placeId = await findPlaceSmart(query, apiKey);
 
   if (!placeId) {
+    console.log("searchCity: no place found via autocomplete", {query});
     return {cities: [], source: "google-empty"};
   }
 
   const city = await getOrCreateCityByPlaceId(
     placeId,
     apiKey,
-    query // 🔥 language 대신 query 넘긴다
+    query, // 🔥 language 대신 query 넘긴다
+    displayNameHint
   );
 
   if (!city) {
+    console.log("searchCity: place found but rejected by filters", {query, placeId});
     return {cities: [], source: "filtered-out"};
   }
+
+  console.log("searchCity: resolved city", {query, city});
 
   return {
     cities: [city],
   };
 });
+
+// ---------------------------------------------------------------------------
+// Ticket OCR (parseTicketImage)
+// ---------------------------------------------------------------------------
+
+type TicketTransport = "airplane" | "bus" | "train";
+
+type TicketExtraction = {
+  isTicket: boolean;
+  transport: TicketTransport | null;
+  departureCity: string | null;
+  departureCityKorean: string | null;
+  departureCountry: string | null;
+  destinationCity: string | null;
+  destinationCityKorean: string | null;
+  destinationCountry: string | null;
+  startDate: string | null;
+  startTime: string | null;
+  endDate: string | null;
+  endTime: string | null;
+  confidence: number;
+  notes: string | null;
+};
+
+const TICKET_EXTRACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    isTicket: {
+      type: "boolean",
+      description:
+        "Whether the image is a readable transportation ticket or " +
+        "boarding pass (bus, train, or airplane) that shows route and " +
+        "date information. False for unrelated photos or unreadable " +
+        "images.",
+    },
+    transport: {
+      anyOf: [
+        {type: "string", enum: ["airplane", "bus", "train"]},
+        {type: "null"},
+      ],
+      description: "The mode of transport shown on the ticket.",
+    },
+    departureCity: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Departure city name, as its commonly-used English/international " +
+        "name (e.g. 'Incheon', 'Seoul', 'Paris', 'Phu Quoc') — this name " +
+        "is used as a search query against a worldwide place database, " +
+        "which matches English/international names far more reliably " +
+        "than a Korean transliteration for less-famous places. The " +
+        "app itself will localize the resolved city into Korean for " +
+        "display, so do not translate it yourself.",
+    },
+    departureCityKorean: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "The same departure city, but as the commonly-used Korean name/" +
+        "transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — used " +
+        "only as a display fallback for places Google's database has no " +
+        "Korean translation for. Use the well-known Korean " +
+        "transliteration, not a literal/character-by-character " +
+        "transcription.",
+    },
+    departureCountry: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Best-guess country of the departure city, in Korean (e.g. " +
+        "'대한민국', '프랑스', '베트남') — matching this app's data, " +
+        "which stores country names in Korean for every country.",
+    },
+    destinationCity: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Destination city name, as its commonly-used English/" +
+        "international name (e.g. 'Incheon', 'Seoul', 'Paris', 'Phu " +
+        "Quoc') — this name is used as a search query against a " +
+        "worldwide place database, which matches English/international " +
+        "names far more reliably than a Korean transliteration for " +
+        "less-famous places. The app itself will localize the resolved " +
+        "city into Korean for display, so do not translate it yourself.",
+    },
+    destinationCityKorean: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "The same destination city, but as the commonly-used Korean " +
+        "name/transliteration (e.g. '인천', '서울', '파리', '푸꾸옥') — " +
+        "used only as a display fallback for places Google's database " +
+        "has no Korean translation for. Use the well-known Korean " +
+        "transliteration, not a literal/character-by-character " +
+        "transcription.",
+    },
+    destinationCountry: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Best-guess country of the destination city, in Korean (e.g. " +
+        "'대한민국', '프랑스', '베트남') — matching this app's data, " +
+        "which stores country names in Korean for every country.",
+    },
+    startDate: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description: "Departure date in ISO 8601 (YYYY-MM-DD).",
+    },
+    startTime: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Departure time in 24-hour HH:mm, if shown on the ticket.",
+    },
+    endDate: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Arrival or return date in ISO 8601 (YYYY-MM-DD), if shown (e.g. " +
+        "a round-trip or multi-day ticket). Null if not shown.",
+    },
+    endTime: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description: "Arrival time in 24-hour HH:mm, if shown on the ticket.",
+    },
+    confidence: {
+      type: "number",
+      description:
+        "Overall confidence in this extraction, from 0 (no confidence) " +
+        "to 1 (fully confident).",
+    },
+    notes: {
+      anyOf: [{type: "string"}, {type: "null"}],
+      description:
+        "Any ambiguity or assumption worth flagging to the user, in " +
+        "English. Null if none.",
+    },
+  },
+  required: [
+    "isTicket", "transport", "departureCity", "departureCityKorean",
+    "departureCountry", "destinationCity", "destinationCityKorean",
+    "destinationCountry", "startDate", "startTime",
+    "endDate", "endTime", "confidence", "notes",
+  ],
+  additionalProperties: false,
+};
+
+const TICKET_EXTRACTION_SYSTEM_PROMPT =
+  "You extract structured trip data from a single photo of a public " +
+  "transportation ticket or boarding pass. Tickets may be for a bus, " +
+  "train, or airplane, from any country, in any language, and in any " +
+  "layout (printed, mobile screenshot, or handwritten). Read the whole " +
+  "image carefully, including small print, before answering. If the " +
+  "image is not a recognizable ticket, set isTicket to false and leave " +
+  "the other fields null except confidence (0) and notes (briefly why). " +
+  "Never guess a date or city you cannot actually read on the ticket — " +
+  "use null instead of fabricating a value. If the ticket shows a " +
+  "3-letter IATA airport code (e.g. ICN, GMP, NRT, HND, CDG), report " +
+  "the city where THAT SPECIFIC airport is physically located, not a " +
+  "broader metro-area label that may be printed next to it for " +
+  "marketing purposes — e.g. report 'Incheon' for ICN even if the " +
+  "ticket prints 'Seoul' next to it (Gimpo/GMP is the airport actually " +
+  "in Seoul), and 'Narita' for NRT rather than 'Tokyo' (Haneda/HND is " +
+  "the airport actually in Tokyo). If no airport code is shown, use " +
+  "the city name as printed.";
+
+const ALLOWED_TICKET_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+] as const;
+
+type TicketImageMediaType = typeof ALLOWED_TICKET_IMAGE_MEDIA_TYPES[number];
+
+// ~5MB of base64 (roughly 3.7MB original image) — comfortably under the
+// callable function's 10MB request-body limit while still allowing a
+// reasonably high-resolution photo.
+const MAX_TICKET_IMAGE_BASE64_LENGTH = 5 * 1024 * 1024;
+
+function isTicketImageMediaType(value: string): value is TicketImageMediaType {
+  return (ALLOWED_TICKET_IMAGE_MEDIA_TYPES as readonly string[]).includes(value);
+}
+
+export const parseTicketImage = onCall(
+  {secrets: [anthropicApiKey]},
+  async (request): Promise<{ result: TicketExtraction }> => {
+    const imageBase64 = (request.data?.imageBase64 ?? "") as string;
+    const mimeType = (request.data?.mimeType ?? "") as string;
+
+    if (!imageBase64) {
+      throw new HttpsError("invalid-argument", "imageBase64 is required");
+    }
+    if (!isTicketImageMediaType(mimeType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        `mimeType must be one of: ${ALLOWED_TICKET_IMAGE_MEDIA_TYPES.join(", ")}`
+      );
+    }
+    if (imageBase64.length > MAX_TICKET_IMAGE_BASE64_LENGTH) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Image is too large; please resize before uploading"
+      );
+    }
+
+    const client = new Anthropic({apiKey: anthropicApiKey.value()});
+
+    let response;
+    try {
+      response = await client.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 2048,
+        // 정해진 스키마로 이미지 한 장을 읽어 채우는, 다단계 추론이 필요 없는 작업이라
+        // thinking을 끄고 effort를 낮춰 토큰 사용량을 줄인다. (특정 티켓 형식에서
+        // 정확도가 떨어지면 가장 먼저 되돌려볼 지점이기도 하다.)
+        thinking: {type: "disabled"},
+        system: TICKET_EXTRACTION_SYSTEM_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mimeType,
+                data: imageBase64,
+              },
+            },
+            {
+              type: "text",
+              text: "Extract the trip data from this ticket photo.",
+            },
+          ],
+        }],
+        output_config: {
+          format: {type: "json_schema", schema: TICKET_EXTRACTION_SCHEMA},
+          effort: "low",
+        },
+      });
+    } catch (error) {
+      console.error("parseTicketImage: Claude request failed", error);
+      throw new HttpsError("internal", "Failed to reach the extraction model");
+    }
+
+    if (response.stop_reason === "refusal") {
+      throw new HttpsError(
+        "failed-precondition",
+        "The model declined to process this image"
+      );
+    }
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      throw new HttpsError("internal", "No structured result returned");
+    }
+
+    let result: TicketExtraction;
+    try {
+      result = JSON.parse(textBlock.text) as TicketExtraction;
+    } catch (error) {
+      console.error("parseTicketImage: failed to parse model output", error);
+      throw new HttpsError("internal", "Failed to parse extraction result");
+    }
+
+    console.log("parseTicketImage: extraction result", result);
+
+    return {result};
+  }
+);
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript

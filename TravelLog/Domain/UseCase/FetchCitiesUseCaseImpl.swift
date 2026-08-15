@@ -15,7 +15,7 @@ final class FetchCitiesUseCaseImpl: FetchCitiesUseCase {
         self.repository = repository
     }
     
-    func execute(query: String) -> Single<[City]> {
+    func execute(query: String, displayNameHint: String?) -> Single<[City]> {
         repository.searchLocal(query: query)
             .catch { error in
                 // local 단계에서 연결 에러면 remote로 넘기지 않고 즉시 offline 처리
@@ -36,7 +36,7 @@ final class FetchCitiesUseCaseImpl: FetchCitiesUseCase {
 
                 // 로컬에 없으면 remote를 시도하고,
                 // 실제 연결 에러일 때만 offline으로 매핑한다.
-                return self.repository.searchRemote(query: query)
+                return self.repository.searchRemote(query: query, displayNameHint: displayNameHint)
                     .catch { error in
                         if self.isConnectivityError(error) {
                             return .error(CitySearchError.offline)
