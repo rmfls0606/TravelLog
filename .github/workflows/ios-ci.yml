@@ -1,0 +1,35 @@
+name: iOS CI
+
+on:
+  pull_request:
+    paths:
+      - "TravelLog/**"
+      - "TravelLogTests/**"
+      - "TravelLogUITests/**"
+      - "TravelLog.xcodeproj/**"
+      - ".github/workflows/ios-ci.yml"
+  push:
+    branches: [release, develop, main]
+    paths:
+      - "TravelLog/**"
+      - "TravelLogTests/**"
+      - "TravelLogUITests/**"
+      - "TravelLog.xcodeproj/**"
+      - ".github/workflows/ios-ci.yml"
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app
+
+      - name: Build and test
+        run: |
+          xcodebuild \
+            -project TravelLog.xcodeproj \
+            -scheme TravelLog \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            test
