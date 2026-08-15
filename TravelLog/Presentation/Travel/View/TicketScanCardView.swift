@@ -26,7 +26,7 @@ final class TicketScanCardView: BaseCardView {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "티켓으로 빠르게 채우기"
+        label.text = "티켓으로 자동 채우기"
         label.font = .boldSystemFont(ofSize: 16)
         label.textColor = .black
         return label
