@@ -35,6 +35,16 @@ final class TicketScanConsentViewController: BaseViewController {
         return view
     }()
 
+    // 국외 이전 고지 블록이 추가되며 내용이 길어질 수 있어, 내용이 화면보다 길면
+    // 스크롤되도록 한다. cardView 자체는 safeArea에 required로 고정된 프레임을
+    // 가지므로(아래 configureLayout 참고), scrollView의 프레임 높이도 항상 확정된
+    // 값으로 계산된다 — 내용 크기에 프레임 높이가 거꾸로 의존하는 순환 참조가 없다.
+    private let scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.showsVerticalScrollIndicator = false
+        return scrollView
+    }()
+
     private let contentStackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .vertical
@@ -79,12 +89,32 @@ final class TicketScanConsentViewController: BaseViewController {
         return label
     }()
 
-    private let footerLabel: UILabel = {
+    private let transferNoticeTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "개인정보 국외 이전 및 위탁 고지"
+        label.font = .boldSystemFont(ofSize: 12)
+        label.textColor = .black
+        return label
+    }()
+
+    // 「개인정보 보호법」 제28조의8이 요구하는 국외 이전 고지사항(이전받는 자/국가/
+    // 항목/목적/보유기간/거부권)을 동의 시점에 바로 확인할 수 있도록 명시한다.
+    // 보관기간은 Anthropic 쪽 정책이라 구체 일수 대신 처리방침 참조를 안내한다 —
+    // 정책이 바뀌면 처리방침(웹페이지)만 고치면 되고, 이 화면(앱 바이너리)은
+    // 다시 빌드하지 않아도 되게 하기 위함이다.
+    private let transferNoticeBodyLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 11)
-        label.textColor = .systemGray
+        label.textColor = .darkGray
         label.numberOfLines = 0
-        label.text = "전송된 사진은 AI 모델 학습에는 쓰이지 않으며, Anthropic의 데이터 보관 정책에 따라 처리된 뒤 삭제됩니다."
+        label.text = """
+        · 이전받는 자: Anthropic, PBC
+        · 이전 국가: 미국
+        · 이전 항목: 확인 및 마스킹을 마친 티켓 이미지
+        · 이전 목적: AI를 통한 여정 정보(출발지·도착지·일시·교통수단) 추출
+        · 보유 및 이용 기간: Anthropic 정책에 따라 처리되며 모델 학습에는 사용되지 않습니다. 최신 보관기간은 개인정보처리방침에서 확인할 수 있습니다.
+        · 동의를 거부할 수 있으며, 거부 시 AI 인식 기능만 제한되고 수동 입력 등 다른 기능은 계속 이용할 수 있습니다.
+        """
         return label
     }()
 
@@ -118,8 +148,8 @@ final class TicketScanConsentViewController: BaseViewController {
         headerStackView.addArrangedSubview(titleLabel)
         headerContainerView.addSubview(headerStackView)
 
-        cardView.addSubview(contentStackView)
-        cardView.addSubview(buttonStackView)
+        cardView.addSubview(scrollView)
+        scrollView.addSubview(contentStackView)
 
         contentStackView.addArrangedSubview(headerContainerView)
         contentStackView.addArrangedSubview(introLabel)
@@ -143,7 +173,16 @@ final class TicketScanConsentViewController: BaseViewController {
             description: "확인 후 \"전송\"을 눌러야만 실제로 전송됩니다.",
             emphasis: .normal
         ))
-        contentStackView.addArrangedSubview(footerLabel)
+        contentStackView.addArrangedSubview(transferNoticeTitleLabel)
+        contentStackView.addArrangedSubview(transferNoticeBodyLabel)
+        // 제목과 본문은 한 블록으로 보여야 해서, contentStackView의 기본 spacing(16)
+        // 대신 더 좁은 간격을 준다.
+        contentStackView.setCustomSpacing(4, after: transferNoticeTitleLabel)
+
+        // 버튼을 스크롤 밖에 고정하지 않고 콘텐츠 맨 마지막 항목으로 넣어서,
+        // 내용이 화면보다 길면 끝까지 스크롤해야 "동의" 버튼이 나오게 한다.
+        // 화면이 커서 내용이 다 보이는 경우엔 자연히 버튼도 바로 보인다.
+        contentStackView.addArrangedSubview(buttonStackView)
 
         buttonStackView.addArrangedSubview(cancelButton)
         buttonStackView.addArrangedSubview(agreeButton)
@@ -154,13 +193,15 @@ final class TicketScanConsentViewController: BaseViewController {
             make.edges.equalToSuperview()
         }
 
-        // cardView는 스스로 높이를 갖지 않고, 아래 contentStackView/buttonStackView를
-        // 감싸는 크기로 결정된다(bottom-up). safe area 상하한은 화면을 벗어나지 않게
-        // 막는 유연한 경계일 뿐, 실제 높이를 정하는 제약이 아니다.
+        // cardView 자신은 top/bottom을 직접 고정하지 않는다 — centerY와, 아래
+        // scrollView→cardView로 이어지는 bottom-up 체인이 합쳐져서 높이가 결정된다
+        // (내용이 짧으면 카드도 작아지고, 길면 scrollView의 상한 캡에 걸려 그 안
+        // (버튼 포함)에서만 스크롤된다). top/bottom 부등식은 혹시 모를 경우를 막는
+        // 안전판일 뿐, 실제 크기를 정하는 제약이 아니다.
         cardView.snp.makeConstraints { make in
             make.top.greaterThanOrEqualTo(view.safeAreaLayoutGuide).offset(20)
             make.bottom.lessThanOrEqualTo(view.safeAreaLayoutGuide).offset(-20)
-            make.centerY.equalToSuperview().priority(.high)
+            make.centerY.equalToSuperview()
             make.horizontalEdges.equalToSuperview().inset(24)
         }
 
@@ -173,14 +214,27 @@ final class TicketScanConsentViewController: BaseViewController {
             make.verticalEdges.equalToSuperview()
         }
 
-        contentStackView.snp.makeConstraints { make in
+        // 버튼(동의 포함)이 이제 contentStackView 맨 마지막 항목이라, 스크롤 끝까지
+        // 내려야만 보인다. scrollView의 높이는 (1) 내용 크기와 최대한 같아지려
+        // 하되(우선순위 750), (2) safeArea 대비 여유 공간(카드 상하 여백만, 약
+        // 100pt)을 절대 넘지 않는다(우선순위 1000, 필수). 내용이 짧으면 (1)이
+        // 그대로 적용돼 카드가 내용만큼만 커지고(이 경우 버튼도 바로 보임), 내용이
+        // 길면 (2)가 이겨서 그 높이에서 잘리고 스크롤이 생긴다 — 이 두 값이
+        // cardView 자체를 참조하지 않으므로(contentStackView의 고유 크기와
+        // safeAreaLayoutGuide만 참조) 순환 참조가 생기지 않는다.
+        scrollView.snp.makeConstraints { make in
             make.top.horizontalEdges.equalToSuperview().inset(24)
-            make.bottom.equalTo(buttonStackView.snp.top).offset(-20)
+            make.bottom.equalToSuperview().inset(24)
+            make.height.lessThanOrEqualTo(view.safeAreaLayoutGuide).offset(-100)
+            make.height.equalTo(contentStackView).priority(.high)
+        }
+
+        contentStackView.snp.makeConstraints { make in
+            make.edges.equalTo(scrollView.contentLayoutGuide)
+            make.width.equalTo(scrollView.frameLayoutGuide)
         }
 
         buttonStackView.snp.makeConstraints { make in
-            make.horizontalEdges.equalToSuperview().inset(24)
-            make.bottom.equalToSuperview().inset(24)
             make.height.equalTo(48)
         }
     }
