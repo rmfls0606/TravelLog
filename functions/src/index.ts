@@ -663,8 +663,15 @@ const TICKET_EXTRACTION_SYSTEM_PROMPT =
   "marketing purposes — e.g. report 'Incheon' for ICN even if the " +
   "ticket prints 'Seoul' next to it (Gimpo/GMP is the airport actually " +
   "in Seoul), and 'Narita' for NRT rather than 'Tokyo' (Haneda/HND is " +
-  "the airport actually in Tokyo). If no airport code is shown, use " +
-  "the city name as printed. Only extract itinerary fields: transport " +
+  "the airport actually in Tokyo). If the departure or destination is " +
+  "printed as a bus terminal or train station name rather than a plain " +
+  "city name (e.g. a specific terminal brand name, or a station name " +
+  "with a suffix like '역'/'Station'/'터미널'/'Terminal'), report the " +
+  "city that terminal or station is located in, not the terminal/" +
+  "station's own name — e.g. report '서울' (not '센트럴시티' or " +
+  "'서울역') and '대구' (not '동대구터미널' or '동대구역'). If none of " +
+  "the above apply, use the city name as printed. Only extract " +
+  "itinerary fields: transport " +
   "type, departure/destination city and country, and start/end date " +
   "and time. Do not extract, return, infer, or repeat the passenger's " +
   "name, passport number, ticket/booking number, seat number, " +
