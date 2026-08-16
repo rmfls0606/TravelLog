@@ -84,7 +84,7 @@ final class TicketScanConsentViewController: BaseViewController {
         label.font = .systemFont(ofSize: 11)
         label.textColor = .systemGray
         label.numberOfLines = 0
-        label.text = "전송된 사진은 AI 모델 학습에는 쓰이지 않고, 최대 7일간 보관된 뒤 자동 삭제됩니다."
+        label.text = "전송된 사진은 AI 모델 학습에는 쓰이지 않으며, Anthropic의 데이터 보관 정책에 따라 처리된 뒤 삭제됩니다."
         return label
     }()
 
