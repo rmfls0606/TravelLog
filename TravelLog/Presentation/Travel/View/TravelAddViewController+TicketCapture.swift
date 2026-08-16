@@ -79,12 +79,27 @@ extension TravelAddViewController {
     /// 압축 후에도 이 값을 넘으면 base64 인코딩 시 서버의 5MB 제한을 넘길 수 있어 전송하지 않는다.
     private static let maxUploadByteSize = 3_670_016 // 3.5MB
 
+    /// 촬영/선택된 원본 이미지를 곧바로 전송하지 않고, 민감정보 후보를 가린 뒤
+    /// 사용자가 확인·동의한 이미지만 전송 파이프라인(압축 → ticketImageRelay)으로 넘긴다.
     fileprivate func handlePickedTicketImage(_ image: UIImage?) {
         guard let image else {
             view.makeToast("이미지를 불러오지 못했어요. 다시 시도해주세요.", duration: 2.0, position: .top)
             return
         }
 
+        TicketImageRedactor.redact(image) { [weak self] maskedImage in
+            self?.presentTicketMaskPreview(maskedImage)
+        }
+    }
+
+    private func presentTicketMaskPreview(_ maskedImage: UIImage) {
+        let preview = TicketMaskPreviewViewController(maskedImage: maskedImage)
+        preview.delegate = self
+        preview.modalPresentationStyle = .fullScreen
+        present(preview, animated: true)
+    }
+
+    fileprivate func finalizeTicketImageForUpload(_ image: UIImage) {
         guard let jpegData = Self.compressedTicketImageData(from: image) else {
             view.makeToast("이미지를 처리하지 못했어요. 다른 사진으로 시도해주세요.", duration: 2.0, position: .top)
             return
@@ -170,5 +185,25 @@ extension TravelAddViewController: TicketCameraViewControllerDelegate {
         controller.dismiss(animated: true) { [weak self] in
             self?.presentTicketPhotoPicker()
         }
+    }
+}
+
+//MARK: - TicketMaskPreviewViewControllerDelegate (마스킹 결과 확인 후 전송/재촬영)
+
+extension TravelAddViewController: TicketMaskPreviewViewControllerDelegate {
+    func ticketMaskPreview(_ controller: TicketMaskPreviewViewController, didConfirm image: UIImage) {
+        controller.dismiss(animated: true) { [weak self] in
+            self?.finalizeTicketImageForUpload(image)
+        }
+    }
+
+    func ticketMaskPreviewDidRequestRetake(_ controller: TicketMaskPreviewViewController) {
+        controller.dismiss(animated: true) { [weak self] in
+            self?.presentTicketCamera()
+        }
+    }
+
+    func ticketMaskPreviewDidCancel(_ controller: TicketMaskPreviewViewController) {
+        controller.dismiss(animated: true)
     }
 }
