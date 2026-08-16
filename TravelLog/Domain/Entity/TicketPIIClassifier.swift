@@ -51,7 +51,6 @@ enum TicketPIIClassifier {
 
             if isPassportNumberCandidate(trimmed)
                 || isReservationCodeCandidate(trimmed)
-                || isDateOfBirthCandidate(trimmed)
                 || isPhoneNumberCandidate(trimmed)
                 || containsKeyword(trimmed, in: dobKeywords)
                 || containsKeyword(trimmed, in: nameKeywords)
@@ -83,23 +82,29 @@ enum TicketPIIClassifier {
         return hasLetter && hasDigit
     }
 
-    /// 생년월일 후보: YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY 등 날짜 형식 텍스트
-    private static func isDateOfBirthCandidate(_ text: String) -> Bool {
-        let patterns = [
-            #"^\d{4}[-.\/]\d{2}[-.\/]\d{2}$"#,
-            #"^\d{2}[-.\/]\d{2}[-.\/]\d{4}$"#,
-        ]
-        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
-    }
-
     /// 전화번호 후보: 숫자/공백/괄호/하이픈/점으로만 구성되고(선행 +는 허용),
-    /// 실제 숫자 자릿수가 7~15개(국내외 전화번호 범위)인 텍스트.
+    /// 실제 숫자 자릿수가 7~15개(국내외 전화번호 범위)인 텍스트. 다만 "1990-05-12"
+    /// 같은 날짜 형식은 숫자+구분자 조합이 겹쳐서 오탐하기 쉬워 먼저 제외한다 —
+    /// 티켓엔 출발일/도착일처럼 실제로 필요한 날짜가 이 형식으로 찍혀있기 때문이다.
     private static func isPhoneNumberCandidate(_ text: String) -> Bool {
+        guard !looksLikePlainDate(text) else { return false }
+
         let pattern = #"^\+?[0-9][0-9()\-.\s]{5,17}[0-9)]$"#
         guard text.range(of: pattern, options: .regularExpression) != nil else { return false }
 
         let digitCount = text.filter(\.isNumber).count
         return digitCount >= 7 && digitCount <= 15
+    }
+
+    /// YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY 등 날짜로 보이는 형식인지만 판별한다.
+    /// (이 자체를 마스킹 여부 판단에 쓰지는 않는다 — 그러면 출발일/도착일까지 다
+    /// 마스킹돼버린다. 다른 규칙이 날짜 형식과 겹쳐 오탐하는 걸 막는 용도로만 쓴다.)
+    private static func looksLikePlainDate(_ text: String) -> Bool {
+        let patterns = [
+            #"^\d{4}[-.\/]\d{2}[-.\/]\d{2}$"#,
+            #"^\d{2}[-.\/]\d{2}[-.\/]\d{4}$"#,
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
     }
 
     /// 단어 경계 기준으로 키워드를 찾는다. 단순 부분 문자열 포함으로 체크하면

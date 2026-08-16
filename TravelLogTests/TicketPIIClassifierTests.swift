@@ -33,8 +33,20 @@ final class TicketPIIClassifierTests: XCTestCase {
         XCTAssertEqual(result, [regions[0].boundingBox])
     }
 
-    //MARK: - 생년월일로 보이는 날짜 형식(YYYY-MM-DD, DD/MM/YYYY)이 마스킹 대상으로 잡히는지 확인
-    func testMasksDateOfBirthPatterns() {
+    //MARK: - "DOB"/"생년월일" 키워드 바로 다음 블록의 날짜만 마스킹 대상으로 잡히는지 확인
+    func testMasksDateFollowingDobKeyword() {
+        let regions = [
+            TicketTextRegion(text: "DOB", boundingBox: CGRect(x: 0, y: 0.3, width: 0.1, height: 0.05)),
+            TicketTextRegion(text: "1990-05-12", boundingBox: CGRect(x: 0, y: 0.2, width: 0.1, height: 0.05)),
+        ]
+
+        let result = TicketPIIClassifier.regionsToMask(in: regions)
+
+        XCTAssertTrue(result.contains(regions[1].boundingBox))
+    }
+
+    //MARK: - 출발일/도착일처럼 키워드 없이 단독으로 찍힌 날짜(YYYY-MM-DD 등)는 여정 정보라 마스킹되지 않는지 확인
+    func testDoesNotMaskDateWithoutDobKeyword() {
         let regions = [
             TicketTextRegion(text: "1990-05-12", boundingBox: CGRect(x: 0, y: 0, width: 0.1, height: 0.05)),
             TicketTextRegion(text: "12/05/1990", boundingBox: CGRect(x: 0, y: 0.2, width: 0.1, height: 0.05)),
@@ -42,7 +54,7 @@ final class TicketPIIClassifierTests: XCTestCase {
 
         let result = TicketPIIClassifier.regionsToMask(in: regions)
 
-        XCTAssertEqual(Set(result.map { $0 }), Set(regions.map { $0.boundingBox }))
+        XCTAssertTrue(result.isEmpty)
     }
 
     //MARK: - "Passenger"/"성명" 같은 키워드 바로 다음 블록(실제 이름이 적혔을 위치)이 마스킹 대상으로 잡히는지 확인
