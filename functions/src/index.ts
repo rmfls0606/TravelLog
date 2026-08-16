@@ -661,7 +661,13 @@ const TICKET_EXTRACTION_SYSTEM_PROMPT =
   "ticket prints 'Seoul' next to it (Gimpo/GMP is the airport actually " +
   "in Seoul), and 'Narita' for NRT rather than 'Tokyo' (Haneda/HND is " +
   "the airport actually in Tokyo). If no airport code is shown, use " +
-  "the city name as printed.";
+  "the city name as printed. Only extract itinerary fields: transport " +
+  "type, departure/destination city and country, and start/end date " +
+  "and time. Do not extract, return, infer, or repeat the passenger's " +
+  "name, passport number, ticket/booking number, seat number, " +
+  "barcode/QR contents, date of birth, payment details, or any other " +
+  "personal identifier, even if visible in the image — ignore that " +
+  "information entirely.";
 
 const ALLOWED_TICKET_IMAGE_MEDIA_TYPES = [
   "image/jpeg",
