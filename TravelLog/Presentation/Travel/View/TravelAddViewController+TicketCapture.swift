@@ -31,28 +31,15 @@ extension TravelAddViewController {
     }
 
     private func presentTicketScanConsentAlert(completion: @escaping (Bool) -> Void) {
-        let alert = UIAlertController(
-            title: "티켓 사진 처리 안내",
-            message: """
-            촬영한 티켓 사진은 여행 정보를 자동으로 채우기 위해 외부 AI 서비스(Anthropic)로 전송되어 분석돼요. 전송 전에 아래 순서를 거쳐요.
-
-            1. 여권번호·바코드 등 민감해 보이는 부분을 자동으로 가려요.
-            2. 가려진 사진을 직접 확인하고, 필요하면 추가로 가리거나 다시 촬영할 수 있어요.
-            3. 확인 후 "전송"을 눌러야만 실제로 전송돼요.
-
-            자동 인식이 모든 경우를 완벽히 잡아내진 못할 수 있으니, 2번 확인 단계를 꼭 거쳐주세요.
-
-            전송된 사진은 AI 모델 학습에는 쓰이지 않고, 최대 7일간 보관된 뒤 자동 삭제돼요.
-            """,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in
-            completion(false)
-        })
-        alert.addAction(UIAlertAction(title: "동의하고 계속하기", style: .default) { _ in
-            completion(true)
-        })
-        present(alert, animated: true)
+        let consent = TicketScanConsentViewController()
+        consent.modalPresentationStyle = .overFullScreen
+        consent.modalTransitionStyle = .crossDissolve
+        consent.onDecision = { [weak consent] agreed in
+            consent?.dismiss(animated: true) {
+                completion(agreed)
+            }
+        }
+        present(consent, animated: true)
     }
 
     private func presentTicketCamera() {
