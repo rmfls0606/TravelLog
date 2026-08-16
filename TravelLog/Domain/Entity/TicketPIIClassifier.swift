@@ -21,11 +21,25 @@ struct TicketTextRegion {
 /// 넓게 잡아내는 1차 방어선이다. 놓치는 케이스가 있을 수 있어, 최종 확인은 사용자가
 /// 마스킹 결과를 직접 보고 판단하는 미리보기 단계에서 이뤄진다.
 enum TicketPIIClassifier {
+    // 영어/한중일 외 국가 티켓도 커버하도록, 자주 쓰이는 유럽/동남아시아 언어의
+    // "이름"/"생년월일"/"전화번호" 표기를 같이 등록한다.
     private static let nameKeywords = [
-        "PASSENGER", "PASSENGER NAME", "NAME", "성명", "승객", "탑승객", "氏名", "姓名", "乘客",
+        "PASSENGER", "PASSENGER NAME", "NAME", "NOM", "NOMBRE", "NOME", "NAAM",
+        "HỌ TÊN", "ชื่อ", "성명", "승객", "탑승객", "氏名", "姓名", "乘客",
     ]
     private static let dobKeywords = [
-        "DOB", "DATE OF BIRTH", "BIRTH DATE", "생년월일", "生年月日", "出生日期",
+        "DOB", "DATE OF BIRTH", "BIRTH DATE", "DATE DE NAISSANCE",
+        "FECHA DE NACIMIENTO", "GEBURTSDATUM", "NGÀY SINH", "생년월일", "生年月日", "出生日期",
+    ]
+    private static let phoneKeywords = [
+        "TEL", "TEL.", "PHONE", "MOBILE", "CONTACT", "CONTACT NO", "CONTACT NUMBER",
+        "TÉLÉPHONE", "TELÉFONO", "TELEFONE",
+        "전화", "전화번호", "연락처", "휴대폰", "電話", "电话",
+    ]
+    // 좌석번호는 "34A" 같은 형식 자체가 게이트/편명과 겹치기 쉬워 정규식으로는
+    // 안 잡고, "SEAT"/"좌석" 같은 키워드 바로 다음 블록만 마스킹한다.
+    private static let seatKeywords = [
+        "SEAT", "SEAT NO", "SEAT NUMBER", "PLACE", "ASIENTO", "좌석", "좌석번호", "座位",
     ]
 
     static func regionsToMask(in regions: [TicketTextRegion]) -> [CGRect] {
@@ -38,10 +52,14 @@ enum TicketPIIClassifier {
             if isPassportNumberCandidate(trimmed)
                 || isReservationCodeCandidate(trimmed)
                 || isDateOfBirthCandidate(trimmed)
+                || isPhoneNumberCandidate(trimmed)
                 || containsKeyword(trimmed, in: dobKeywords)
                 || containsKeyword(trimmed, in: nameKeywords)
+                || containsKeyword(trimmed, in: phoneKeywords)
                 || (index > 0 && containsKeyword(regions[index - 1].text, in: nameKeywords))
-                || (index > 0 && containsKeyword(regions[index - 1].text, in: dobKeywords)) {
+                || (index > 0 && containsKeyword(regions[index - 1].text, in: dobKeywords))
+                || (index > 0 && containsKeyword(regions[index - 1].text, in: phoneKeywords))
+                || (index > 0 && containsKeyword(regions[index - 1].text, in: seatKeywords)) {
                 matched.append(region.boundingBox)
             }
         }
@@ -74,8 +92,24 @@ enum TicketPIIClassifier {
         return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
     }
 
+    /// 전화번호 후보: 숫자/공백/괄호/하이픈/점으로만 구성되고(선행 +는 허용),
+    /// 실제 숫자 자릿수가 7~15개(국내외 전화번호 범위)인 텍스트.
+    private static func isPhoneNumberCandidate(_ text: String) -> Bool {
+        let pattern = #"^\+?[0-9][0-9()\-.\s]{5,17}[0-9)]$"#
+        guard text.range(of: pattern, options: .regularExpression) != nil else { return false }
+
+        let digitCount = text.filter(\.isNumber).count
+        return digitCount >= 7 && digitCount <= 15
+    }
+
+    /// 단어 경계 기준으로 키워드를 찾는다. 단순 부분 문자열 포함으로 체크하면
+    /// "TEL"이 "HOTEL"에도 걸리는 식으로 오탐이 생겨, 그걸 막기 위한 것이다.
     private static func containsKeyword(_ text: String, in keywords: [String]) -> Bool {
         let upper = text.uppercased()
-        return keywords.contains { upper.contains($0.uppercased()) }
+        return keywords.contains { keyword in
+            let escaped = NSRegularExpression.escapedPattern(for: keyword.uppercased())
+            let pattern = "\\b\(escaped)\\b"
+            return upper.range(of: pattern, options: .regularExpression) != nil
+        }
     }
 }
