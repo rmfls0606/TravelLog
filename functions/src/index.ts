@@ -367,8 +367,11 @@ async function getOrCreateCityByPlaceId(
     return null;
   }
 
-  // 🔥 읍/면/동/리 차단 (한국 행정구역 접미사 — 해외 지명에는 매칭되지 않으므로 그대로 둔다)
-  if (/(읍|면|동|리)$/.test(name)) {
+  // 읍/면/동/리 차단 (한국 행정구역 접미사). 이 접미사는 대한민국 주소에서만 실제
+  // 행정구역을 의미하고, "파리"(리)처럼 해외 지명이 한글 표기상 우연히 같은 글자로
+  // 끝나는 경우가 있어 국가가 대한민국일 때로 한정한다.
+  const isKoreanAddress = country === "대한민국" || country === "한국";
+  if (isKoreanAddress && /(읍|면|동|리)$/.test(name)) {
     console.log("getOrCreateCityByPlaceId: rejected — sub-district suffix", {placeId, name});
     return null;
   }
