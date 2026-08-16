@@ -532,6 +532,27 @@ type TicketExtraction = {
   notes: string | null;
 };
 
+// 시스템 프롬프트가 개인식별정보를 결과에 담지 말라고 지시하지만, 모델이 그 지시를
+// 어기고 notes 등 자유 텍스트 필드에 여권번호·전화번호 형식의 문자열을 남기는
+// 경우를 대비한 방어선이다. Cloud Logging에 평문으로 남지 않도록 로그에 찍기
+// 직전에만 적용하고, 실제로 앱에 반환되는 result 객체는 건드리지 않는다.
+function redactPotentialPIIForLogging(value: unknown): unknown {
+  const json = JSON.stringify(value);
+
+  const redacted = json
+    .replace(/[A-Za-z]{1,2}[0-9]{6,9}/g, "[MASKED]") // 여권번호 형식
+    .replace(/\+?[0-9][0-9()\-.\s]{5,17}[0-9)]/g, (match) => {
+      const digitCount = (match.match(/[0-9]/g) ?? []).length;
+      return digitCount >= 7 && digitCount <= 15 ? "[MASKED]" : match;
+    });
+
+  try {
+    return JSON.parse(redacted);
+  } catch {
+    return "[unable to redact for logging]";
+  }
+}
+
 const TICKET_EXTRACTION_SCHEMA = {
   type: "object",
   properties: {
@@ -778,7 +799,7 @@ export const parseTicketImage = onCall(
       throw new HttpsError("internal", "Failed to parse extraction result");
     }
 
-    console.log("parseTicketImage: extraction result", result);
+    console.log("parseTicketImage: extraction result", redactPotentialPIIForLogging(result));
 
     return {result};
   }
