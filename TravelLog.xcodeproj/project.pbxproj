@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		33E84258A7B0A5092EE64D64 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 232627D3E8AB86B1D39A4F32 /* FirebaseAppCheck */; };
 		792526812EDF1DF9004C0A56 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = 792526802EDF1DF9004C0A56 /* Toast */; };
 		7949702A2F4B39D7008860C1 /* IQKeyboardManagerSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 794970292F4B39D7008860C1 /* IQKeyboardManagerSwift */; };
 		7958685D2F475A3C00663739 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7958685C2F475A3C00663739 /* Kingfisher */; };
@@ -126,6 +127,7 @@
 				7975EA7F2E97B3BB004969AE /* RealmSwift in Frameworks */,
 				79A76B3F2E8A9E51003437BE /* SnapKit in Frameworks */,
 				79FEA8972F44C71C0060F424 /* FirebaseFirestore in Frameworks */,
+				33E84258A7B0A5092EE64D64 /* FirebaseAppCheck in Frameworks */,
 				792526812EDF1DF9004C0A56 /* Toast in Frameworks */,
 				7949702A2F4B39D7008860C1 /* IQKeyboardManagerSwift in Frameworks */,
 				79834F3E2EB988DB00A9F387 /* PhotosUI.framework in Frameworks */,
@@ -243,6 +245,7 @@
 				792526802EDF1DF9004C0A56 /* Toast */,
 				79FEA8962F44C71C0060F424 /* FirebaseFirestore */,
 				79FEA8982F44C71C0060F424 /* FirebaseFunctions */,
+				232627D3E8AB86B1D39A4F32 /* FirebaseAppCheck */,
 				7958685C2F475A3C00663739 /* Kingfisher */,
 				794970292F4B39D7008860C1 /* IQKeyboardManagerSwift */,
 			);
@@ -462,6 +465,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TravelLog/TravelLog.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 643M6R9A8T;
@@ -482,7 +486,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.4;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TripRoad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -504,6 +508,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TravelLog/TravelLog.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 643M6R9A8T;
@@ -524,7 +529,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.4;
+				MARKETING_VERSION = 1.6.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sniffing.TripRoad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -769,6 +774,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		232627D3E8AB86B1D39A4F32 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 79FEA8952F44C71C0060F424 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
 		792526802EDF1DF9004C0A56 /* Toast */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7925267F2EDF1DF9004C0A56 /* XCRemoteSwiftPackageReference "Toast-Swift" */;
