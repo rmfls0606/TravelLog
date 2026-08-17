@@ -94,6 +94,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         cache.memoryStorage.config.expiration = .seconds(300)
         cache.diskStorage.config.sizeLimit = 200 * 1024 * 1024
         cache.diskStorage.config.expiration = .days(7)
+
+        // cityPhotoProxy로 가는 이미지 요청에만 App Check 토큰을 붙인다(다른 호스트는
+        // CityPhotoProxyAppCheckModifier 내부에서 그대로 통과시킴).
+        KingfisherManager.shared.defaultOptions += [.requestModifier(CityPhotoProxyAppCheckModifier())]
     }
 
 }
