@@ -473,7 +473,6 @@
 				INFOPLIST_FILE = TravelLog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TripRoad;
 				INFOPLIST_KEY_NSCameraUsageDescription = "여행 기록에 올릴 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 메모를 녹음하여 여행 기록에 추가하기 위해 마이크 접근 권한이 필요합니다.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "여행 기록을 위해 촬영한 사진을 앨범에 저장하기 위해 사진 추가 권한이 필요합니다";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "여행 기록에 저장할 사진을 앨범에서 선택하기 위해 접근 권한이 필요합니다";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -516,7 +515,6 @@
 				INFOPLIST_FILE = TravelLog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TripRoad;
 				INFOPLIST_KEY_NSCameraUsageDescription = "여행 기록에 올릴 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "음성 메모를 녹음하여 여행 기록에 추가하기 위해 마이크 접근 권한이 필요합니다.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "여행 기록을 위해 촬영한 사진을 앨범에 저장하기 위해 사진 추가 권한이 필요합니다";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "여행 기록에 저장할 사진을 앨범에서 선택하기 위해 접근 권한이 필요합니다";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
