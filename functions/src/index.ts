@@ -821,6 +821,22 @@ export const parseTicketImage = onCall(
 setGlobalOptions({maxInstances: 10});
 
 export const cityPhotoProxy = onRequest(async (request, response) => {
+  // onRequest는 onCall과 달리 App Check를 자동으로 강제하지 않아, 헤더의
+  // App Check 토큰을 직접 검증한다. 이 값은 앱(Kingfisher 요청 수정자)이
+  // 붙여 보내며, 앱을 거치지 않은 요청(curl 등)은 토큰 자체가 없거나
+  // 위조가 불가능해 여기서 걸러진다.
+  const appCheckToken = request.header("X-Firebase-AppCheck");
+  if (!appCheckToken) {
+    response.status(401).send("Missing App Check token");
+    return;
+  }
+  try {
+    await admin.appCheck().verifyToken(appCheckToken);
+  } catch {
+    response.status(401).send("Invalid App Check token");
+    return;
+  }
+
   const photoReference = String(request.query.photoReference ?? "").trim();
   const apiKey = process.env.GOOGLE_API_KEY;
 
