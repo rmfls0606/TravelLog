@@ -63,7 +63,7 @@ final class TicketMaskPreviewViewController: BaseViewController {
         label.textAlignment = .center
         label.text = """
         여권번호, 바코드 등 민감해 보이는 부분은 검게 가렸어요.
-        아직 보이는 정보가 있다면 손가락으로 문질러 가려주세요. 많이 남았다면 다시 촬영해주세요.
+        아직 보이는 정보가 있다면 손가락으로 드래그해서 가려주세요. 많이 남았다면 다시 촬영해주세요.
         """
         return label
     }()
