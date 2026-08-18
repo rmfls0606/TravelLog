@@ -65,6 +65,11 @@ final class TicketMaskPreviewViewController: BaseViewController {
         여권번호, 바코드 등 민감해 보이는 부분은 검게 가렸어요.
         아직 보이는 정보가 있다면 손가락으로 드래그해서 가려주세요. 많이 남았다면 다시 촬영해주세요.
         """
+        // imageView와 세로 공간을 나눠 갖는 구조라, 앨범에서 가져온 원본 해상도가 큰
+        // 사진일수록 imageView의 intrinsic size가 커져 이 라벨이 밀려 눌릴 수 있다.
+        // 라벨은 항상 자기 텍스트 높이만큼은 확보하도록 required로 고정한다.
+        label.setContentHuggingPriority(.required, for: .vertical)
+        label.setContentCompressionResistancePriority(.required, for: .vertical)
         return label
     }()
 
