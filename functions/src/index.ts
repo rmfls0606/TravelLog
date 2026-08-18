@@ -367,8 +367,11 @@ async function getOrCreateCityByPlaceId(
     return null;
   }
 
-  // 🔥 읍/면/동/리 차단 (한국 행정구역 접미사 — 해외 지명에는 매칭되지 않으므로 그대로 둔다)
-  if (/(읍|면|동|리)$/.test(name)) {
+  // 읍/면/동/리 차단 (한국 행정구역 접미사). 이 접미사는 대한민국 주소에서만 실제
+  // 행정구역을 의미하고, "파리"(리)처럼 해외 지명이 한글 표기상 우연히 같은 글자로
+  // 끝나는 경우가 있어 국가가 대한민국일 때로 한정한다.
+  const isKoreanAddress = country === "대한민국" || country === "한국";
+  if (isKoreanAddress && /(읍|면|동|리)$/.test(name)) {
     console.log("getOrCreateCityByPlaceId: rejected — sub-district suffix", {placeId, name});
     return null;
   }
@@ -529,6 +532,27 @@ type TicketExtraction = {
   notes: string | null;
 };
 
+// 시스템 프롬프트가 개인식별정보를 결과에 담지 말라고 지시하지만, 모델이 그 지시를
+// 어기고 notes 등 자유 텍스트 필드에 여권번호·전화번호 형식의 문자열을 남기는
+// 경우를 대비한 방어선이다. Cloud Logging에 평문으로 남지 않도록 로그에 찍기
+// 직전에만 적용하고, 실제로 앱에 반환되는 result 객체는 건드리지 않는다.
+function redactPotentialPIIForLogging(value: unknown): unknown {
+  const json = JSON.stringify(value);
+
+  const redacted = json
+    .replace(/[A-Za-z]{1,2}[0-9]{6,9}/g, "[MASKED]") // 여권번호 형식
+    .replace(/\+?[0-9][0-9()\-.\s]{5,17}[0-9)]/g, (match) => {
+      const digitCount = (match.match(/[0-9]/g) ?? []).length;
+      return digitCount >= 7 && digitCount <= 15 ? "[MASKED]" : match;
+    });
+
+  try {
+    return JSON.parse(redacted);
+  } catch {
+    return "[unable to redact for logging]";
+  }
+}
+
 const TICKET_EXTRACTION_SCHEMA = {
   type: "object",
   properties: {
@@ -660,8 +684,21 @@ const TICKET_EXTRACTION_SYSTEM_PROMPT =
   "marketing purposes — e.g. report 'Incheon' for ICN even if the " +
   "ticket prints 'Seoul' next to it (Gimpo/GMP is the airport actually " +
   "in Seoul), and 'Narita' for NRT rather than 'Tokyo' (Haneda/HND is " +
-  "the airport actually in Tokyo). If no airport code is shown, use " +
-  "the city name as printed.";
+  "the airport actually in Tokyo). If the departure or destination is " +
+  "printed as a bus terminal or train station name rather than a plain " +
+  "city name (e.g. a specific terminal brand name, or a station name " +
+  "with a suffix like '역'/'Station'/'터미널'/'Terminal'), report the " +
+  "city that terminal or station is located in, not the terminal/" +
+  "station's own name — e.g. report '서울' (not '센트럴시티' or " +
+  "'서울역') and '대구' (not '동대구터미널' or '동대구역'). If none of " +
+  "the above apply, use the city name as printed. Only extract " +
+  "itinerary fields: transport " +
+  "type, departure/destination city and country, and start/end date " +
+  "and time. Do not extract, return, infer, or repeat the passenger's " +
+  "name, passport number, ticket/booking number, seat number, " +
+  "barcode/QR contents, date of birth, payment details, or any other " +
+  "personal identifier, even if visible in the image — ignore that " +
+  "information entirely.";
 
 const ALLOWED_TICKET_IMAGE_MEDIA_TYPES = [
   "image/jpeg",
@@ -762,7 +799,7 @@ export const parseTicketImage = onCall(
       throw new HttpsError("internal", "Failed to parse extraction result");
     }
 
-    console.log("parseTicketImage: extraction result", result);
+    console.log("parseTicketImage: extraction result", redactPotentialPIIForLogging(result));
 
     return {result};
   }
@@ -784,6 +821,22 @@ export const parseTicketImage = onCall(
 setGlobalOptions({maxInstances: 10});
 
 export const cityPhotoProxy = onRequest(async (request, response) => {
+  // onRequest는 onCall과 달리 App Check를 자동으로 강제하지 않아, 헤더의
+  // App Check 토큰을 직접 검증한다. 이 값은 앱(Kingfisher 요청 수정자)이
+  // 붙여 보내며, 앱을 거치지 않은 요청(curl 등)은 토큰 자체가 없거나
+  // 위조가 불가능해 여기서 걸러진다.
+  const appCheckToken = request.header("X-Firebase-AppCheck");
+  if (!appCheckToken) {
+    response.status(401).send("Missing App Check token");
+    return;
+  }
+  try {
+    await admin.appCheck().verifyToken(appCheckToken);
+  } catch {
+    response.status(401).send("Invalid App Check token");
+    return;
+  }
+
   const photoReference = String(request.query.photoReference ?? "").trim();
   const apiKey = process.env.GOOGLE_API_KEY;
 
