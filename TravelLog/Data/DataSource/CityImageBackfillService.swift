@@ -10,6 +10,7 @@ import UIKit
 import RealmSwift
 import FirebaseFirestore
 import FirebaseFunctions
+import FirebaseAppCheck
 import Kingfisher
 
 private final class ConcurrentBox<Value>: @unchecked Sendable {
@@ -537,7 +538,21 @@ final class CityImageBackfillService {
         let semaphore = DispatchSemaphore(value: 0)
         let resultData = ConcurrentBox<Data?>(nil)
 
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
+        // Kingfisher는 CityPhotoProxyAppCheckModifier를 거치지만, 이 경로는 순수
+        // URLSession이라 cityPhotoProxy로 가는 요청에는 App Check 토큰을 직접 붙여야 한다.
+        var request = URLRequest(url: url)
+        if let host = url.host, host.hasSuffix("cloudfunctions.net") {
+            let tokenSemaphore = DispatchSemaphore(value: 0)
+            AppCheck.appCheck().token(forcingRefresh: false) { token, _ in
+                if let token {
+                    request.setValue(token.token, forHTTPHeaderField: "X-Firebase-AppCheck")
+                }
+                tokenSemaphore.signal()
+            }
+            _ = tokenSemaphore.wait(timeout: .now() + 5.0)
+        }
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             defer { semaphore.signal() }
             guard error == nil else { return }
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return }
