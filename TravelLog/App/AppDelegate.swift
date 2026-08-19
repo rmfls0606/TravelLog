@@ -8,16 +8,31 @@
 import UIKit
 import RealmSwift
 import Firebase
+import FirebaseAppCheck
 import IQKeyboardManagerSwift
 import Kingfisher
 internal import Realm
+
+/// 디버그 빌드(시뮬레이터 포함)에서는 App Attest를 쓸 수 없어 디버그 프로바이더를 쓰고,
+/// 실제 배포 빌드에서는 기기 증명 기반의 App Attest를 쓴다. 반드시 FirebaseApp.configure()
+/// 이전에 등록해야 이후 모든 Firestore/Functions 요청에 App Check 토큰이 자동으로 실린다.
+final class TravelLogAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
+    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
+        #if DEBUG
+        return AppCheckDebugProvider(app: app)
+        #else
+        return AppAttestProvider(app: app)
+        #endif
+    }
+}
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        AppCheck.setAppCheckProviderFactory(TravelLogAppCheckProviderFactory())
         FirebaseApp.configure()
-        
+
         migration()
         configureImageCache()
         
@@ -79,6 +94,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         cache.memoryStorage.config.expiration = .seconds(300)
         cache.diskStorage.config.sizeLimit = 200 * 1024 * 1024
         cache.diskStorage.config.expiration = .days(7)
+
+        // cityPhotoProxy로 가는 이미지 요청에만 App Check 토큰을 붙인다(다른 호스트는
+        // CityPhotoProxyAppCheckModifier 내부에서 그대로 통과시킴).
+        KingfisherManager.shared.defaultOptions += [.requestModifier(CityPhotoProxyAppCheckModifier())]
     }
 
 }
